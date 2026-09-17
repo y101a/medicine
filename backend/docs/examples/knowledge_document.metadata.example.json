@@ -1,0 +1,19 @@
+{
+  "source_key": "nhc_health_literacy_2024",
+  "canonical_url": "https://www.nhc.gov.cn/example/replace-with-reviewed-document-url.shtml",
+  "title": "请替换为正式文件标题",
+  "responsible_department": "请替换为发布部门",
+  "authors": [],
+  "published_at": "2024-05-30T00:00:00+08:00",
+  "version_label": "2024年版",
+  "license_type": "请填写逐篇核查后的许可证或授权类型",
+  "license_notes": "请填写允许本项目使用的依据和限制",
+  "legal_reviewed_at": "2026-09-11T09:00:00+08:00",
+  "legal_reviewed_by": "请填写版权审核人",
+  "medical_reviewed_at": "2026-09-11T09:30:00+08:00",
+  "medical_reviewed_by": "请填写医学审核人",
+  "metadata": {
+    "audience": "general_public",
+    "topic": "请填写医学主题"
+  }
+}

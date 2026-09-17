@@ -1,0 +1,29 @@
+{
+  "run_date": "2026-09-12",
+  "environment": "development",
+  "corpus_status": "prototype",
+  "metric": "prototype_document_hit_at_k",
+  "top_k": 3,
+  "case_count": 10,
+  "hit_count": 10,
+  "topic_hit_rate": 1.0,
+  "all_expected_documents_ranked_first": true,
+  "mean_top_similarity": 0.76509,
+  "limitations": [
+    "开发者自编原型语料，未完成医学专业审核",
+    "题集与语料在同一开发阶段设计，可能高估效果",
+    "指标衡量预期文档命中，不衡量答案或临床准确性"
+  ],
+  "cases": [
+    {"case_id": "stroke_warning", "matched_rank": 1, "top_similarity": 0.810501},
+    {"case_id": "acute_chest_pain", "matched_rank": 1, "top_similarity": 0.842909},
+    {"case_id": "severe_allergy", "matched_rank": 1, "top_similarity": 0.751544},
+    {"case_id": "antibiotic_cold", "matched_rank": 1, "top_similarity": 0.779007},
+    {"case_id": "dog_bite", "matched_rank": 1, "top_similarity": 0.673184},
+    {"case_id": "cpr_basics", "matched_rank": 1, "top_similarity": 0.781474},
+    {"case_id": "hypertension_lifestyle", "matched_rank": 1, "top_similarity": 0.722055},
+    {"case_id": "hypoglycemia", "matched_rank": 1, "top_similarity": 0.819612},
+    {"case_id": "seasonal_infection_prevention", "matched_rank": 1, "top_similarity": 0.766231},
+    {"case_id": "self_harm_risk", "matched_rank": 1, "top_similarity": 0.704385}
+  ]
+}

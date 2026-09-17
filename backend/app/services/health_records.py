@@ -1,0 +1,338 @@
+"""Health record storage and retrieval.
+
+Boundary: only facts the user stated themselves are stored. Model output is treated as
+a restatement of the user's own words, and record data never feeds red-flag triage.
+"""
+
+import hashlib
+import json
+import unicodedata
+from datetime import UTC, datetime
+from uuid import UUID, uuid4
+
+from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.ai.health_context import render_health_context
+from app.ai.health_extract import extract_health_facts, is_safe_fact
+from app.ai.registry import ModelConfig, available_models
+from app.core.errors import AppError
+from app.core.security import decrypt_sensitive, encrypt_sensitive
+from app.models import (
+    Consultation,
+    HealthRecord,
+    HealthRecordCategory,
+    HealthRecordSettings,
+    HealthRecordSource,
+    Message,
+)
+from app.models.health_record import CATEGORY_LABELS, ONBOARDING_STATUS_LABELS
+from app.schemas.health_records import (
+    HealthRecordCreate,
+    HealthRecordList,
+    HealthRecordOnboarding,
+    HealthRecordOut,
+    HealthRecordSettingsOut,
+    HealthRecordSettingsUpdate,
+    HealthRecordUpdate,
+)
+
+MAX_LIST_ITEMS = 200
+MAX_CONTEXT_RECORDS = 20
+MAX_CONTEXT_CHARS = 1200
+
+
+def _normalized(value: str) -> str:
+    return unicodedata.normalize("NFKC", value).strip()
+
+
+def content_hash(value: str) -> str:
+    return hashlib.sha256(_normalized(value).casefold().encode("utf-8")).hexdigest()
+
+
+def record_out(row: HealthRecord) -> HealthRecordOut:
+    return HealthRecordOut(
+        id=row.id,
+        category=row.category,
+        category_label=CATEGORY_LABELS[row.category],
+        content=decrypt_sensitive(row.content_ciphertext),
+        source=row.source,
+        recorded_at=row.recorded_at,
+        updated_at=row.updated_at,
+    )
+
+
+async def _settings_row(db: AsyncSession, user_id: UUID) -> HealthRecordSettings | None:
+    return await db.scalar(
+        select(HealthRecordSettings).where(HealthRecordSettings.user_id == user_id)
+    )
+
+
+async def get_or_create_settings(db: AsyncSession, user_id: UUID) -> HealthRecordSettings:
+    row = await _settings_row(db, user_id)
+    if row is None:
+        row = HealthRecordSettings(user_id=user_id)
+        db.add(row)
+        await db.flush()
+    return row
+
+
+async def _record_count(db: AsyncSession, user_id: UUID) -> int:
+    total = await db.scalar(
+        select(func.count()).select_from(HealthRecord).where(HealthRecord.user_id == user_id)
+    )
+    return int(total or 0)
+
+
+async def settings_out(db: AsyncSession, user_id: UUID) -> HealthRecordSettingsOut:
+    """Read-only view: a missing row means the confirmed default (collecting,未通知)."""
+
+    row = await _settings_row(db, user_id)
+    return HealthRecordSettingsOut(
+        collection_enabled=row.collection_enabled if row else True,
+        notice_seen=row.notice_seen_at is not None if row else False,
+        record_count=await _record_count(db, user_id),
+    )
+
+
+async def update_settings(
+    db: AsyncSession, user_id: UUID, payload: HealthRecordSettingsUpdate
+) -> HealthRecordSettingsOut:
+    row = await get_or_create_settings(db, user_id)
+    if payload.collection_enabled is not None:
+        row.collection_enabled = payload.collection_enabled
+    if payload.notice_seen is not None:
+        row.notice_seen_at = datetime.now(UTC) if payload.notice_seen else None
+    await db.commit()
+    return await settings_out(db, user_id)
+
+
+async def list_records(
+    db: AsyncSession, user_id: UUID, limit: int = MAX_LIST_ITEMS
+) -> HealthRecordList:
+    rows = await db.scalars(
+        select(HealthRecord)
+        .where(HealthRecord.user_id == user_id)
+        .order_by(HealthRecord.recorded_at.desc(), HealthRecord.id.desc())
+        .limit(min(limit, MAX_LIST_ITEMS))
+    )
+    return HealthRecordList(items=[record_out(row) for row in rows])
+
+
+async def _upsert_fact(
+    db: AsyncSession,
+    user_id: UUID,
+    category: HealthRecordCategory,
+    content: str,
+    source: HealthRecordSource,
+    message_id: UUID | None = None,
+) -> bool:
+    """Store one fact; returns False when the same fact is already recorded."""
+
+    # 只做 strip：NFKC 仅用于去重哈希，避免改写用户原文的全角标点。
+    clean = content.strip()[:500]
+    if not clean:
+        return False
+    # 双保险：对话提取的内容即使绕过提取层，推断性表述也不会落库。
+    if source is HealthRecordSource.CONVERSATION and not is_safe_fact(clean):
+        return False
+    result = await db.execute(
+        insert(HealthRecord)
+        .values(
+            id=uuid4(),
+            user_id=user_id,
+            category=category,
+            content_ciphertext=encrypt_sensitive(clean),
+            content_hash=content_hash(clean),
+            source=source,
+            source_message_id=message_id,
+            # 用 Python 侧时间戳：server_default 的 now() 在同一事务内是常量，
+            # 同批写入的记录会时间相同、排序退化。
+            recorded_at=datetime.now(UTC),
+        )
+        .on_conflict_do_nothing(constraint="uq_health_records_user_category_hash")
+    )
+    return bool(result.rowcount)
+
+
+async def _find_fact(
+    db: AsyncSession, user_id: UUID, category: HealthRecordCategory, content: str
+) -> HealthRecord | None:
+    return await db.scalar(
+        select(HealthRecord).where(
+            HealthRecord.user_id == user_id,
+            HealthRecord.category == category,
+            HealthRecord.content_hash == content_hash(content),
+        )
+    )
+
+
+async def create_record(
+    db: AsyncSession, user_id: UUID, payload: HealthRecordCreate
+) -> HealthRecordOut:
+    await _upsert_fact(db, user_id, payload.category, payload.content, HealthRecordSource.USER)
+    row = await _find_fact(db, user_id, payload.category, payload.content)
+    await db.commit()
+    if row is None:
+        raise AppError(409, "HEALTH_RECORD_CONFLICT", "健康记录保存冲突，请重试")
+    return record_out(row)
+
+
+async def owned_record(db: AsyncSession, user_id: UUID, record_id: UUID) -> HealthRecord:
+    row = await db.scalar(
+        select(HealthRecord)
+        .where(HealthRecord.id == record_id, HealthRecord.user_id == user_id)
+        .with_for_update()
+    )
+    if row is None:
+        raise AppError(404, "HEALTH_RECORD_NOT_FOUND", "健康记录不存在或无权访问")
+    return row
+
+
+async def update_record(
+    db: AsyncSession, user_id: UUID, record_id: UUID, payload: HealthRecordUpdate
+) -> HealthRecordOut:
+    row = await owned_record(db, user_id, record_id)
+    if payload.content is not None:
+        # 同样只 strip：NFKC 只用于哈希，不能改写用户自己写的标点。
+        row.content_ciphertext = encrypt_sensitive(payload.content.strip()[:500])
+        row.content_hash = content_hash(payload.content)
+    if payload.category is not None:
+        row.category = payload.category
+    # A hand-edited fact is a user-stated fact from now on.
+    row.source = HealthRecordSource.USER
+    row.recorded_at = datetime.now(UTC)
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise AppError(409, "HEALTH_RECORD_CONFLICT", "该记录与已有记录重复") from exc
+    # updated_at 由 onupdate 在数据库端生成，提交后该属性已过期，必须重新读取。
+    await db.refresh(row)
+    return record_out(row)
+
+
+async def delete_record(db: AsyncSession, user_id: UUID, record_id: UUID) -> None:
+    row = await owned_record(db, user_id, record_id)
+    await db.delete(row)
+    await db.commit()
+
+
+async def record_onboarding(
+    db: AsyncSession, user_id: UUID, payload: HealthRecordOnboarding
+) -> HealthRecordSettingsOut:
+    row = await get_or_create_settings(db, user_id)
+    if row.notice_seen_at is None:
+        row.notice_seen_at = datetime.now(UTC)
+    label = ONBOARDING_STATUS_LABELS[payload.status]
+    content = f"{label}：{payload.note}" if payload.note else label
+    await _upsert_fact(
+        db, user_id, HealthRecordCategory.GENERAL_STATUS, content, HealthRecordSource.ONBOARDING
+    )
+    await db.commit()
+    return await settings_out(db, user_id)
+
+
+async def build_health_context(db: AsyncSession, user_id: UUID) -> str | None:
+    """Return the injection block, or None when there is nothing to inject.
+
+    When the user turns collection off, existing records are also kept out of the
+    answer prompt; they stay visible in the health record page until deleted.
+    """
+
+    row = await _settings_row(db, user_id)
+    if row is not None and not row.collection_enabled:
+        return None
+    rows = await db.scalars(
+        select(HealthRecord)
+        .where(HealthRecord.user_id == user_id)
+        .order_by(HealthRecord.recorded_at.desc(), HealthRecord.id.desc())
+        .limit(MAX_CONTEXT_RECORDS)
+    )
+    entries: list[dict[str, str]] = []
+    total = 0
+    for item in rows:
+        entry = {
+            "category": CATEGORY_LABELS[item.category],
+            "content": decrypt_sensitive(item.content_ciphertext),
+            "recordedAt": item.recorded_at.date().isoformat(),
+        }
+        encoded = json.dumps(entry, ensure_ascii=False)
+        if total + len(encoded) > MAX_CONTEXT_CHARS:
+            break
+        total += len(encoded)
+        entries.append(entry)
+    if not entries:
+        return None
+    return render_health_context(json.dumps(entries, ensure_ascii=False))
+
+
+def extraction_model() -> ModelConfig | None:
+    models = available_models()
+    return models[0] if models else None
+
+
+async def _existing_fact_texts(db: AsyncSession, user_id: UUID, limit: int = 20) -> list[str]:
+    rows = await db.scalars(
+        select(HealthRecord)
+        .where(HealthRecord.user_id == user_id)
+        .order_by(HealthRecord.recorded_at.desc())
+        .limit(limit)
+    )
+    return [decrypt_sensitive(row.content_ciphertext) for row in rows]
+
+
+async def extract_and_store(
+    db: AsyncSession, user_id: UUID, user_text: str, message_id: UUID
+) -> int:
+    """Best-effort extraction; never raises so the chat path cannot be broken."""
+
+    row = await get_or_create_settings(db, user_id)
+    if not row.collection_enabled or row.last_extracted_message_id == message_id:
+        return 0
+    model = extraction_model()
+    if model is None:
+        return 0
+    try:
+        facts = await extract_health_facts(
+            user_text, model, existing_facts=await _existing_fact_texts(db, user_id)
+        )
+    except AppError:
+        return 0
+    stored = 0
+    for fact in facts:
+        created = await _upsert_fact(
+            db,
+            user_id,
+            fact.category,
+            fact.content,
+            HealthRecordSource.CONVERSATION,
+            message_id,
+        )
+        stored += 1 if created else 0
+    row.last_extracted_message_id = message_id
+    await db.commit()
+    return stored
+
+
+async def extract_from_message(
+    db: AsyncSession, user_id: UUID, consultation_id: UUID, message_id: UUID
+) -> int:
+    row = await db.scalar(
+        select(Message)
+        .join(Consultation, Consultation.id == Message.consultation_id)
+        .where(
+            Message.id == message_id,
+            Message.consultation_id == consultation_id,
+            Consultation.user_id == user_id,
+        )
+    )
+    if row is None or row.role != "user":
+        raise AppError(404, "HEALTH_EXTRACT_SOURCE_NOT_FOUND", "找不到可用于更新的用户消息")
+    if not row.is_medical_content:
+        return 0
+    return await extract_and_store(
+        db, user_id, decrypt_sensitive(row.content_ciphertext), row.id
+    )

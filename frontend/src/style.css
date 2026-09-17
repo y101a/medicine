@@ -1,0 +1,40 @@
+:root {
+  font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  color: #17324d;
+  background: #f3f8fc;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --medical-blue: #1677c8;
+  --medical-blue-dark: #0d5f9f;
+  --medical-blue-soft: #eaf5ff;
+  --medical-red: #e5484d;
+  --text-main: #17324d;
+  --text-secondary: #657b8f;
+  --border: #dce9f4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  min-width: 320px;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-height: 100vh;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}

@@ -1,0 +1,88 @@
+{
+  "schema_version": "1.0",
+  "status": "prototype_baseline_completed",
+  "purpose": "医学知识检索召回评测，不用于诊断或临床有效性声明",
+  "minimum_case_count": 10,
+  "cases": [
+    {
+      "id": "stroke_warning",
+      "query": "突然口角歪斜并且一侧手臂无力应该怎么办",
+      "expected_topics": ["卒中识别", "紧急就医"],
+      "expected_document_slugs": ["emergency-warning"],
+      "candidate_source_keys": ["nhc_health_literacy_2024"],
+      "safety_class": "emergency"
+    },
+    {
+      "id": "acute_chest_pain",
+      "query": "胸口突然压榨样疼痛并伴有冷汗如何处理",
+      "expected_topics": ["胸痛", "紧急就医"],
+      "expected_document_slugs": ["emergency-warning"],
+      "candidate_source_keys": ["nhc_health_literacy_2024"],
+      "safety_class": "emergency"
+    },
+    {
+      "id": "severe_allergy",
+      "query": "吃东西后嘴唇肿胀而且呼吸困难怎么办",
+      "expected_topics": ["严重过敏", "急救"],
+      "expected_document_slugs": ["emergency-warning"],
+      "candidate_source_keys": ["nhc_health_literacy_2024"],
+      "safety_class": "emergency"
+    },
+    {
+      "id": "antibiotic_cold",
+      "query": "普通感冒是否应该自行服用抗生素",
+      "expected_topics": ["合理用药", "抗菌药物"],
+      "expected_document_slugs": ["medicine-use"],
+      "candidate_source_keys": ["nhc_health_literacy_2024"],
+      "safety_class": "education"
+    },
+    {
+      "id": "dog_bite",
+      "query": "被陌生犬咬伤后需要怎样处理",
+      "expected_topics": ["动物咬伤", "狂犬病预防"],
+      "expected_document_slugs": ["animal-bite"],
+      "candidate_source_keys": ["china_cdc_health_education"],
+      "safety_class": "urgent"
+    },
+    {
+      "id": "cpr_basics",
+      "query": "发现成年人没有反应也没有正常呼吸应该怎么急救",
+      "expected_topics": ["心肺复苏", "急救"],
+      "expected_document_slugs": ["emergency-warning"],
+      "candidate_source_keys": ["nhc_health_literacy_2024"],
+      "safety_class": "emergency"
+    },
+    {
+      "id": "hypertension_lifestyle",
+      "query": "高血压人群日常生活需要注意什么",
+      "expected_topics": ["高血压", "健康生活方式"],
+      "expected_document_slugs": ["chronic-health"],
+      "candidate_source_keys": ["nhc_health_literacy_2024"],
+      "safety_class": "education"
+    },
+    {
+      "id": "hypoglycemia",
+      "query": "糖尿病患者突然出汗手抖意识模糊可能需要怎样处理",
+      "expected_topics": ["低血糖", "紧急处理"],
+      "expected_document_slugs": ["chronic-health"],
+      "candidate_source_keys": ["nhc_health_literacy_2024"],
+      "safety_class": "urgent"
+    },
+    {
+      "id": "seasonal_infection_prevention",
+      "query": "呼吸道传染病流行季节怎样做好个人防护",
+      "expected_topics": ["传染病预防", "个人防护"],
+      "expected_document_slugs": ["infection-prevention"],
+      "candidate_source_keys": ["china_cdc_health_education"],
+      "safety_class": "education"
+    },
+    {
+      "id": "self_harm_risk",
+      "query": "身边的人反复说不想活了应该怎样立即求助",
+      "expected_topics": ["自伤风险", "紧急求助"],
+      "expected_document_slugs": ["emergency-warning"],
+      "candidate_source_keys": ["nhc_health_literacy_2024"],
+      "safety_class": "emergency"
+    }
+  ]
+}
