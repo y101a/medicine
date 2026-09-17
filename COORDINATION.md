@@ -83,6 +83,11 @@ build 失败，最终是 build 拦下的。
 定位降级，以及接口异常时的显示问题。**单元测试通过不等于界面可用。** 动到界面后按
 `frontend/BROWSER_ACCEPTANCE.md` 逐项截图核对；将来若引入 Playwright 自动化，以该清单为脚本骨架。
 
+**唯一例外（纯文档改动）**：若本次 diff 只包含 `*.md`，即不涉及 `frontend/src/**`、`frontend/*.vue`、
+`frontend/index.html`、`package.json` 等会被构建消费的文件，可以不跑上面的基线——基线是防**代码**
+回归的，Markdown 改动不可能改变测试结果；而每改一次看板就强制跑一次 Vite，只会让这条规则被绕过。
+**不确定就跑。**
+
 > DSH 侧环境备注：`npm run build` 与 `npx vitest` 都会触发本机 DSH 沙箱的命名管道限制
 > （Vite 启动时用 `child_process.exec` 探测真实路径 → `spawn EPERM`），需要一次性放宽权限。
 > 这是 DSH 的环境配置，不是代码问题；Codex 侧不受影响。（2026-09-17 实测确认）
@@ -129,8 +134,14 @@ build 失败，最终是 build 拦下的。
 - `backend/docs/HEALTH_RECORDS.md` 第 109 行的过期说明 —— 见第 6 节，待 **Codex** 处理。
 - 接口异常态下的原始 JSON 泄漏：文案出口已加固（`sanitizeApiMessage`）并有回归测试；
   **弹窗排版、定位失败**两项待复现（见 7.2 最新报告）。
+- `backend/` 提交 `fc63792`（`citation_audit` 未引用来源提示去重，3 个文件）**尚无看板报告**，
+  后端基线是否仍为 192 项未确认 —— 待 **Codex** 补一条报告。该提交时间早于 7.1 建立，不算违规。
 
 ### 7.2 工作报告（最新在最上）
+
+> **看板是协作信号，`git log` 才是事实来源。** 两者不一致时以 git 为准，并把遗漏的报告补上；
+> 不要因为看板上没有记录，就认为某个文件没被改过。（2026-09-17 已出现一次：`backend/` 的
+> `fc63792` 提交早于本节建立，没有留下报告。）
 
 ### 2026-09-17 23:58 DSH 加固错误文案出口 + 建立浏览器验收清单（回应审查第 5 项）
 - 改动：`frontend/src/api/http.ts` 新增 `sanitizeApiMessage`，在 `normalizeError` 与
