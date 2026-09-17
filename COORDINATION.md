@@ -136,6 +136,7 @@ build 失败，最终是 build 拦下的。
   **弹窗排版、定位失败**两项待复现（见 7.2 最新报告）。
 - `backend/` 提交 `fc63792`（`citation_audit` 未引用来源提示去重，3 个文件）**尚无看板报告**，
   后端基线是否仍为 192 项未确认 —— 待 **Codex** 补一条报告。该提交时间早于 7.1 建立，不算违规。
+- 流式回答出错时没有显式 `reader.cancel()`，底层连接可能延迟释放 —— 影响很小，本轮未修，待有余量再处理。
 
 ### 7.2 工作报告（最新在最上）
 
@@ -146,9 +147,10 @@ build 失败，最终是 build 拦下的。
 ### 2026-09-17 23:58 DSH 加固错误文案出口 + 建立浏览器验收清单（回应审查第 5 项）
 - 改动：`frontend/src/api/http.ts` 新增 `sanitizeApiMessage`，在 `normalizeError` 与
   `getApiErrorMessage` 两处出口过滤服务端文案（非字符串 / JSON / HTML / 多行 / 超长一律退回中文通用文案）。
-  `frontend/src/api/consultations.ts` 补两处同类漏洞：非 OK 响应的 `payload.message` 原先绕过拦截器直接
-  透传；`JSON.parse(line)` 原先没有 try/catch，一帧坏数据就抛裸 `SyntaxError`，且坏帧之前的残缺内容
-  仍会当成回答显示。新增 `frontend/src/api/http.test.ts`（8 项）与 `consultations.test.ts` 2 项；
+  `frontend/src/api/consultations.ts` 补两处同类问题：非 OK 响应的 `payload.message` 原先绕过拦截器
+  直接透传；`JSON.parse(line)` 原先没有 try/catch，一帧坏数据会抛出裸 `SyntaxError`，用户只看到
+  「发生未知错误」而无法判断是数据格式问题；`delta` 事件原先不校验 `content` 类型，非字符串内容会被
+  直接追加进回答正文（这才是真正的显示风险）。新增 `frontend/src/api/http.test.ts`（8 项）与 `consultations.test.ts` 2 项；
   新增 `frontend/BROWSER_ACCEPTANCE.md`（14 项人工截图清单，覆盖登录、咨询、追问卡、病理科普卡、
   导航定位的四种降级、健康记录、窄屏、接口异常态）；`COORDINATION.md` 第 4 节纳入该清单。
 - 验证：`npm run build` 退出码 0；`npx vitest run` **13 files / 83 passed**（73 → 83，新增 10 项，
