@@ -59,7 +59,7 @@ async function onDisable() {
     v-model="visible"
     class="health-notice"
     title="关于健康记录"
-    width="560px"
+    width="min(560px, 92vw)"
     append-to-body
     :show-close="false"
     :close-on-click-modal="false"

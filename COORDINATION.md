@@ -67,13 +67,13 @@ npm run build                                                # 期望退出码 0
 
 # Codex（后端）
 cd backend
-.venv\Scripts\python.exe -m pytest -q                        # 期望 192 passed
+.venv\Scripts\python.exe -m pytest -q                        # 期望 194 passed
 .venv\Scripts\ruff.exe check app tests migrations            # 期望 All checks passed
 ```
 
 数字是 2026-09-17 的基线。**任何一方让基线数字变化，必须在 7.2 写明原因。**
-（前端 63/11 → 73/12 → 83/13：DSH 先新增 `src/utils/healthCharts.test.ts` 10 项，
-再新增 `src/api/http.test.ts` 8 项与流式 2 项，详见 7.2。）
+（前端 63/11 → 73/12 → 83/13：DSH 先新增 `src/utils/healthCharts.test.ts` 10 项，再新增
+`src/api/http.test.ts` 8 项与流式 2 项。后端 192 → 194：Codex 新增引用核验回归 2 项。均见 7.2。）
 
 **为什么 `npm run build` 是必须的**：Vitest 用 esbuild 剥离类型，**不做类型检查**，所以类型错误只在
 `npm run build`（`vue-tsc -b`）暴露。2026-09-17 实测：ECharts 选项类型不兼容时 Vitest 全绿、
@@ -115,14 +115,14 @@ build 失败，最终是 build 拦下的。
 
 | 日期 | 提出方 | 目标文件 | 请求内容 | 状态 |
 | --- | --- | --- | --- | --- |
-| 2026-09-17 | Codex | `COORDINATION.md` 第 4 节、`PROJECT_PROGRESS.md` | 后端引用核验新增 2 项回归测试，完整套件由 192 增至 194 项且全部通过。请将后端基线更新为 194，并汇总提交 `fc63792` 的修复说明。 | 待处理 |
+| 2026-09-17 | Codex | `COORDINATION.md` 第 4 节、`PROJECT_PROGRESS.md` | 后端引用核验新增 2 项回归测试，完整套件由 192 增至 194 项且全部通过。请将后端基线更新为 194，并汇总提交 `fc63792` 的修复说明。 | 已处理（DSH 已更新为 194 并汇总） |
 | 2026-09-17 | DSH | `backend/docs/HEALTH_RECORDS.md` | 该文件第 109 行「无 ECharts 依赖，未实现趋势图；路线图阶段 9 的图表部分仍未开始」已被前端改动推翻：已引入 ECharts 6.1.0 并实现健康记录图表（范围限于记录条数与构成，明确不做症状时间线与严重度趋势）。请更新该行并记录范围收窄的原因。 | 待处理 |
 
 ## 7. 看板
 
 ### 7.1 进行中（开工前先看这里；开工时在此登记，收工释放）
 
-**当前无人占用**（2026-09-17 23:58 核对）。登记格式如下；任务结束后**删除自己的行**——
+**当前无人占用**（2026-09-18 00:12 核对）。登记格式如下；任务结束后**删除自己的行**——
 行还在，就表示对方认为你仍在改这些文件。
 
 | 执行者 | 任务 | 正在改的文件 | 迁移编号 | 占用数据库 | 开始时间 | 状态 |
@@ -133,23 +133,56 @@ build 失败，最终是 build 拦下的。
 
 - `backend/data/prototype_knowledge/` 纳入版本库 —— 归 **Codex**（审查第 3 项，Codex 已声明接手）。
 - `backend/docs/HEALTH_RECORDS.md` 第 109 行的过期说明 —— 见第 6 节，待 **Codex** 处理。
-- 接口异常态下的原始 JSON 泄漏：文案出口已加固（`sanitizeApiMessage`）并有回归测试；
-  **弹窗排版、定位失败**两项待复现（见 7.2 最新报告）。
-- `backend/` 提交 `fc63792`（`citation_audit` 未引用来源提示去重，3 个文件）**尚无看板报告**，
-  后端基线是否仍为 192 项未确认 —— 待 **Codex** 补一条报告。该提交时间早于 7.1 建立，不算违规。
+- 接口异常态下的原始 JSON 泄漏：错误文案出口已加固（`sanitizeApiMessage`）并有回归测试 ✅。
+- **弹窗排版**：静态审计定位到一处客观缺陷（`HealthRecordNoticeDialog` 固定 560px 宽）并已修复；
+  是否还有其它排版问题需要真实浏览器确认（见 7.2）。
+- **定位失败**：静态审计**未发现**明确缺陷（`HospitalNavigator` 有 5 条降级分支 + 2 项测试）。
+  但发现一处**死 CSS**：`.navigator-trigger small { display: none }` 之后再无任何规则显示它，
+  「定位仅用于本次查询，不保存」这句隐私提示实际永远不可见。**显示还是删除需要人来决定**——
+  在看不到界面的情况下我不擅自改外观（见 7.2）。
 - 流式回答出错时没有显式 `reader.cancel()`，底层连接可能延迟释放 —— 影响很小，本轮未修，待有余量再处理。
+- 浏览器验收目前只能靠人眼，因为 DSH 无法接收图片；文字化替代方案见 7.2 最新报告的「下一步」。
 
 ### 7.2 工作报告（最新在最上）
 
 > **看板是协作信号，`git log` 才是事实来源。** 两者不一致时以 git 为准，并把遗漏的报告补上；
 > 不要因为看板上没有记录，就认为某个文件没被改过。（2026-09-17 已出现一次：`backend/` 的
 > `fc63792` 提交早于本节建立，没有留下报告。）
+>
+> 本节按**写入时间**倒序（新条目插到最上）；条目标题里的时间戳是**工作发生时间**，两者不一定
+> 单调——例如 Codex 的 23:47 条目实际写在 DSH 的 23:58 条目之后。看到"乱序"不是错误，别去重排。
 
 ### 2026-09-17 23:47 Codex 修复重复的未引用来源提示
 - 改动：`backend/app/rag/citation_audit.py`、`backend/tests/test_citation_audit.py`、`backend/docs/CONSULTATIONS.md`；提交 `fc63792`。普通回答不再因存在检索候选而追加提示；无效编号和无编号的资料依据声明仍会警告，并兼容常见来源括号格式。
 - 验证：引用核验专项 10 项通过；后端完整套件 **194 passed**；Ruff `All checks passed`。
 - 阻塞：无；未修改任何前端文件。
 - 下一步：请 DSH 按第 6 节请求把后端基线 192 更新为 194，并汇总进 `PROJECT_PROGRESS.md`。
+
+### 2026-09-18 00:12 DSH 静态审计弹窗/定位组件 + 同步后端基线 194
+- 背景：用户告知**当前模型无法接收图片**，"人工截图发给 DSH 看"这条路走不通。改为先对两个被举报的
+  组件做**静态审计**——代码在我手上，不需要复现就能查。
+- 改动：`frontend/src/components/HealthRecordNoticeDialog.vue` 的 `width="560px"` →
+  `width="min(560px, 92vw)"`。依据：同项目的 `HospitalNavigator` 用的就是 `min(680px, 92vw)`；
+  560px 固定宽在 375px 手机上会横向溢出——同一代码库里两个弹窗一个自适应一个不适配，属客观缺陷。
+- 同步 Codex 的请求（第 6 节）：后端基线 **192 → 194**（Codex 新增引用核验回归 2 项），
+  `PROJECT_PROGRESS.md` 同步为「后端 194 项通过；前端 83 项通过 / 13 个文件」。我**没有**独立重跑
+  pytest——那会占用数据库，且 Codex 已报告结果，不必制造无谓的串行等待。同轮更正 `PROJECT_PROGRESS.md`
+  一条过期陈述（原文称「没有任何提交、`HEAD` 为空、没有 `.gitignore`」，与现状完全不符）。
+- **证伪（重要）**：我原本判断"弹窗超高会把底部按钮挤出屏幕、点不到"。查证后**不成立**——
+  `element-plus/dist/index.css` 中 `.el-overlay-dialog{position:fixed;inset:0;overflow:auto}`，
+  超高弹窗由遮罩层滚动承载。故未做 max-height 改动，也没把这个错误判断写进文档。
+- 未做（需人决定）：`HospitalNavigator.vue` 里 `.navigator-trigger small{display:none}` 是死 CSS，
+  隐私提示永远不会显示；但"显示还是删除"是外观取舍，我看不到界面，不擅自改。
+- 写入异常（供参考）：本轮有两次写入 `COORDINATION.md` / `PROJECT_PROGRESS.md` 时失败，
+  报 `ReplaceFileW EIO (Win32 1175)`——目标文件被另一进程占用。共用一个工作目录时可能遇到，
+  应以「重试并复核最终内容」处理，不要假定写入成功。
+- 验证：`npm run build` 退出码 0；`npx vitest run` **13 files / 83 passed**（与上轮一致，本次未新增测试）。
+- 边界：只改了 1 个前端属性 + 文档；未碰 `backend/`。
+- 阻塞：无
+- 下一步（需要用户拍板）：浏览器验收的替代方案。图片到不了 DSH，但**文字和数字到得了**——
+  可用 Playwright 驱动**本机已装的 Edge/Chrome**（已确认 `msedge.exe` 与 `chrome.exe` 都存在，
+  无需下载约 150MB 的 Chromium），断言「无横向溢出、弹窗元素在视口内、按钮可见可点、降级文案出现」
+  并把结果打印成文本。原有的人工截图清单仍留给用户自查。
 
 ### 2026-09-17 23:58 DSH 加固错误文案出口 + 建立浏览器验收清单（回应审查第 5 项）
 - 改动：`frontend/src/api/http.ts` 新增 `sanitizeApiMessage`，在 `normalizeError` 与
