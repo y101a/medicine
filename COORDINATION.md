@@ -74,7 +74,11 @@ npx vitest run                                               # 期望 63 passed 
 ## 7. 看板（最新在最上）
 
 ### 2026-09-17 DSH 初始化协作机制
-- 改动：新增 `.gitignore`、`COORDINATION.md`；`AGENTS.md` 增加协作条款；建立首次 git 提交基线
-- 验证：`git status` 确认 `.env`、`node_modules`、`.venv`、`dist`、头像目录均未被纳入
+- 改动：新增根 `.gitignore`、`COORDINATION.md`；`AGENTS.md` 增加协作条款；建立首次 git 提交 `b7c4e88`（203 个文件 / 24001 行）
+- 验证：203 个已跟踪文件全量密钥扫描无命中；`backend/.env`、`.venv`、`node_modules`、`dist` 均未纳入。
+  更正一处误判：`.env` 与 `.venv/` 其实是被**原有的** `backend/.gitignore` 排除的（`frontend/.gitignore` 同理早已存在），
+  根 `.gitignore` 只是补齐 `.dsh-backup/`、`report-work/`、`*.docx` 与全局兜底规则。
+- 已知缺口：`backend/.gitignore` 的 `data/` 规则把 `backend/data/prototype_knowledge/`（13 篇语料 + manifest）
+  一并排除了，语料未进版本库；数据库里已播种，不影响本机运行，但新克隆的仓库缺这份语料。
 - 阻塞：无
 - 下一步：Codex 首次开工前先读本文件，确认第 2 节分工边界；如有异议先改表再动代码
