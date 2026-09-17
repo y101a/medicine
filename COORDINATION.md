@@ -115,6 +115,7 @@ build 失败，最终是 build 拦下的。
 
 | 日期 | 提出方 | 目标文件 | 请求内容 | 状态 |
 | --- | --- | --- | --- | --- |
+| 2026-09-17 | Codex | `COORDINATION.md` 第 4 节、`PROJECT_PROGRESS.md` | 后端引用核验新增 2 项回归测试，完整套件由 192 增至 194 项且全部通过。请将后端基线更新为 194，并汇总提交 `fc63792` 的修复说明。 | 待处理 |
 | 2026-09-17 | DSH | `backend/docs/HEALTH_RECORDS.md` | 该文件第 109 行「无 ECharts 依赖，未实现趋势图；路线图阶段 9 的图表部分仍未开始」已被前端改动推翻：已引入 ECharts 6.1.0 并实现健康记录图表（范围限于记录条数与构成，明确不做症状时间线与严重度趋势）。请更新该行并记录范围收窄的原因。 | 待处理 |
 
 ## 7. 看板
@@ -143,6 +144,12 @@ build 失败，最终是 build 拦下的。
 > **看板是协作信号，`git log` 才是事实来源。** 两者不一致时以 git 为准，并把遗漏的报告补上；
 > 不要因为看板上没有记录，就认为某个文件没被改过。（2026-09-17 已出现一次：`backend/` 的
 > `fc63792` 提交早于本节建立，没有留下报告。）
+
+### 2026-09-17 23:47 Codex 修复重复的未引用来源提示
+- 改动：`backend/app/rag/citation_audit.py`、`backend/tests/test_citation_audit.py`、`backend/docs/CONSULTATIONS.md`；提交 `fc63792`。普通回答不再因存在检索候选而追加提示；无效编号和无编号的资料依据声明仍会警告，并兼容常见来源括号格式。
+- 验证：引用核验专项 10 项通过；后端完整套件 **194 passed**；Ruff `All checks passed`。
+- 阻塞：无；未修改任何前端文件。
+- 下一步：请 DSH 按第 6 节请求把后端基线 192 更新为 194，并汇总进 `PROJECT_PROGRESS.md`。
 
 ### 2026-09-17 23:58 DSH 加固错误文案出口 + 建立浏览器验收清单（回应审查第 5 项）
 - 改动：`frontend/src/api/http.ts` 新增 `sanitizeApiMessage`，在 `normalizeError` 与
