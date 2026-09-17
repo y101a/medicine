@@ -85,7 +85,7 @@ build 失败，最终是 build 拦下的。
 
 ```powershell
 cd frontend
-npm run e2e                                                  # 期望 21 passed
+npm run e2e                                                  # 期望 24 passed
 ```
 
 - 用 Playwright 驱动**本机已装的 Edge/Chrome**（不下载约 150MB 的 Chromium，可用
@@ -135,8 +135,7 @@ npm run e2e                                                  # 期望 21 passed
 
 ### 7.1 进行中（开工前先看这里；开工时在此登记，收工释放）
 
-**当前无人占用**（2026-09-18 00:45 核对）。登记格式如下；任务结束后**删除自己的行**——
-行还在，就表示对方认为你仍在改这些文件。
+登记格式如下；任务结束后**删除自己的行**——行还在，就表示对方认为你仍在改这些文件。
 
 | 执行者 | 任务 | 正在改的文件 | 迁移编号 | 占用数据库 | 开始时间 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -170,6 +169,27 @@ npm run e2e                                                  # 期望 21 passed
 - 验证：引用核验专项 10 项通过；后端完整套件 **194 passed**；Ruff `All checks passed`。
 - 阻塞：无；未修改任何前端文件。
 - 下一步：请 DSH 按第 6 节请求把后端基线 192 更新为 194，并汇总进 `PROJECT_PROGRESS.md`。
+
+### 2026-09-18 01:05 DSH 按 ADR-011 增加窄屏明确提示（e2e 24 项）
+- 决定：用户选择「移动端暂不纳入范围，但必须明确提示」→ 记入 `PROJECT_PROGRESS.md` 的
+  **ADR-011**（移动端不纳入范围；窄屏下必须给出明确宽屏提示，不得让界面默默横向溢出）。
+- 改动：`frontend/src/layouts/WorkspaceLayout.vue` 增加 `.viewport-hint`（纯 CSS 媒体查询
+  `max-width: 999px`，用 `position: fixed` 以免被 `min-width: 1000px` 撑开）；
+  `frontend/e2e/layout.spec.ts` 增加 3 项断言（窄屏必须出现且完整落在视口内、桌面不得出现、
+  登录页不得出现）；`frontend/BROWSER_ACCEPTANCE.md` 与本节同步。
+- 验证：`npm run build` 退出码 0；`npx vitest run` **13 files / 83 passed**；
+  `npm run e2e` **24 passed**。实测 375px 下 `.workspace` 宽 1000px、溢出 625px，
+  而提示 `left=0 right=375 width=375` 完整可见。
+- 过程中修掉两个**我自己的**错误（都被断言与浏览器实测暴露，没有靠猜）：
+  1. 提示默认写了 `display: none`，却**忘了在媒体查询里改回 `block`**：元素在 DOM 里、
+     `matchMedia` 也返回 true，但 `getComputedStyle` 是 `display:none`、盒子为 0×0。
+     加了一次性诊断打印计算样式，一次定位。
+  2. **`settle(600)` 固定睡眠不可靠**：实测出现 `load` 已触发、URL 已是 `/app`，但路由守卫
+     仍在等 `GET /users/me`、`.workspace` 尚未挂载，于是测出「无横向溢出」这种**假结论**。
+     已改为 `waitForRendered()` 显式等待元素出现，并给测量类用例补上「必须落在目标页」的断言。
+     教训：`e2e` 里任何测量前都要先确认「我测的是不是我要测的那个页面」。
+- 阻塞：无。
+- 下一步：无。
 
 ### 2026-09-18 00:45 DSH 引入浏览器文字断言（Playwright）+ 修掉注册页无法直接访问
 - 背景：用户告知**当前模型无法接收图片**，"人工截图发给 DSH 看"不可行；用户选择改用 Playwright

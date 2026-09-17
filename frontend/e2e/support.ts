@@ -268,3 +268,15 @@ export async function settle(page: Page, ms = 600): Promise<void> {
   await page.waitForLoadState('load')
   await page.waitForTimeout(ms)
 }
+
+/**
+ * 等页面真正渲染到「可以测量」的状态。
+ *
+ * 固定 sleep 不是确定性：实测出现过 `load` 事件已触发、URL 已是 `/app`，但路由守卫仍在等
+ * `GET /users/me`、`.workspace` 尚未挂载的情况——此时测出来的「无横向溢出」毫无意义
+ * （页面上根本没有那个 1000px 的工作区）。所以**测量前必须显式等到元素出现**，
+ * 而不是睡一段时间赌它渲染完了。
+ */
+export async function waitForRendered(page: Page, selector = '.workspace, main'): Promise<void> {
+  await page.locator(selector).first().waitFor({ state: 'visible' })
+}

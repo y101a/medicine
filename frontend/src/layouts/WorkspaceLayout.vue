@@ -104,11 +104,39 @@ async function menu(command: string) {
       <div class="workspace-content"><router-view :key="route.fullPath" /></div>
     </div>
     <HealthRecordNoticeDialog />
+    <p class="viewport-hint" role="status">
+      当前屏幕较窄：工作区需要至少 1000px 宽才能完整显示。建议改用电脑，或把浏览器窗口拉宽后再操作。
+    </p>
   </div>
 </template>
 
 <style scoped>
 .workspace { display: grid; grid-template-columns: 236px minmax(0, 1fr); height: 100vh; min-width: 1000px; background: #fff; }
+
+/* 桌面优先（ADR-011）：工作区最小宽度 1000px，窄屏下必须明确告知用户，
+   而不是让界面默默横向溢出 625px。用 fixed 定位是为了不被 .workspace 的 min-width 撑开，
+   这样它在 375px 视口里仍能完整显示。纯 CSS 实现，不依赖脚本。
+   坑：这里的 display:none 是默认值，媒体查询里**必须显式改回 block**，
+   否则媒体查询其它属性会生效、而元素仍然不显示（曾实测踩过）。 */
+.viewport-hint { display: none; }
+@media (max-width: 999px) {
+  .viewport-hint {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 3000;
+    margin: 0;
+    padding: 10px 16px;
+    background: #fdf3e6;
+    color: #8a5a1a;
+    font-size: 13px;
+    line-height: 1.6;
+    text-align: center;
+    box-shadow: 0 1px 4px rgb(0 0 0 / 12%);
+  }
+}
 .workspace.collapsed { grid-template-columns: 76px minmax(0, 1fr); }
 .sidebar { display: flex; flex-direction: column; padding: 28px 16px 14px; background: #f6f8fb; border-right: 1px solid #e8edf3; }
 .sidebar { min-height: 0; }

@@ -32,7 +32,7 @@
 | 对象 | 本次实际状态 |
 | --- | --- |
 | 迁移 | `alembic current` = `20260916_0013 (head)` 且已应用。本轮新增两个迁移：`20260916_0012`（病理卡片消息元数据：`answer_format`、`is_medical_content`、`source_message_id`）与 `20260916_0013`（健康记录两张表）。 |
-| 自动化测试 | 后端完整套件 **194 项通过**；前端单测 **83 项通过 / 13 个文件**；前端**浏览器文字断言**（Playwright 驱动本机 Edge/Chrome，接口用 `page.route` 拦截、不依赖后端）**21 项通过**，命令 `npm run e2e`；`ruff check app tests migrations` 与 `vue-tsc --noEmit -p tsconfig.app.json` 均无问题。含数据库的测试在本机 PostgreSQL 可用时全部执行。 |
+| 自动化测试 | 后端完整套件 **194 项通过**；前端单测 **83 项通过 / 13 个文件**；前端**浏览器文字断言**（Playwright 驱动本机 Edge/Chrome，接口用 `page.route` 拦截、不依赖后端）**24 项通过**，命令 `npm run e2e`；`ruff check app tests migrations` 与 `vue-tsc --noEmit -p tsconfig.app.json` 均无问题。含数据库的测试在本机 PostgreSQL 可用时全部执行。 |
 | DSH 会话权限 | **本机已把新会话默认权限预设改为 `danger-full-access`**（沙箱不受限 + 审批 `never`），写在 `C:\Users\Lenovo\.dsh\settings.yaml` 的 `permission.defaultPreset`。因此之后的会话**没有沙箱约束**，可以读写工作区之外的文件；改写它的那一次会话仍是 `workspace-write` + `ask`。 |
 | Git | 已有版本控制：首个提交 `b7c4e88`（203 个文件 / 24001 行），其后按功能小步提交，`master` 工作树当前干净。切勿提交或粘贴 `.env`、密钥。`.dsh-backup/` 是接线时留下的改动前副本与 diff，**不是项目内容、不影响构建与测试**；2026-09-17 确认暂时保留，请勿删除，也不要提交进版本库。根 `.gitignore` 已建立（补齐 `.dsh-backup/`、`report-work/`、`*.docx`），`backend/.gitignore` 与 `frontend/.gitignore` 原本就已排除 `.env`、`.venv`、`data/`、`node_modules`、`dist`。**两个 AI 共用一个工作目录，禁止 `git add .`，只显式暂存自己的文件**（细则见 `COORDINATION.md` 第 1 节）。 |
 | 本轮未复核 | Docker 容器状态、原型语料与知识库的文档／文本块／向量数量未在本轮重新统计。 |
@@ -196,6 +196,7 @@ Git、日志、截图、文档或聊天记录中。
 | ADR-008 | 医学知识向量使用阿里云 qwen3.7-text-embedding-flash，固定 1024 维 | 已确认 |
 | ADR-009 | 联网仅开发环境、固定病名或受控泛主题与官方域名；搜索摘要入原型库，永不自动批准 | 已确认；泛主题先试点甲状腺疾病 |
 | ADR-010 | 健康记录默认采集、首次登录通知一次、用户可在设置中关闭；只保存用户明确陈述的事实，模型推断不落库，且记录不参与红旗分流 | 已确认（2026-09-16 取代原「仅在用户确认后保存」） |
+| ADR-011 | 移动端暂不纳入范围：工作区为桌面优先（`min-width: 1000px`）；窄屏下**必须给出明确的宽屏提示**，不得让界面默默横向溢出 | 已确认（2026-09-18） |
 
 ## 6. 当前未决事项
 
