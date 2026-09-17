@@ -37,7 +37,24 @@ def test_fabricated_source_is_marked_and_never_credited():
 def test_retrieval_without_answer_citation_does_not_claim_source():
     checked, cited = audit_answer_citations("这是普通科普。", sample_sources())
     assert cited == []
-    assert "未标注来源" in checked
+    assert checked == "这是普通科普。"
+
+
+def test_unnumbered_source_claim_is_flagged_when_evidence_was_available():
+    checked, cited = audit_answer_citations(
+        "根据检索资料，这种情况比较常见。", sample_sources()
+    )
+    assert cited == []
+    assert "未标注可核验的来源编号" in checked
+    assert "不能视为已有资料支持" in checked
+
+
+def test_common_source_bracket_variants_are_normalized_and_verified():
+    checked, cited = audit_answer_citations(
+        "资料见【来源 1】和[来源 2]。", sample_sources()
+    )
+    assert checked == "资料见[来源1]和[来源2]。"
+    assert [item["reference_number"] for item in cited] == [1, 2]
 
 
 def test_no_retrieval_and_fabricated_citation_is_not_supported():
