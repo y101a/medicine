@@ -56,8 +56,9 @@ cd backend
 
 数字是 2026-09-17 的基线。**任何一方让基线数字变化，必须在第 7 节写明原因。**
 
-> DSH 侧环境备注：`npx vitest` 可能触发本机 DSH 沙箱的命名管道限制（`spawn EPERM`），
-> 需要一次性放宽权限。这属于 DSH 的环境配置，不是代码问题，Codex 侧不受影响。
+> DSH 侧环境备注：`npm run build` 与 `npx vitest` 都会触发本机 DSH 沙箱的命名管道限制
+> （Vite 启动时用 `child_process.exec` 探测真实路径 → `spawn EPERM`），需要一次性放宽权限。
+> 这是 DSH 的环境配置，不是代码问题；Codex 侧不受影响。（2026-09-17 实测确认）
 
 ## 5. 收工报告模板
 
@@ -80,6 +81,14 @@ cd backend
 | — | — | — | （暂无） | — |
 
 ## 7. 看板（最新在最上）
+
+### 2026-09-17 23:27 DSH 前端热身：修掉 index.html 两处脚手架残留
+- 改动：`frontend/index.html`（`lang="en"` → `zh-CN`；`<title>frontend</title>` → 产品名「病理诊断科普助手」）；
+  `COORDINATION.md` 第 4 节环境备注更正为「`npm run build` 与 `npx vitest` 都受影响」。
+- 验证：`npm run build` 退出码 0（11.79s）；`npx vitest run` **11 files / 63 passed**，基线不变。
+- 阻塞：无。DSH 会话跑 Vite 需一次性放宽沙箱（见第 4 节备注），Codex 侧不受影响。
+- 下一步：待定——ECharts 健康趋势图要先定「图表允许表达什么」，趋势类图表容易触碰
+  「不作确诊、不替代医生」的产品红线，需先与用户确认范围再动手。
 
 ### 2026-09-17 DSH 交换分工：前端 ↔ 后端
 - 改动：第 2 节分工表交换为 **DSH 拥有 `frontend/`、Codex 拥有 `backend/`**；第 3 节高冲突文件
