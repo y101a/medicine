@@ -1,5 +1,5 @@
 import http from './http'
-import { ApiError } from './http'
+import { ApiError, sanitizeApiMessage } from './http'
 import type { AnswerFormat, Consultation, Message, Page } from '../types/consultations'
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL?.trim() || '/api/v1').replace(/\/$/, '')
@@ -46,8 +46,17 @@ async function streamAnswer(
     )
   }
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({})) as { code?: string; message?: string }
-    throw new ApiError(payload.message || 'AI 服务请求失败', payload.code || `HTTP_${response.status}`, response.status)
+    const payload = (await response.json().catch(() => ({}))) as {
+      code?: unknown
+      message?: unknown
+    }
+    // 这条路径绕过了 http.ts 的拦截器，必须用同一道过滤：非 OK 响应可能带回
+    // 网关错误页、JSON 片段或多行堆栈，直接显示给用户既无用又泄漏内部细节。
+    throw new ApiError(
+      sanitizeApiMessage(payload.message) || 'AI 服务请求失败',
+      typeof payload.code === 'string' && payload.code ? payload.code : `HTTP_${response.status}`,
+      response.status,
+    )
   }
   if (!response.body) throw new ApiError('浏览器无法读取流式回答', 'STREAM_UNAVAILABLE')
 
@@ -62,7 +71,7 @@ async function streamAnswer(
     buffer = lines.pop() || ''
     for (const line of lines) {
       if (!line.trim()) continue
-      const event = JSON.parse(line) as {
+      let event: {
         type: 'start' | 'delta' | 'done' | 'error'
         content?: string
         message?: Message
@@ -70,8 +79,15 @@ async function streamAnswer(
         messageText?: string
         retrieval?: RetrievalProgress
       } & Record<string, unknown>
+      try {
+        event = JSON.parse(line) as typeof event
+      } catch {
+        // 一帧坏数据说明这条流已不可信。与其把残缺内容当成回答继续展示
+        // （可能悄悄吞掉红旗提醒），不如明确报错让用户重试。
+        throw new ApiError('回答数据格式异常，请重试', 'STREAM_MALFORMED')
+      }
       if (event.type === 'start' && event.retrieval) onRetrieval(event.retrieval)
-      if (event.type === 'delta' && event.content) onDelta(event.content)
+      if (event.type === 'delta' && typeof event.content === 'string') onDelta(event.content)
       if (event.type === 'done' && event.message) completed = event.message
       if (event.type === 'error') {
         const text = typeof event.message === 'string' ? event.message : 'AI 回答生成失败'

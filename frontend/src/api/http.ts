@@ -51,6 +51,27 @@ function getStatusMessage(status?: number) {
   return status ? messages[status] : undefined
 }
 
+const FALLBACK_MESSAGE = '请求失败，请稍后重试'
+const UNKNOWN_MESSAGE = '发生未知错误，请稍后重试'
+
+/** 服务器给的文案超过这个长度就不再透传，避免整段堆栈或报文占满界面。 */
+const MAX_SERVER_MESSAGE_LENGTH = 120
+
+/**
+ * 只放行「像是写给人看的短句」的服务端文案。
+ *
+ * 同一个 `message` 字段可能被带出结构化内容：网关/代理的错误页、FastAPI 的
+ * `detail` 数组、上游返回的 JSON 片段，甚至多行堆栈。这些内容直接显示给用户
+ * 既没有帮助，又把内部细节暴露到了界面上。判断不了就退回通用文案。
+ */
+export function sanitizeApiMessage(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const text = value.trim()
+  if (!text || text.length > MAX_SERVER_MESSAGE_LENGTH) return undefined
+  if (/[{}[\]<>]/.test(text) || /[\r\n]/.test(text)) return undefined
+  return text
+}
+
 function normalizeError(error: AxiosError<ApiErrorPayload>) {
   if (axios.isCancel(error)) {
     return new ApiError('请求已取消', 'REQUEST_CANCELLED')
@@ -65,7 +86,8 @@ function normalizeError(error: AxiosError<ApiErrorPayload>) {
   }
 
   const { status, data } = error.response
-  const message = data?.message || getStatusMessage(status) || '请求失败，请稍后重试'
+  const message =
+    sanitizeApiMessage(data?.message) || getStatusMessage(status) || FALLBACK_MESSAGE
   const code = data?.code || `HTTP_${status}`
 
   return new ApiError(message, code, status, data?.details)
@@ -137,7 +159,9 @@ http.interceptors.response.use(
 )
 
 export function getApiErrorMessage(error: unknown) {
-  return error instanceof ApiError ? error.message : '发生未知错误，请稍后重试'
+  if (!(error instanceof ApiError)) return UNKNOWN_MESSAGE
+  // 兜底复核：即使文案是别处构造进 ApiError 的，也绝不把结构化内容透传给用户。
+  return sanitizeApiMessage(error.message) ?? FALLBACK_MESSAGE
 }
 
 export default http

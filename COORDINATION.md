@@ -62,7 +62,7 @@
 # DSH（前端）
 cd frontend
 npx vue-tsc --noEmit -p tsconfig.app.json                    # 期望退出码 0
-npx vitest run                                               # 期望 73 passed / 12 files
+npx vitest run                                               # 期望 83 passed / 13 files
 npm run build                                                # 期望退出码 0（含 vue-tsc -b，全量类型检查）
 
 # Codex（后端）
@@ -72,15 +72,16 @@ cd backend
 ```
 
 数字是 2026-09-17 的基线。**任何一方让基线数字变化，必须在 7.2 写明原因。**
-（前端由 63/11 变为 73/12：DSH 新增 `src/utils/healthCharts.test.ts` 10 项，见 7.2。）
+（前端 63/11 → 73/12 → 83/13：DSH 先新增 `src/utils/healthCharts.test.ts` 10 项，
+再新增 `src/api/http.test.ts` 8 项与流式 2 项，详见 7.2。）
 
 **为什么 `npm run build` 是必须的**：Vitest 用 esbuild 剥离类型，**不做类型检查**，所以类型错误只在
 `npm run build`（`vue-tsc -b`）暴露。2026-09-17 实测：ECharts 选项类型不兼容时 Vitest 全绿、
 build 失败，最终是 build 拦下的。
 
-**浏览器冒烟（尚未纳入验收，方案待定）**：单元测试跑在 jsdom 里，覆盖不到真实排版、弹窗层级、
-定位降级，以及接口异常时把原始 JSON 直接显示给用户这类问题。**单元测试通过不等于界面可用。**
-重要界面任务应补一次人工截图或 Playwright 冒烟；是否引入 Playwright 依赖尚未决定，见 7.1「待认领」。
+**浏览器冒烟（人工截图，2026-09-17 起纳入）**：单元测试跑在 jsdom 里，覆盖不到真实排版、弹窗层级、
+定位降级，以及接口异常时的显示问题。**单元测试通过不等于界面可用。** 动到界面后按
+`frontend/BROWSER_ACCEPTANCE.md` 逐项截图核对；将来若引入 Playwright 自动化，以该清单为脚本骨架。
 
 > DSH 侧环境备注：`npm run build` 与 `npx vitest` 都会触发本机 DSH 沙箱的命名管道限制
 > （Vite 启动时用 `child_process.exec` 探测真实路径 → `spawn EPERM`），需要一次性放宽权限。
@@ -115,20 +116,37 @@ build 失败，最终是 build 拦下的。
 
 ### 7.1 进行中（开工前先看这里；开工时在此登记，收工释放）
 
-**当前无人占用**（2026-09-17 23:45 核对）。登记格式如下；任务结束后**删除自己的行**——
+**当前无人占用**（2026-09-17 23:58 核对）。登记格式如下；任务结束后**删除自己的行**——
 行还在，就表示对方认为你仍在改这些文件。
 
 | 执行者 | 任务 | 正在改的文件 | 迁移编号 | 占用数据库 | 开始时间 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| （示例格式，非真实占用）DSH | 修订协作机制 | `COORDINATION.md`、`AGENTS.md` | — | 否 | 2026-09-17 23:40 | 进行中 |
+| — | — | — | — | — | — | — |
 
 **待认领**（只是备忘，**不算占用**；认领后请移到上表，完成后从本节删除）
 
 - `backend/data/prototype_knowledge/` 纳入版本库 —— 归 **Codex**（审查第 3 项，Codex 已声明接手）。
 - `backend/docs/HEALTH_RECORDS.md` 第 109 行的过期说明 —— 见第 6 节，待 **Codex** 处理。
-- 浏览器冒烟方案（人工截图或 Playwright）—— 待定，尚未决定是否引入依赖。
+- 接口异常态下的原始 JSON 泄漏：文案出口已加固（`sanitizeApiMessage`）并有回归测试；
+  **弹窗排版、定位失败**两项待复现（见 7.2 最新报告）。
 
 ### 7.2 工作报告（最新在最上）
+
+### 2026-09-17 23:58 DSH 加固错误文案出口 + 建立浏览器验收清单（回应审查第 5 项）
+- 改动：`frontend/src/api/http.ts` 新增 `sanitizeApiMessage`，在 `normalizeError` 与
+  `getApiErrorMessage` 两处出口过滤服务端文案（非字符串 / JSON / HTML / 多行 / 超长一律退回中文通用文案）。
+  `frontend/src/api/consultations.ts` 补两处同类漏洞：非 OK 响应的 `payload.message` 原先绕过拦截器直接
+  透传；`JSON.parse(line)` 原先没有 try/catch，一帧坏数据就抛裸 `SyntaxError`，且坏帧之前的残缺内容
+  仍会当成回答显示。新增 `frontend/src/api/http.test.ts`（8 项）与 `consultations.test.ts` 2 项；
+  新增 `frontend/BROWSER_ACCEPTANCE.md`（14 项人工截图清单，覆盖登录、咨询、追问卡、病理科普卡、
+  导航定位的四种降级、健康记录、窄屏、接口异常态）；`COORDINATION.md` 第 4 节纳入该清单。
+- 验证：`npm run build` 退出码 0；`npx vitest run` **13 files / 83 passed**（73 → 83，新增 10 项，
+  故第 4 节前端基线数字再次同步）。
+- 边界：过滤只作用于**错误文案出口**，不改动正常接口数据结构与字段；判定不了就退回通用中文文案。
+- 阻塞：无
+- 下一步：审查提到的**弹窗排版**与**定位失败**两项尚未复现。`HospitalNavigator.vue` 已有 5 条降级
+  分支、2 项测试，但 jsdom 无法验证真实定位行为。建议按 `BROWSER_ACCEPTANCE.md` 第 5、9 项先做一轮
+  人工截图，把真实缺陷写进 7.1 待认领。
 
 ### 2026-09-17 23:45 DSH 修订协作机制（回应 Codex 审查第 1/2/4/5 项）
 - 改动：`COORDINATION.md`：第 1 节硬规则重写并加入共享工作目录的 Git 纪律；第 2 节明确

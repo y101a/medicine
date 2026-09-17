@@ -42,3 +42,38 @@ it('读取流式 start 检索状态并保留回答消息，不把状态当正文
   expect(onDelta).toHaveBeenCalledWith('仅供科普。')
   expect(result.citations).toEqual([])
 })
+
+it('非 OK 响应带回结构化报文时，不把原始内容显示给用户', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+    ok: false,
+    status: 502,
+    json: async () => ({ detail: [{ msg: 'upstream failed' }] }),
+  }))
+
+  await expect(consultationsApi.stream(
+    'c1', 'r1', 'test-model', 'plain', new AbortController().signal, vi.fn(), vi.fn(),
+  )).rejects.toMatchObject({ message: 'AI 服务请求失败', code: 'HTTP_502' })
+})
+
+it('流中混入坏帧时明确报错，不把残缺内容当成回答', async () => {
+  const bytes = new TextEncoder().encode('{"type":"delta","content":"片段"}\n{坏帧\n')
+  let readCount = 0
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    body: {
+      getReader: () => ({
+        read: async () => readCount++ === 0
+          ? { done: false, value: bytes }
+          : { done: true, value: undefined },
+      }),
+    },
+  }))
+
+  const onDelta = vi.fn()
+  await expect(consultationsApi.stream(
+    'c1', 'r1', 'test-model', 'plain', new AbortController().signal, onDelta, vi.fn(),
+  )).rejects.toMatchObject({ message: '回答数据格式异常，请重试', code: 'STREAM_MALFORMED' })
+  // 坏帧之前的正常内容已经送达，但不会再继续往下读。
+  expect(onDelta).toHaveBeenCalledWith('片段')
+})
