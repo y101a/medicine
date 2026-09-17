@@ -46,7 +46,7 @@
 # DSH（前端）
 cd frontend
 npx vue-tsc --noEmit -p tsconfig.app.json                    # 期望退出码 0
-npx vitest run                                               # 期望 63 passed / 11 files
+npx vitest run                                               # 期望 73 passed / 12 files
 
 # Codex（后端）
 cd backend
@@ -55,6 +55,7 @@ cd backend
 ```
 
 数字是 2026-09-17 的基线。**任何一方让基线数字变化，必须在第 7 节写明原因。**
+（前端由 63/11 变为 73/12：DSH 新增 `src/utils/healthCharts.test.ts` 10 项，见第 7 节。）
 
 > DSH 侧环境备注：`npm run build` 与 `npx vitest` 都会触发本机 DSH 沙箱的命名管道限制
 > （Vite 启动时用 `child_process.exec` 探测真实路径 → `spawn EPERM`），需要一次性放宽权限。
@@ -78,9 +79,22 @@ cd backend
 
 | 日期 | 提出方 | 目标文件 | 请求内容 | 状态 |
 | --- | --- | --- | --- | --- |
-| — | — | — | （暂无） | — |
+| 2026-09-17 | DSH | `backend/docs/HEALTH_RECORDS.md` | 该文件第 109 行「无 ECharts 依赖，未实现趋势图；路线图阶段 9 的图表部分仍未开始」已被前端改动推翻：已引入 ECharts 6.1.0 并实现健康记录图表（范围限于记录条数与构成，明确不做症状时间线与严重度趋势）。请更新该行并记录范围收窄的原因。 | 待处理 |
 
 ## 7. 看板（最新在最上）
+
+### 2026-09-17 23:40 DSH 实现健康记录图表（ECharts）
+- 改动：新增 `frontend/src/utils/healthCharts.ts`（数据派生 + 图表配置纯函数）、
+  `frontend/src/components/HealthRecordCharts.vue`、`frontend/src/utils/healthCharts.test.ts`（10 项）；
+  `frontend/src/views/HealthRecordView.vue` 接入；`package.json` 增加 `echarts ^6.1.0`；
+  同步 `frontend/PROJECT_ROADMAP.md` 阶段 9 与 `PROJECT_PROGRESS.md`。
+- 验证：`npm run build` 退出码 0；`npx vitest run` **12 files / 73 passed**（原 63/11，新增 10 项，
+  故第 4 节前端基线数字已同步）。主包仍为 862.87 kB 未变，ECharts 全部落在懒加载的健康记录
+  路由分块（534.60 kB / gzip 181.68 kB），未进入首屏包。
+- 边界：图表只表达「记录条数与构成」，纵轴为「记录条数」，不出现严重程度、症状频率或病情趋势；
+  边界文案与配置有测试回归保护（断言配置里不得出现临床口径词）。
+- 阻塞：无。已按第 6 节就 `backend/docs/HEALTH_RECORDS.md` 第 109 行的过期说明提出跨边界请求。
+- 下一步：Codex 接手后端时先跑第 4 节后端基线（期望 192 passed），并回应第 6 节的请求。
 
 ### 2026-09-17 23:27 DSH 前端热身：修掉 index.html 两处脚手架残留
 - 改动：`frontend/index.html`（`lang="en"` → `zh-CN`；`<title>frontend</title>` → 产品名「病理诊断科普助手」）；

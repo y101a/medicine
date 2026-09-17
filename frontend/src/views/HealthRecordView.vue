@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getApiErrorMessage } from '../api/http'
+import HealthRecordCharts from '../components/HealthRecordCharts.vue'
 import { useHealthRecordsStore } from '../stores/healthRecords'
 import type {
   HealthRecord,
@@ -188,6 +189,8 @@ onMounted(() => {
       :closable="false"
       :title="store.error"
     />
+
+    <HealthRecordCharts :records="store.records" />
 
     <el-empty
       v-if="!store.loading && store.records.length === 0"

@@ -22,7 +22,7 @@
 - AI：OpenAI 兼容 Chat Completions 协议，流式 HTTP 增量返回。
 - 检索：pgvector 余弦 + `pg_trgm` 关键词 + RRF 混合检索，回答引用编号核验。
 - 外部工具：开发环境挂载只读 MCP 服务（PubMed、高德 POI 与路线），生产环境不挂载，见 `backend/docs/MCP_EXTERNAL_TOOLS.md`。
-- 待接入：Skills 工作流、ECharts 图表、管理员端。
+- 待接入：Skills 工作流、管理员端。（ECharts 图表已于 2026-09-17 接入健康记录页，范围限于记录条数与构成）
 
 ### 当前核对快照（2026-09-16）
 
@@ -32,7 +32,7 @@
 | 对象 | 本次实际状态 |
 | --- | --- |
 | 迁移 | `alembic current` = `20260916_0013 (head)` 且已应用。本轮新增两个迁移：`20260916_0012`（病理卡片消息元数据：`answer_format`、`is_medical_content`、`source_message_id`）与 `20260916_0013`（健康记录两张表）。 |
-| 自动化测试 | 后端完整套件 **192 项通过**；前端完整套件 **63 项通过 / 11 个文件**；`ruff check app tests migrations` 与 `vue-tsc --noEmit -p tsconfig.app.json` 均无问题。含数据库的测试在本机 PostgreSQL 可用时全部执行。 |
+| 自动化测试 | 后端完整套件 **192 项通过**；前端完整套件 **73 项通过 / 12 个文件**；`ruff check app tests migrations` 与 `vue-tsc --noEmit -p tsconfig.app.json` 均无问题。含数据库的测试在本机 PostgreSQL 可用时全部执行。 |
 | DSH 会话权限 | **本机已把新会话默认权限预设改为 `danger-full-access`**（沙箱不受限 + 审批 `never`），写在 `C:\Users\Lenovo\.dsh\settings.yaml` 的 `permission.defaultPreset`。因此之后的会话**没有沙箱约束**，可以读写工作区之外的文件；改写它的那一次会话仍是 `workspace-write` + `ask`。 |
 | Git | 仍是 `git init` 之后**没有任何提交**，`HEAD` 为空，全部文件未跟踪。没有版本控制可用于回滚或对比，改动前请自行备份。切勿提交或粘贴 `.env`、密钥。`.dsh-backup/` 是接线时留下的改动前副本与 diff，**不是项目内容、不影响构建与测试**；2026-09-17 确认暂时保留（尚无任何提交时它是唯一回滚手段），请勿删除，也不要提交进版本库。另注意仓库**没有 `.gitignore`**，直接 `git add .` 会把 `backend/.env` 与 `.dsh-backup/` 一并纳入。 |
 | 本轮未复核 | Docker 容器状态、原型语料与知识库的文档／文本块／向量数量未在本轮重新统计。 |
