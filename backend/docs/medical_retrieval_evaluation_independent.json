@@ -1,0 +1,129 @@
+{
+  "schema_version": "1.0",
+  "status": "independent_prototype_evaluation",
+  "purpose": "独立题集：用于比较纯关键词 / 纯向量 / 混合检索的召回表现，不用于诊断或临床有效性声明。",
+  "method_note": "本文件与 medical_retrieval_evaluation.json 的区别是刻意的：那 10 道题与语料由同一开发过程设计，会高估效果。这里改用患者口语化的问法，尽量不照抄语料标题与小节词，并且覆盖全部 13 篇原型语料（原题集只覆盖最初 5 篇）。因此本文件上的漏召回更接近真实换词提问时的表现。",
+  "minimum_case_count": 15,
+  "cases": [
+    {
+      "id": "sudden_slurred_speech",
+      "query": "说话突然含糊不清，半边身子使不上劲，几分钟后又好像正常了",
+      "expected_topics": ["卒中识别", "紧急就医"],
+      "expected_document_slugs": ["emergency-warning"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "emergency"
+    },
+    {
+      "id": "unresponsive_no_breathing",
+      "query": "有人突然倒地叫不醒，也看不到正常呼吸，旁边的人现在该做什么",
+      "expected_topics": ["心肺复苏", "急救"],
+      "expected_document_slugs": ["emergency-warning"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "emergency"
+    },
+    {
+      "id": "lay_term_anti_inflammatory",
+      "query": "感冒了想自己先吃点消炎药顶一顶，有必要吗",
+      "expected_topics": ["合理用药", "抗菌药物"],
+      "expected_document_slugs": ["medicine-use"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "cat_scratch_bleeding",
+      "query": "手背被小区里的猫抓破出血了，需要去打针吗",
+      "expected_topics": ["动物咬伤", "狂犬病预防"],
+      "expected_document_slugs": ["animal-bite"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "urgent"
+    },
+    {
+      "id": "elderly_blood_pressure_high",
+      "query": "家里老人量出来一直偏高，平常吃和动要注意哪些事",
+      "expected_topics": ["高血压", "慢病随访"],
+      "expected_document_slugs": ["hypertension"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "exertional_chest_tightness",
+      "query": "快走或者爬楼时胸口发闷发紧，停下来歇一会就缓解，要紧吗",
+      "expected_topics": ["冠心病", "胸痛就医"],
+      "expected_document_slugs": ["coronary-heart-disease"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "urgent"
+    },
+    {
+      "id": "drinking_and_urinating_a_lot",
+      "query": "最近特别能喝水还老跑厕所，体重也掉了一些",
+      "expected_topics": ["糖尿病", "血糖监测"],
+      "expected_document_slugs": ["diabetes"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "urgent"
+    },
+    {
+      "id": "hypoglycemia_after_medication",
+      "query": "用了降糖药之后突然心慌出虚汗，是不是血糖太低了，先怎么办",
+      "expected_topics": ["低血糖", "紧急处理"],
+      "expected_document_slugs": ["chronic-health"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "urgent"
+    },
+    {
+      "id": "sneezing_fit_every_spring",
+      "query": "每年一到换季就连续打十几个喷嚏，鼻子和眼睛都发痒",
+      "expected_topics": ["过敏性鼻炎"],
+      "expected_document_slugs": ["allergic-rhinitis"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "night_wheeze_cough",
+      "query": "夜里老是喘不上气还伴着咳嗽，呼气的时候有哨子一样的响声",
+      "expected_topics": ["哮喘"],
+      "expected_document_slugs": ["asthma"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "urgent"
+    },
+    {
+      "id": "reflux_after_meals",
+      "query": "吃完饭一躺下就反酸烧心，嗓子里像有东西堵着",
+      "expected_topics": ["胃食管反流"],
+      "expected_document_slugs": ["gastroesophageal-reflux"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "family_vomiting_diarrhea",
+      "query": "一家人接连上吐下泻，怀疑是吃了不干净的东西，要注意什么",
+      "expected_topics": ["急性胃肠炎", "诺如病毒"],
+      "expected_document_slugs": ["norovirus-gastroenteritis"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "urgent"
+    },
+    {
+      "id": "flu_season_household",
+      "query": "流感高发这段时间，家里怎么做防护和清洁比较合适",
+      "expected_topics": ["传染病预防", "个人防护"],
+      "expected_document_slugs": ["infection-prevention"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "neck_nodule_on_checkup",
+      "query": "体检查出脖子里有个结节，需要马上处理吗",
+      "expected_topics": ["甲状腺结节"],
+      "expected_document_slugs": ["thyroid-conditions"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "thyroid_function_abnormal",
+      "query": "报告上说甲状腺功能有点异常，需要再去复查吗",
+      "expected_topics": ["甲亢", "甲减"],
+      "expected_document_slugs": ["thyroid-conditions"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    }
+  ]
+}

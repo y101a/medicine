@@ -1,4 +1,6 @@
+import json
 from datetime import UTC, datetime
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -27,6 +29,28 @@ def citation(slug: str, similarity: float = 0.8) -> RetrievalCitation:
         content="隔离测试内容",
         similarity=similarity,
         trust_level="prototype",
+    )
+
+
+def test_independent_dataset_covers_every_prototype_document():
+    """独立题集必须覆盖全部原型语料：新增语料却没补题时，这条会失败提醒。"""
+    backend_root = Path(__file__).resolve().parents[1]
+    manifest = json.loads(
+        (backend_root / "data" / "prototype_knowledge" / "manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    corpus_slugs = {entry["slug"] for entry in manifest["documents"]}
+    evaluation_set = load_evaluation_set(
+        backend_root / "docs" / "medical_retrieval_evaluation_independent.json"
+    )
+    covered = {
+        slug for case in evaluation_set.cases for slug in case.expected_document_slugs
+    }
+
+    assert len(evaluation_set.cases) >= 15
+    assert corpus_slugs <= covered, (
+        f"以下原型语料没有对应评测题：{sorted(corpus_slugs - covered)}"
     )
 
 

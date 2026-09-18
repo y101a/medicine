@@ -67,7 +67,7 @@ npm run build                                                # 期望退出码 0
 
 # Codex（后端）
 cd backend
-.venv\Scripts\python.exe -m pytest -q                        # 期望 199 passed
+.venv\Scripts\python.exe -m pytest -q                        # 期望 200 passed
 .venv\Scripts\ruff.exe check app tests migrations            # 期望 All checks passed
 ```
 
@@ -176,6 +176,36 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 - 验证：引用核验专项 10 项通过；后端完整套件 **194 passed**；Ruff `All checks passed`。
 - 阻塞：无；未修改任何前端文件。
 - 下一步：请 DSH 按第 6 节请求把后端基线 192 更新为 194，并汇总进 `PROJECT_PROGRESS.md`。
+
+### 2026-09-18 03:10 DSH 后端：独立题集 + 三模式检索对比（含一项对项目不利的实测结论）
+- 背景：新增的 `--mode` 让对比成为可能，但原 10 题与语料同源、会高估效果，所以先写独立题集。
+- 改动：
+  1. 新增 `backend/docs/medical_retrieval_evaluation_independent.json`：**15 题，覆盖全部 13 篇
+     原型语料**（原题集只覆盖最初 5 篇）。问法刻意用患者口语、不照抄语料标题词。
+  2. `backend/tests/test_retrieval_evaluation.py` 增加覆盖率测试：题集必须覆盖 manifest 里
+     每个 slug，新增语料却忘了补题时会失败提醒。
+- 实测（`--top-k 3`，独立题集 15 题）：
+
+  | 模式 | 命中 | 命中率 | 平均首位相似度 |
+  | --- | --- | --- | --- |
+  | keyword | 4/15 | 0.2667 | 0.113 |
+  | vector | 15/15 | 1.0 | 0.640 |
+  | hybrid | 15/15 | 1.0 | 0.613 |
+
+- **结论（如实记录，对项目不利也要写）**：
+  1. 纯关键词在**同源题集**是 8/10，在**口语化独立题集**只有 4/15，差约 3 倍——
+     同源题集确实虚高，以后「召回效果」的结论必须基于独立题集。
+  2. 本次 **hybrid 没跑出比纯 vector 更好**：同为 15/15、排第 1 者同为 13/15。有 3 题 hybrid
+     首位相似度明显低于 vector（0.41–0.51 对 0.63–0.70），是 RRF 把 trigram 分很弱的关键词
+     命中抬到了首位。**这是一项新待办：RRF 融合方式值得复核。**
+     但不代表线上 hybrid 更差——本评测只测召回，线上还有引用审计等环节。
+  3. 局限：15 题、单一向量模型，不足以下普遍结论。
+- 验证：`ruff check app tests migrations` → All checks passed；**后端套件 200 passed**
+  （199 + 覆盖率测试 1）。基线 199 → 200，原因即新增该测试。
+- 花费：`vector` 与 `hybrid` 两次评测共约 30 次查询向量调用（用户已确认预算）；`keyword` 零调用。
+- 阻塞：无。
+- 下一步（建议 Codex 或 DSH 接手其一）：复核 hybrid 的 RRF 融合（是否该给向量路更高权重、
+  或改用加权分数融合），再用同一独立题集回归；必要时扩充题集样本量。
 
 ### 2026-09-18 02:35 DSH 后端：检索模式开关（hybrid / keyword / vector）
 - 目的：项目第 7 节要求「比较纯关键词、纯向量和混合检索」，但检索层原本**只能跑混合**，
