@@ -67,7 +67,7 @@ npm run build                                                # 期望退出码 0
 
 # Codex（后端）
 cd backend
-.venv\Scripts\python.exe -m pytest -q                        # 期望 194 passed
+.venv\Scripts\python.exe -m pytest -q                        # 期望 199 passed
 .venv\Scripts\ruff.exe check app tests migrations            # 期望 All checks passed
 ```
 
@@ -176,6 +176,30 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 - 验证：引用核验专项 10 项通过；后端完整套件 **194 passed**；Ruff `All checks passed`。
 - 阻塞：无；未修改任何前端文件。
 - 下一步：请 DSH 按第 6 节请求把后端基线 192 更新为 194，并汇总进 `PROJECT_PROGRESS.md`。
+
+### 2026-09-18 02:35 DSH 后端：检索模式开关（hybrid / keyword / vector）
+- 目的：项目第 7 节要求「比较纯关键词、纯向量和混合检索」，但检索层原本**只能跑混合**，
+  对比根本做不了。本次把这个开关补上。
+- 改动（后端，含 Python 代码）：
+  1. `app/rag/retrieval.py`：`search_knowledge(..., mode=...)`，新增 `RetrievalMode` /
+     `RETRIEVAL_MODES`。**默认 hybrid，线上行为不变**；单路复用同一套 RRF，会自然退化为该路名次。
+     keyword 模式**完全不进入向量分支**（连 pg_trgm 阈值设置也跳过），因此零向量调用。
+     非法 mode 抛 `RETRIEVAL_MODE_INVALID`（422）——Literal 只约束类型，CLI 传的是运行期值。
+     `RetrievalResult` 增加 `mode` 字段（带默认值，既有构造点不受影响）。
+  2. `app/rag/evaluation.py`：`run_prototype_evaluation(..., mode=...)` 透传；报告新增 `mode`
+     （keyword 的 similarity 是 pg_trgm 分、vector 是余弦，不写明模式无法横向对比）。
+  3. `app/rag/cli.py`：`evaluate-prototype --mode {hybrid,keyword,vector}`，默认 hybrid。
+- 新增 5 项测试，**全部注入假 embedder，不调用真实向量服务**：keyword 不调用向量服务且只返回
+  关键词命中；vector 忽略关键词命中并按向量排序；默认仍为 hybrid 且两路都合并；非法 mode 被拒；
+  评测把 mode 透传并写进报告。
+- 验证：`ruff check app tests migrations` → All checks passed；**后端套件 199 passed**（194 + 5）。
+  零成本端到端实跑 `evaluate-prototype --mode keyword`：`ok=True`、10 题命中 8、8 题排第 1；
+  漏召回 2 题（`acute_chest_pain`、`dog_bite`）——纯关键词会漏掉换了说法的提问。
+- 踩坑记录：**开发库里 13 篇原型语料会一起参与召回**，检索测试必须 monkeypatch
+  `app_environment="production"` 才能只看见自己的夹具。我第一版漏了这步，两条用例因此失败。
+- 阻塞：无。
+- 下一步：跑 `--mode vector` 与 `--mode hybrid` 做同题对比（各约 10 次查询向量调用，**需先确认预算**），
+  然后建立**独立于语料编写过程的新题集**再评测（现有 10 题与语料同源，会高估效果）。
 
 ### 2026-09-18 02:05 DSH 后端基线证实为 194，数据库快照复核一致
 - 上一则报告写「后端基线无法通过（PostgreSQL 未运行）」——用户随后启动了 Docker Desktop，

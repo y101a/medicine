@@ -276,6 +276,103 @@ async def test_keyword_recall_returns_unembedded_specific_disease(monkeypatch):
         await cleanup_retrieval_fixture(source_id)
 
 
+async def test_keyword_mode_never_calls_the_vector_service(monkeypatch):
+    """keyword 模式必须完全不碰向量服务：既省成本，也能用于评测没有向量的语料。"""
+    from app.rag import retrieval
+
+    # 开发库里那 13 篇原型语料会一起参与召回；切到 production 才能只看见本用例的夹具。
+    settings = retrieval.get_settings().model_copy(
+        update={"app_environment": "production"}
+    )
+    monkeypatch.setattr(retrieval, "get_settings", lambda: settings)
+    source_id = await create_retrieval_fixture(f"retrieval_mode_{uuid4().hex[:12]}")
+
+    async def unexpected_embedder(_texts: list[str]) -> EmbeddingBatch:
+        raise AssertionError("keyword 模式不应调用向量服务")
+
+    try:
+        async with SessionLocal() as db:
+            result = await search_knowledge(
+                db,
+                "卒中识别",
+                mode="keyword",
+                embedder=unexpected_embedder,
+            )
+
+        assert result.mode == "keyword"
+        # 只有标题/小节命中关键词的那一篇；另一篇只能靠向量召回，因此不应出现。
+        assert [item.title for item in result.items] == ["卒中识别测试资料"]
+        assert all(item.keyword_score is not None for item in result.items)
+        assert all(item.vector_similarity is None for item in result.items)
+    finally:
+        await cleanup_retrieval_fixture(source_id)
+
+
+async def test_vector_mode_ignores_keyword_hits_and_ranks_by_vector(monkeypatch):
+    from app.rag import retrieval
+
+    settings = retrieval.get_settings().model_copy(
+        update={"app_environment": "production"}
+    )
+    monkeypatch.setattr(retrieval, "get_settings", lambda: settings)
+    source_id = await create_retrieval_fixture(f"retrieval_mode_{uuid4().hex[:12]}")
+
+    async def drug_embedder(_texts: list[str]) -> EmbeddingBatch:
+        # unit_vector(1) 与「合理用药测试资料」的块向量一致：即使查询词「卒中识别」
+        # 在关键词上与它毫无交集，纯向量模式下它也应排第一。
+        return EmbeddingBatch([unit_vector(1)], 5)
+
+    try:
+        async with SessionLocal() as db:
+            result = await search_knowledge(
+                db,
+                "卒中识别",
+                mode="vector",
+                embedder=drug_embedder,
+            )
+
+        assert result.mode == "vector"
+        assert result.items[0].title == "合理用药测试资料"
+        assert result.items[0].vector_similarity == 1.0
+        assert all(item.keyword_score is None for item in result.items)
+    finally:
+        await cleanup_retrieval_fixture(source_id)
+
+
+async def test_default_mode_is_hybrid_and_merges_both_paths(monkeypatch):
+    """默认模式不许变：关键词与向量各召回一篇时，两篇都要在。"""
+    from app.rag import retrieval
+
+    settings = retrieval.get_settings().model_copy(
+        update={"app_environment": "production"}
+    )
+    monkeypatch.setattr(retrieval, "get_settings", lambda: settings)
+    source_id = await create_retrieval_fixture(f"retrieval_mode_{uuid4().hex[:12]}")
+
+    async def drug_embedder(_texts: list[str]) -> EmbeddingBatch:
+        return EmbeddingBatch([unit_vector(1)], 5)
+
+    try:
+        async with SessionLocal() as db:
+            result = await search_knowledge(db, "卒中识别", embedder=drug_embedder)
+
+        assert result.mode == "hybrid"
+        assert {item.title for item in result.items} == {
+            "卒中识别测试资料",
+            "合理用药测试资料",
+        }
+    finally:
+        await cleanup_retrieval_fixture(source_id)
+
+
+async def test_invalid_retrieval_mode_is_rejected():
+    async with SessionLocal() as db:
+        with pytest.raises(RetrievalError) as error:
+            await search_knowledge(db, "卒中识别", mode="semantic")  # type: ignore[arg-type]
+
+    assert error.value.code == "RETRIEVAL_MODE_INVALID"
+
+
 def test_knowledge_search_api_requires_login():
     with TestClient(app) as client:
         response = client.post(

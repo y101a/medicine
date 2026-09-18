@@ -3,6 +3,7 @@ import unicodedata
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Literal
 from uuid import UUID
 
 from sqlalchemy import and_, func, literal, or_, select, text
@@ -13,6 +14,14 @@ from app.models import KnowledgeChunk, KnowledgeDocument, KnowledgeSource
 from app.rag.embeddings import EmbeddingBatch, EmbeddingError, embed_texts
 
 QueryEmbedder = Callable[[list[str]], Awaitable[EmbeddingBatch]]
+
+# 检索模式。hybrid 是线上默认行为，另两种只为「纯关键词 / 纯向量 / 混合」对比评测而存在：
+#   hybrid  —— 关键词（pg_trgm word_similarity）与向量两路召回，再用 RRF 合并；
+#   keyword —— 只走关键词，**完全不调用向量服务**（可零成本评测，且能验证无向量的语料）；
+#   vector  —— 只走向量，忽略关键词命中。
+# 两条单路都复用同一套 RRF 排序：单路时 RRF 会自然退化为该路自己的名次排序。
+RetrievalMode = Literal["hybrid", "keyword", "vector"]
+RETRIEVAL_MODES: tuple[RetrievalMode, ...] = ("hybrid", "keyword", "vector")
 MAX_QUERY_CHARS = 500
 HYBRID_CANDIDATE_LIMIT = 20
 RRF_RANK_CONSTANT = 60
@@ -64,6 +73,7 @@ class RetrievalResult:
     model: str
     version: str
     items: list[RetrievalCitation]
+    mode: RetrievalMode = "hybrid"
 
 
 def sanitize_retrieval_query(query: str) -> tuple[str, bool]:
@@ -102,10 +112,18 @@ async def search_knowledge(
     query: str,
     *,
     top_k: int = 5,
+    mode: RetrievalMode = "hybrid",
     embedder: QueryEmbedder | None = None,
 ) -> RetrievalResult:
     if top_k < 1 or top_k > 10:
         raise RetrievalError(422, "RETRIEVAL_LIMIT_INVALID", "召回数量必须为 1-10")
+    if mode not in RETRIEVAL_MODES:
+        # Literal 只在类型层面约束；CLI 与评测脚本传进来的仍是运行期值。
+        raise RetrievalError(
+            422,
+            "RETRIEVAL_MODE_INVALID",
+            "检索模式只能是 hybrid、keyword 或 vector",
+        )
     sanitized_query, query_redacted = sanitize_retrieval_query(query)
     keyword_query = normalize_keyword_query(sanitized_query)
     settings = get_settings()
@@ -141,69 +159,85 @@ async def search_knowledge(
     )
 
     candidate_limit = max(HYBRID_CANDIDATE_LIMIT, top_k * 4)
-    # Keep the operator threshold aligned with MIN_KEYWORD_SCORE so PostgreSQL can
-    # use the pg_trgm GIN indexes instead of ranking every eligible row.
-    await db.execute(
-        text(f"SET LOCAL pg_trgm.word_similarity_threshold = {MIN_KEYWORD_SCORE}")
-    )
-    keyword_match = or_(
-        literal(keyword_query).bool_op("<%")(KnowledgeDocument.title),
-        literal(keyword_query).bool_op("<%")(
-            func.coalesce(KnowledgeChunk.section_title, "")
-        ),
-        literal(keyword_query).bool_op("<%")(KnowledgeChunk.content),
-    )
-    keyword_score = func.greatest(
-        func.word_similarity(keyword_query, KnowledgeDocument.title),
-        func.word_similarity(
-            keyword_query,
-            func.coalesce(KnowledgeChunk.section_title, ""),
-        ),
-        func.word_similarity(keyword_query, KnowledgeChunk.content),
-    ).label("keyword_score")
-    keyword_statement = (
-        select(KnowledgeChunk, KnowledgeDocument, KnowledgeSource, keyword_score)
-        .join(KnowledgeDocument, KnowledgeDocument.id == KnowledgeChunk.document_id)
-        .join(KnowledgeSource, KnowledgeSource.id == KnowledgeDocument.source_id)
-        .where(*base_filters, keyword_match, keyword_score >= MIN_KEYWORD_SCORE)
-        .order_by(keyword_score.desc(), KnowledgeSource.priority, KnowledgeChunk.id)
-        .limit(candidate_limit)
-    )
-    keyword_rows = (await db.execute(keyword_statement)).all()
+    if mode == "vector":
+        keyword_rows = []
+    else:
+        # Keep the operator threshold aligned with MIN_KEYWORD_SCORE so PostgreSQL can
+        # use the pg_trgm GIN indexes instead of ranking every eligible row.
+        await db.execute(
+            text(f"SET LOCAL pg_trgm.word_similarity_threshold = {MIN_KEYWORD_SCORE}")
+        )
+        keyword_match = or_(
+            literal(keyword_query).bool_op("<%")(KnowledgeDocument.title),
+            literal(keyword_query).bool_op("<%")(
+                func.coalesce(KnowledgeChunk.section_title, "")
+            ),
+            literal(keyword_query).bool_op("<%")(KnowledgeChunk.content),
+        )
+        keyword_score = func.greatest(
+            func.word_similarity(keyword_query, KnowledgeDocument.title),
+            func.word_similarity(
+                keyword_query,
+                func.coalesce(KnowledgeChunk.section_title, ""),
+            ),
+            func.word_similarity(keyword_query, KnowledgeChunk.content),
+        ).label("keyword_score")
+        keyword_statement = (
+            select(KnowledgeChunk, KnowledgeDocument, KnowledgeSource, keyword_score)
+            .join(KnowledgeDocument, KnowledgeDocument.id == KnowledgeChunk.document_id)
+            .join(KnowledgeSource, KnowledgeSource.id == KnowledgeDocument.source_id)
+            .where(*base_filters, keyword_match, keyword_score >= MIN_KEYWORD_SCORE)
+            .order_by(keyword_score.desc(), KnowledgeSource.priority, KnowledgeChunk.id)
+            .limit(candidate_limit)
+        )
+        keyword_rows = (await db.execute(keyword_statement)).all()
 
-    eligible_chunk_id = await db.scalar(
-        select(KnowledgeChunk.id)
-        .join(KnowledgeDocument, KnowledgeDocument.id == KnowledgeChunk.document_id)
-        .join(KnowledgeSource, KnowledgeSource.id == KnowledgeDocument.source_id)
-        .where(*vector_filters)
-        .limit(1)
-    )
-    if eligible_chunk_id is None:
+    if mode == "keyword":
         vector_rows = []
     else:
-        try:
-            embedding_batch = await (embedder or embed_texts)([sanitized_query])
-        except EmbeddingError as exc:
-            status_code = 504 if exc.code == "EMBEDDING_TIMEOUT" else 502
-            raise RetrievalError(status_code, exc.code, str(exc)) from exc
-        if len(embedding_batch.vectors) != 1:
-            raise RetrievalError(502, "EMBEDDING_RESPONSE_INVALID", "查询向量数量不一致")
-        query_vector = embedding_batch.vectors[0]
-        if len(query_vector) != settings.embedding_dimensions:
-            raise RetrievalError(502, "EMBEDDING_DIMENSION_MISMATCH", "查询向量维度不一致")
-
-        distance = KnowledgeChunk.embedding.cosine_distance(query_vector).label(
-            "cosine_distance"
-        )
-        vector_statement = (
-            select(KnowledgeChunk, KnowledgeDocument, KnowledgeSource, distance)
+        eligible_chunk_id = await db.scalar(
+            select(KnowledgeChunk.id)
             .join(KnowledgeDocument, KnowledgeDocument.id == KnowledgeChunk.document_id)
             .join(KnowledgeSource, KnowledgeSource.id == KnowledgeDocument.source_id)
             .where(*vector_filters)
-            .order_by(distance, KnowledgeSource.priority, KnowledgeChunk.id)
-            .limit(candidate_limit)
+            .limit(1)
         )
-        vector_rows = (await db.execute(vector_statement)).all()
+        if eligible_chunk_id is None:
+            vector_rows = []
+        else:
+            try:
+                embedding_batch = await (embedder or embed_texts)([sanitized_query])
+            except EmbeddingError as exc:
+                status_code = 504 if exc.code == "EMBEDDING_TIMEOUT" else 502
+                raise RetrievalError(status_code, exc.code, str(exc)) from exc
+            if len(embedding_batch.vectors) != 1:
+                raise RetrievalError(
+                    502, "EMBEDDING_RESPONSE_INVALID", "查询向量数量不一致"
+                )
+            query_vector = embedding_batch.vectors[0]
+            if len(query_vector) != settings.embedding_dimensions:
+                raise RetrievalError(
+                    502, "EMBEDDING_DIMENSION_MISMATCH", "查询向量维度不一致"
+                )
+
+            distance = KnowledgeChunk.embedding.cosine_distance(query_vector).label(
+                "cosine_distance"
+            )
+            vector_statement = (
+                select(KnowledgeChunk, KnowledgeDocument, KnowledgeSource, distance)
+                .join(
+                    KnowledgeDocument,
+                    KnowledgeDocument.id == KnowledgeChunk.document_id,
+                )
+                .join(
+                    KnowledgeSource,
+                    KnowledgeSource.id == KnowledgeDocument.source_id,
+                )
+                .where(*vector_filters)
+                .order_by(distance, KnowledgeSource.priority, KnowledgeChunk.id)
+                .limit(candidate_limit)
+            )
+            vector_rows = (await db.execute(vector_statement)).all()
 
     candidates: dict[UUID, dict[str, object]] = {}
     for rank, (chunk, document, source, score) in enumerate(keyword_rows, start=1):
@@ -295,4 +329,5 @@ async def search_knowledge(
         model=settings.embedding_model,
         version=settings.embedding_version,
         items=items,
+        mode=mode,
     )

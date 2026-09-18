@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.rag.retrieval import RetrievalCitation, search_knowledge
+from app.rag.retrieval import RetrievalCitation, RetrievalMode, search_knowledge
 
 DEFAULT_EVALUATION_PATH = (
     Path(__file__).resolve().parents[2] / "docs" / "medical_retrieval_evaluation.json"
@@ -52,6 +52,9 @@ class RetrievalEvaluationReport:
     mean_top_similarity: float | None
     top_k: int
     cases: tuple[EvaluationCaseResult, ...]
+    # 报告必须自带模式：keyword 与 vector 的 similarity 语义不同
+    # （pg_trgm word_similarity / 余弦相似度），不写明模式就没法横向对比。
+    mode: RetrievalMode = "hybrid"
 
 
 def load_evaluation_set(path: Path | None = None) -> EvaluationSet:
@@ -94,13 +97,14 @@ async def run_prototype_evaluation(
     path: Path | None = None,
     *,
     top_k: int = 3,
+    mode: RetrievalMode = "hybrid",
 ) -> RetrievalEvaluationReport:
     if get_settings().app_environment != "development":
         raise RetrievalEvaluationError("原型语料评测只允许在 development 环境运行")
     evaluation_set = load_evaluation_set(path)
     case_results: list[EvaluationCaseResult] = []
     for case in evaluation_set.cases:
-        retrieval = await search_knowledge(db, case.query, top_k=top_k)
+        retrieval = await search_knowledge(db, case.query, top_k=top_k, mode=mode)
         case_results.append(score_case(case, retrieval.items))
 
     hit_count = sum(result.hit for result in case_results)
@@ -119,4 +123,5 @@ async def run_prototype_evaluation(
         ),
         top_k=top_k,
         cases=tuple(case_results),
+        mode=mode,
     )

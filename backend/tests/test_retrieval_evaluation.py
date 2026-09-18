@@ -10,7 +10,7 @@ from app.rag.evaluation import (
     run_prototype_evaluation,
     score_case,
 )
-from app.rag.retrieval import RetrievalCitation
+from app.rag.retrieval import RetrievalCitation, RetrievalResult
 
 
 def citation(slug: str, similarity: float = 0.8) -> RetrievalCitation:
@@ -52,6 +52,30 @@ def test_evaluation_dataset_loads_all_cases():
 
     assert len(evaluation_set.cases) >= 10
     assert all(case.expected_document_slugs for case in evaluation_set.cases)
+
+
+async def test_evaluation_passes_the_mode_through_and_records_it(monkeypatch):
+    """对比评测的前提：模式必须真的透传到检索层，并且写进报告里。"""
+    from app.rag import evaluation
+
+    async def fake_search(_db, _query: str, *, top_k: int, mode: str):
+        assert top_k == 3
+        assert mode == "keyword"
+        return RetrievalResult(
+            query_redacted=False,
+            model="qwen3.7-text-embedding-flash",
+            version="2026-09-01",
+            items=[],
+            mode="keyword",
+        )
+
+    monkeypatch.setattr(evaluation, "search_knowledge", fake_search)
+
+    report = await run_prototype_evaluation(None, mode="keyword")  # type: ignore[arg-type]
+
+    assert report.mode == "keyword"
+    assert report.case_count >= 10
+    assert report.hit_count == 0
 
 
 async def test_prototype_evaluation_is_disabled_outside_development(

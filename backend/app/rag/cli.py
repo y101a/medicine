@@ -12,6 +12,7 @@ from app.models import KnowledgeDocument, KnowledgeSource
 from app.rag.evaluation import RetrievalEvaluationError, run_prototype_evaluation
 from app.rag.markdown_importer import ControlledImportError, import_markdown_document
 from app.rag.prototype_seed import PrototypeSeedError, seed_prototype_knowledge
+from app.rag.retrieval import RETRIEVAL_MODES
 from app.rag.source_sync import SourceRegistryError, sync_approved_sources
 from app.rag.vectorizer import ControlledVectorizationError, vectorize_document
 
@@ -55,6 +56,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     evaluation_parser.add_argument("--dataset", type=Path, default=None)
     evaluation_parser.add_argument("--top-k", type=int, default=3, choices=range(1, 11))
+    evaluation_parser.add_argument(
+        "--mode",
+        choices=RETRIEVAL_MODES,
+        default="hybrid",
+        help=(
+            "检索模式：hybrid（默认，线上行为）；keyword 只走关键词且不调用向量服务"
+            "（零成本，可用于对比漏召回）；vector 只走向量"
+        ),
+    )
     return parser
 
 
@@ -101,6 +111,7 @@ async def run_command(args: argparse.Namespace) -> int:
                     db,
                     args.dataset,
                     top_k=args.top_k,
+                    mode=args.mode,
                 )
             await db.commit()
         except (
