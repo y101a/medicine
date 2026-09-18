@@ -58,6 +58,7 @@ it('非 OK 响应带回结构化报文时，不把原始内容显示给用户', 
 it('流中混入坏帧时明确报错，不把残缺内容当成回答', async () => {
   const bytes = new TextEncoder().encode('{"type":"delta","content":"片段"}\n{坏帧\n')
   let readCount = 0
+  const cancel = vi.fn().mockResolvedValue(undefined)
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
     ok: true,
     status: 200,
@@ -66,6 +67,7 @@ it('流中混入坏帧时明确报错，不把残缺内容当成回答', async (
         read: async () => readCount++ === 0
           ? { done: false, value: bytes }
           : { done: true, value: undefined },
+        cancel,
       }),
     },
   }))
@@ -76,4 +78,5 @@ it('流中混入坏帧时明确报错，不把残缺内容当成回答', async (
   )).rejects.toMatchObject({ message: '回答数据格式异常，请重试', code: 'STREAM_MALFORMED' })
   // 坏帧之前的正常内容已经送达，但不会再继续往下读。
   expect(onDelta).toHaveBeenCalledWith('片段')
+  expect(cancel).toHaveBeenCalledOnce()
 })

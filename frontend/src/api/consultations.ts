@@ -64,40 +64,51 @@ async function streamAnswer(
   const decoder = new TextDecoder()
   let buffer = ''
   let completed: Message | undefined
-  while (true) {
-    const { done, value } = await reader.read()
-    buffer += decoder.decode(value, { stream: !done })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() || ''
-    for (const line of lines) {
-      if (!line.trim()) continue
-      let event: {
-        type: 'start' | 'delta' | 'done' | 'error'
-        content?: string
-        message?: Message
-        code?: string
-        messageText?: string
-        retrieval?: RetrievalProgress
-      } & Record<string, unknown>
-      try {
-        event = JSON.parse(line) as typeof event
-      } catch {
-        // 一帧坏数据说明这条流已不可信。与其把残缺内容当成回答继续展示
-        // （可能悄悄吞掉红旗提醒），不如明确报错让用户重试。
-        throw new ApiError('回答数据格式异常，请重试', 'STREAM_MALFORMED')
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      buffer += decoder.decode(value, { stream: !done })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+      for (const line of lines) {
+        if (!line.trim()) continue
+        let event: {
+          type: 'start' | 'delta' | 'done' | 'error'
+          content?: string
+          message?: Message
+          code?: string
+          messageText?: string
+          retrieval?: RetrievalProgress
+        } & Record<string, unknown>
+        try {
+          event = JSON.parse(line) as typeof event
+        } catch {
+          // 一帧坏数据说明这条流已不可信。与其把残缺内容当成回答继续展示
+          // （可能悄悄吞掉红旗提醒），不如明确报错让用户重试。
+          throw new ApiError('回答数据格式异常，请重试', 'STREAM_MALFORMED')
+        }
+        if (event.type === 'start' && event.retrieval) onRetrieval(event.retrieval)
+        if (event.type === 'delta' && typeof event.content === 'string') onDelta(event.content)
+        if (event.type === 'done' && event.message) completed = event.message
+        if (event.type === 'error') {
+          const text = typeof event.message === 'string' ? event.message : 'AI 回答生成失败'
+          throw new ApiError(text, event.code || 'AI_GENERATION_FAILED')
+        }
       }
-      if (event.type === 'start' && event.retrieval) onRetrieval(event.retrieval)
-      if (event.type === 'delta' && typeof event.content === 'string') onDelta(event.content)
-      if (event.type === 'done' && event.message) completed = event.message
-      if (event.type === 'error') {
-        const text = typeof event.message === 'string' ? event.message : 'AI 回答生成失败'
-        throw new ApiError(text, event.code || 'AI_GENERATION_FAILED')
-      }
+      if (done) break
     }
-    if (done) break
+    if (!completed) throw new ApiError('AI 回答意外中断，请稍后重试', 'STREAM_INCOMPLETE')
+    return completed
+  } catch (error) {
+    // 解析失败、服务端 error 事件、网络错误和用户中止都会进入这里。
+    // 显式取消读取器，避免底层连接等待服务端自然结束后才释放。
+    try {
+      await reader.cancel()
+    } catch {
+      // 原始错误更能说明失败原因；连接取消失败不应覆盖它。
+    }
+    throw error
   }
-  if (!completed) throw new ApiError('AI 回答意外中断，请稍后重试', 'STREAM_INCOMPLETE')
-  return completed
 }
 
 export const consultationsApi = {

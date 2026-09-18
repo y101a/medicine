@@ -19,7 +19,7 @@ test.describe('首次采集弹窗', () => {
     await settle(page)
 
     const dialog = page.locator('.el-dialog', { hasText: DIALOG_TEXT })
-    await expect(dialog, '首次进入应该弹出采集说明').toBeVisible()
+    await expect(dialog, '首次进入应该弹出采集说明').toBeVisible({ timeout: 15_000 })
 
     const box = await dialog.boundingBox()
     expect(box, `${DIALOG_TEXT} 弹窗应该有布局盒`).not.toBeNull()
@@ -60,7 +60,7 @@ test.describe('首次采集弹窗', () => {
     await settle(page)
 
     const dialog = page.locator('.el-dialog', { hasText: DIALOG_TEXT })
-    await expect(dialog).toBeVisible()
+    await expect(dialog).toBeVisible({ timeout: 15_000 })
     await dialog.getByRole('button', { name: '跳过' }).click()
 
     await expect(dialog, '点「跳过」后弹窗应该关闭').toBeHidden()

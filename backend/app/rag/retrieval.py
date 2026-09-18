@@ -16,15 +16,16 @@ from app.rag.embeddings import EmbeddingBatch, EmbeddingError, embed_texts
 QueryEmbedder = Callable[[list[str]], Awaitable[EmbeddingBatch]]
 
 # 检索模式。hybrid 是线上默认行为，另两种只为「纯关键词 / 纯向量 / 混合」对比评测而存在：
-#   hybrid  —— 关键词（pg_trgm word_similarity）与向量两路召回，再用 RRF 合并；
+#   hybrid  —— 关键词（pg_trgm word_similarity）与向量两路召回，再做加权分数融合；
 #   keyword —— 只走关键词，**完全不调用向量服务**（可零成本评测，且能验证无向量的语料）；
 #   vector  —— 只走向量，忽略关键词命中。
-# 两条单路都复用同一套 RRF 排序：单路时 RRF 会自然退化为该路自己的名次排序。
+# 单路模式直接按各自的原始相关度排序。
 RetrievalMode = Literal["hybrid", "keyword", "vector"]
 RETRIEVAL_MODES: tuple[RetrievalMode, ...] = ("hybrid", "keyword", "vector")
 MAX_QUERY_CHARS = 500
 HYBRID_CANDIDATE_LIMIT = 20
-RRF_RANK_CONSTANT = 60
+HYBRID_VECTOR_WEIGHT = 0.85
+HYBRID_KEYWORD_WEIGHT = 0.15
 MIN_KEYWORD_SCORE = 0.1
 SENSITIVE_PATTERNS = (
     re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)"),
@@ -105,6 +106,22 @@ def _candidate_relevance(candidate: dict[str, object]) -> float:
         candidate["vector_similarity"],
     )
     return max(float(score) for score in scores if score is not None)
+
+
+def _fusion_score(
+    *,
+    keyword_score: float | None,
+    vector_similarity: float | None,
+    mode: RetrievalMode,
+) -> float:
+    if mode == "keyword":
+        return float(keyword_score or 0.0)
+    if mode == "vector":
+        return float(vector_similarity or 0.0)
+    return (
+        HYBRID_VECTOR_WEIGHT * float(vector_similarity or 0.0)
+        + HYBRID_KEYWORD_WEIGHT * float(keyword_score or 0.0)
+    )
 
 
 async def search_knowledge(
@@ -240,19 +257,21 @@ async def search_knowledge(
             vector_rows = (await db.execute(vector_statement)).all()
 
     candidates: dict[UUID, dict[str, object]] = {}
-    for rank, (chunk, document, source, score) in enumerate(keyword_rows, start=1):
+    for chunk, document, source, score in keyword_rows:
+        keyword_relevance = float(score)
         candidates[chunk.id] = {
             "chunk": chunk,
             "document": document,
             "source": source,
-            "keyword_score": float(score),
+            "keyword_score": keyword_relevance,
             "vector_similarity": None,
-            "rrf_score": 1.0 / (RRF_RANK_CONSTANT + rank),
+            "rerank_score": _fusion_score(
+                keyword_score=keyword_relevance,
+                vector_similarity=None,
+                mode=mode,
+            ),
         }
-    for rank, (chunk, document, source, row_distance) in enumerate(
-        vector_rows,
-        start=1,
-    ):
+    for chunk, document, source, row_distance in vector_rows:
         vector_similarity = max(-1.0, min(1.0, 1.0 - float(row_distance)))
         candidate = candidates.setdefault(
             chunk.id,
@@ -262,18 +281,24 @@ async def search_knowledge(
                 "source": source,
                 "keyword_score": None,
                 "vector_similarity": None,
-                "rrf_score": 0.0,
+                "rerank_score": 0.0,
             },
         )
         candidate["vector_similarity"] = vector_similarity
-        candidate["rrf_score"] = float(candidate["rrf_score"]) + 1.0 / (
-            RRF_RANK_CONSTANT + rank
+        candidate["rerank_score"] = _fusion_score(
+            keyword_score=(
+                float(candidate["keyword_score"])
+                if candidate["keyword_score"] is not None
+                else None
+            ),
+            vector_similarity=vector_similarity,
+            mode=mode,
         )
 
     ranked_candidates = sorted(
         candidates.values(),
         key=lambda item: (
-            -float(item["rrf_score"]),
+            -float(item["rerank_score"]),
             -_candidate_relevance(item),
             str(item["chunk"].id),
         ),
@@ -321,7 +346,7 @@ async def search_knowledge(
                     if vector_relevance is not None
                     else None
                 ),
-                rerank_score=round(float(candidate["rrf_score"]), 8),
+                rerank_score=round(float(candidate["rerank_score"]), 8),
             )
         )
     return RetrievalResult(

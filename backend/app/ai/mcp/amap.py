@@ -30,6 +30,13 @@ AMAP_DIRECTION_URLS = {
 }
 
 
+def _amap_client(timeout_seconds: float) -> httpx.AsyncClient:
+    return httpx.AsyncClient(
+        timeout=httpx.Timeout(timeout_seconds, connect=timeout_seconds),
+        transport=httpx.AsyncHTTPTransport(retries=1),
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class _HospitalCandidate:
     poi_id: str | None
@@ -130,9 +137,7 @@ async def search_medical_pois(
         raise ExternalToolError("AMAP_NOT_CONFIGURED")
 
     owns_client = client is None
-    active_client = client or httpx.AsyncClient(
-        timeout=httpx.Timeout(timeout_seconds, connect=min(timeout_seconds, 4))
-    )
+    active_client = client or _amap_client(timeout_seconds)
     try:
         response = await active_client.get(
             AMAP_SEARCH_URL,
@@ -200,9 +205,7 @@ async def search_hospitals_by_area(
     if not api_key or not api_key.strip():
         raise ExternalToolError("AMAP_NOT_CONFIGURED")
     owns_client = client is None
-    active_client = client or httpx.AsyncClient(
-        timeout=httpx.Timeout(timeout_seconds, connect=min(timeout_seconds, 4))
-    )
+    active_client = client or _amap_client(timeout_seconds)
     try:
         response = await active_client.get(
             AMAP_SEARCH_URL,
@@ -281,11 +284,9 @@ async def find_nearby_hospitals(
         raise ExternalToolError("AMAP_NOT_CONFIGURED")
 
     owns_client = client is None
-    active_client = client or httpx.AsyncClient(
-        timeout=httpx.Timeout(timeout_seconds, connect=min(timeout_seconds, 4))
-    )
+    active_client = client or _amap_client(timeout_seconds)
     try:
-        request_timeout = min(timeout_seconds, 5)
+        request_timeout = timeout_seconds
         gps_location = f"{safe_longitude:.6f},{safe_latitude:.6f}"
         convert_payload = _provider_payload(
             await active_client.get(

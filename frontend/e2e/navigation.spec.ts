@@ -30,6 +30,16 @@ async function openNavigator(page: import('@playwright/test').Page) {
   await expect(page.locator('.el-dialog', { hasText: DIALOG })).toBeVisible()
 }
 
+test('导航入口显示本次定位不保存的隐私提示', async ({ page }) => {
+  await installApiStubs(page)
+  await page.goto('/app/chat')
+  await settle(page)
+
+  const privacyHint = page.locator('.navigator-trigger small')
+  await expect(privacyHint).toBeVisible()
+  await expect(privacyHint).toHaveText('定位仅用于本次查询，不保存')
+})
+
 async function failGeolocation(
   page: import('@playwright/test').Page,
   code: number,

@@ -1,3 +1,5 @@
+import logging
+
 import httpx
 import pytest
 from mcp import Client
@@ -105,6 +107,12 @@ async def test_amap_requires_key_before_network_call():
         await search_medical_pois("北京市", "内科", api_key=None)
 
 
+def test_httpx_success_logs_are_suppressed_to_protect_query_keys():
+    from app import main  # noqa: F401
+
+    assert logging.getLogger("httpx").getEffectiveLevel() >= logging.WARNING
+
+
 async def test_nearby_hospitals_converts_gps_and_sorts_by_route_time():
     captured: list[httpx.Request] = []
 
@@ -157,6 +165,8 @@ async def test_nearby_hospitals_converts_gps_and_sorts_by_route_time():
 
     assert captured[0].url.params["coordsys"] == "gps"
     assert captured[1].url.params["sortrule"] == "distance"
+    assert captured[0].extensions["timeout"]["connect"] == 10
+    assert captured[1].extensions["timeout"]["connect"] == 10
     assert [item.name for item in result.hospitals] == ["甲医院", "乙医院"]
     assert result.hospitals[0].route_duration_seconds == 300
     assert "39.89" not in str(result.model_dump())

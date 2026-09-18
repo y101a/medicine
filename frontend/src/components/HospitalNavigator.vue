@@ -191,7 +191,7 @@ function formatDuration(seconds?: number | null) {
 .navigator-trigger:hover { border-color: #9fc6e4; background: #f0f8fe; }
 .navigator-trigger > span { display: flex; flex-direction: column; gap: 2px; }
 .navigator-trigger strong { font-size: 13px; font-weight: 600; }
-.navigator-trigger small { display: none; color: #7e94a7; font-size: 10px; }
+.navigator-trigger small { display: block; color: #7e94a7; font-size: 10px; }
 .location-consent { padding: 28px 12px 12px; text-align: center; color: #4e677d; }
 .location-consent > .el-icon { color: #377fb7; }
 .location-consent h3 { margin: 12px 0 8px; color: #314e67; }

@@ -18,6 +18,7 @@ from app.rag.retrieval import (
     RetrievalCitation,
     RetrievalError,
     RetrievalResult,
+    _fusion_score,
     normalize_keyword_query,
     sanitize_retrieval_query,
     search_knowledge,
@@ -155,6 +156,32 @@ def test_query_sanitizer_rejects_identifier_only_input():
 
 def test_keyword_query_keeps_disease_name_and_removes_question_wrappers():
     assert normalize_keyword_query("请问哮喘有什么表现？") == "哮喘"
+
+
+def test_hybrid_fusion_uses_keywords_as_a_tiebreaker_without_overriding_strong_vectors():
+    strong_vector_only = _fusion_score(
+        keyword_score=None,
+        vector_similarity=0.65,
+        mode="hybrid",
+    )
+    weak_vector_with_keyword = _fusion_score(
+        keyword_score=0.80,
+        vector_similarity=0.40,
+        mode="hybrid",
+    )
+    exact_term_with_close_vector = _fusion_score(
+        keyword_score=1.0,
+        vector_similarity=0.55,
+        mode="hybrid",
+    )
+    close_vector_only = _fusion_score(
+        keyword_score=None,
+        vector_similarity=0.63,
+        mode="hybrid",
+    )
+
+    assert strong_vector_only > weak_vector_with_keyword
+    assert exact_term_with_close_vector > close_vector_only
 
 
 async def test_pgvector_recall_returns_current_approved_citations():

@@ -1,3 +1,4 @@
+import logging
 from contextlib import AsyncExitStack, asynccontextmanager
 from typing import Any
 
@@ -12,6 +13,8 @@ from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.db.session import engine
+
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 settings = get_settings()
 mcp_enabled = settings.app_environment == "development" and settings.mcp_enabled
