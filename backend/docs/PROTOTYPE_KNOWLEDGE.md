@@ -37,15 +37,16 @@
 相关导入、向量化、检索测试 17 项通过。未运行新增 8 篇的独立检索题集，也未经
 医学和版权审核。数据库快照可能变化，下次操作前仍须重新核对。
 
-**2026-09-18 复核尝试失败（环境原因，不是回归）：**本机 Docker Desktop 未运行
-（`docker compose ps` 报 `dockerDesktopLinuxEngine` 命名管道不存在），PostgreSQL 连不上，
-因此**未能复核上面的文档 / 文本块 / 向量数量**。后端套件实测 `10 failed / 123 passed / 61 errors`，
-失败与错误**逐条核对后全部是数据库连接类**（`test_auth_flow`、`test_consultations`、
-`test_embeddings`、`test_prototype_seed`、`test_retrieval`、`test_web_search_integration`、
-`test_controlled_ingestion`、`test_health_records`、`test_navigation_api`、`test_profile`），
-与当时的改动无关：那次只改 `.gitignore`、语料文件与文档，不含任何 Python 代码。
-**恢复数据库后请先 `docker compose up -d`，重新核对上述数量，再据实更新本节**；
-在此之前不要把上面的数字当作实时现状。
+**2026-09-18 复核结果：与上表一致。**首次核对时本机 Docker Desktop 未运行
+（`docker compose ps` 报 `dockerDesktopLinuxEngine` 命名管道不存在），后端套件为
+`10 failed / 123 passed / 61 errors`，失败与错误**逐条核对全部是数据库连接类**——是环境，
+不是回归（当时只改 `.gitignore`、语料与文档，不含任何 Python 代码）。启动容器后重新核对：
+`medical-assistant-postgres`（`pgvector/pgvector:0.8.6-pg17-trixie`，healthy）上的实际数量为
+`developer_prototype_knowledge` **13 篇 / 41 块**、`web_search_prototype` **2 篇 / 2 块**，
+向量共 **43** 个、模型 `qwen3.7-text-embedding-flash`、版本 `2026-09-01`、维度 1024，
+与上表逐项吻合；后端套件 **194 passed**。
+（DSH 沙箱下不放宽权限时会出现 8 项 `PermissionError` 的 setup 错误，属环境问题，
+见 `COORDINATION.md` 第 4 节环境备注。）
 
 ## 可复现命令
 

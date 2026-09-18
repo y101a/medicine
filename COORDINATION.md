@@ -105,6 +105,12 @@ npm run e2e                                                  # 期望 24 passed
 > （Vite 启动时用 `child_process.exec` 探测真实路径 → `spawn EPERM`），需要一次性放宽权限。
 > 这是 DSH 的环境配置，不是代码问题；Codex 侧不受影响。（2026-09-17 实测确认）
 >
+> **`pytest` 在 DSH 侧同样需要放宽权限**（2026-09-18 实测）：沙箱拒绝 pytest 的 `tmp_path`
+> 与 `.pytest_cache`，报 `PermissionError: [WinError 5] ...\Temp\dsh-<id>\pytest-of-Lenovo`，
+> 表现为**恰好 8 项用例在 setup 阶段 ERROR、其余 186 项通过**。放宽后实测 **194 passed**。
+> 判定要点：**若错误是 `PermissionError` 且集中在用 `tmp_path` 的用例，就是环境而非代码**；
+> 反之若错误是 `ConnectionRefusedError`，则是 PostgreSQL 没起来（先 `docker compose up -d`）。
+>
 > **中文显示陷阱**：在 PowerShell 控制台用 `Get-Content` 等命令查看中文会出现乱码
 > （控制台按 GBK 解读 UTF-8），例如 `<title>病理诊断科普助手</title>` 会显示成 `鐥呯悊…`。
 > 这是**显示问题，不是文件损坏**，不要据此判断文件有问题或「顺手修复」它；请用编辑器或读取工具核对。
@@ -170,6 +176,23 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 - 验证：引用核验专项 10 项通过；后端完整套件 **194 passed**；Ruff `All checks passed`。
 - 阻塞：无；未修改任何前端文件。
 - 下一步：请 DSH 按第 6 节请求把后端基线 192 更新为 194，并汇总进 `PROJECT_PROGRESS.md`。
+
+### 2026-09-18 02:05 DSH 后端基线证实为 194，数据库快照复核一致
+- 上一则报告写「后端基线无法通过（PostgreSQL 未运行）」——用户随后启动了 Docker Desktop，
+  现补齐验证。**结论：基线完好，此前纯属环境问题。**
+- 容器：`medical-assistant-postgres`（`pgvector/pgvector:0.8.6-pg17-trixie`），`Up (healthy)`，
+  `127.0.0.1:5432->5432/tcp`。
+- 基线：放宽沙箱权限后 **`194 passed`（16.96s）**；不放宽时为 `186 passed + 8 errors`，
+  8 项全部是 `PermissionError: WinError 5 ...\Temp\dsh-<id>\pytest-of-Lenovo`（pytest `tmp_path`
+  建不出来），**与代码无关**；186 + 8 = 194，与文档基线一致。`ruff check` 亦为 All checks passed。
+- 数据库快照复核（**只读查询，未改动任何数据**）：`developer_prototype_knowledge` 13 篇 / 41 块、
+  `web_search_prototype` 2 篇 / 2 块；向量共 43 个、模型 `qwen3.7-text-embedding-flash`、
+  版本 `2026-09-01`、维度 1024——与 `PROTOTYPE_KNOWLEDGE.md` 记载**逐项一致**。
+- 已把「DSH 侧 pytest 需放宽权限」连同两种错误类型的判别方法写进第 4 节环境备注。
+- 阻塞：无。
+- 下一步（接力点）：按 `PROTOTYPE_KNOWLEDGE.md` 的升级路径做**独立题集**的检索评测
+  （纯关键词 / 纯向量 / 混合对比，记录漏召回与误召回）。注意 `evaluate-prototype` 会调用
+  收费向量服务，动手前须与用户确认预算。
 
 ### 2026-09-18 01:40 DSH 临时接手后端：原型语料纳入版本库（审查第 3 项）
 - 授权：Codex 暂时打不开，**用户明确授权 DSH 临时接手后端**。分工表的所有权归属**未改**，
