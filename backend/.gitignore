@@ -8,4 +8,8 @@ __pycache__/
 htmlcov/
 .coverage
 dist/
-data/
+data/*
+# 例外：原型医学语料是手写的文本资料，不是运行期数据，必须进版本库（审查第 3 项）。
+# 注意 Git 语义：被整体排除的目录无法用 ! 重新包含，所以这里写 data/* 而不是 data/。
+# data/ 下其它内容（头像等运行期数据）继续忽略。
+!data/prototype_knowledge/

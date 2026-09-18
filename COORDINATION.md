@@ -129,7 +129,7 @@ npm run e2e                                                  # 期望 24 passed
 | 日期 | 提出方 | 目标文件 | 请求内容 | 状态 |
 | --- | --- | --- | --- | --- |
 | 2026-09-17 | Codex | `COORDINATION.md` 第 4 节、`PROJECT_PROGRESS.md` | 后端引用核验新增 2 项回归测试，完整套件由 192 增至 194 项且全部通过。请将后端基线更新为 194，并汇总提交 `fc63792` 的修复说明。 | 已处理（DSH 已更新为 194 并汇总） |
-| 2026-09-17 | DSH | `backend/docs/HEALTH_RECORDS.md` | 该文件第 109 行「无 ECharts 依赖，未实现趋势图；路线图阶段 9 的图表部分仍未开始」已被前端改动推翻：已引入 ECharts 6.1.0 并实现健康记录图表（范围限于记录条数与构成，明确不做症状时间线与严重度趋势）。请更新该行并记录范围收窄的原因。 | 待处理 |
+| 2026-09-17 | DSH | `backend/docs/HEALTH_RECORDS.md` | 该文件第 109 行「无 ECharts 依赖，未实现趋势图；路线图阶段 9 的图表部分仍未开始」已被前端改动推翻：已引入 ECharts 6.1.0 并实现健康记录图表（范围限于记录条数与构成，明确不做症状时间线与严重度趋势）。请更新该行并记录范围收窄的原因。 | 已处理（2026-09-18 DSH 临时接手后端时直接更新，见 7.2） |
 
 ## 7. 看板
 
@@ -141,10 +141,11 @@ npm run e2e                                                  # 期望 24 passed
 | --- | --- | --- | --- | --- | --- | --- |
 | — | — | — | — | — | — | — |
 
+（2026-09-18 01:40 说明：DSH 临时接手后端完成审查第 3 项后已释放；**分工表所有权归属未改**，
+Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登记。）
+
 **待认领**（只是备忘，**不算占用**；认领后请移到上表，完成后从本节删除）
 
-- `backend/data/prototype_knowledge/` 纳入版本库 —— 归 **Codex**（审查第 3 项，Codex 已声明接手）。
-- `backend/docs/HEALTH_RECORDS.md` 第 109 行的过期说明 —— 见第 6 节，待 **Codex** 处理。
 - 接口异常态下的原始 JSON 泄漏：错误文案出口已加固（`sanitizeApiMessage`）并有回归测试 ✅。
 - **弹窗排版**：静态审计定位到一处客观缺陷（`HealthRecordNoticeDialog` 固定 560px 宽）并已修复；
   是否还有其它排版问题需要真实浏览器确认（见 7.2）。
@@ -169,6 +170,34 @@ npm run e2e                                                  # 期望 24 passed
 - 验证：引用核验专项 10 项通过；后端完整套件 **194 passed**；Ruff `All checks passed`。
 - 阻塞：无；未修改任何前端文件。
 - 下一步：请 DSH 按第 6 节请求把后端基线 192 更新为 194，并汇总进 `PROJECT_PROGRESS.md`。
+
+### 2026-09-18 01:40 DSH 临时接手后端：原型语料纳入版本库（审查第 3 项）
+- 授权：Codex 暂时打不开，**用户明确授权 DSH 临时接手后端**。分工表的所有权归属**未改**，
+  本节的改动清单就是 Codex 回来后的接力点。
+- 改动（**不含任何 Python 代码**）：
+  1. `backend/.gitignore`：`data/` → `data/*` + `!data/prototype_knowledge/`。
+     **Git 语义坑**：被整体排除的目录无法用 `!` 重新包含，所以必须写 `data/*` 而不是 `data/`。
+     已用 `git check-ignore` 逐条验证：语料放行，`data/` 下其它运行期数据（头像、db 文件）仍忽略。
+  2. 新增 `backend/data/prototype_knowledge/README.md`，把「未审核、仅开发原型、不可用于生产」
+     的边界**随语料一起进库**。安全性已确认：`seed-prototype` 由 `manifest.json` 驱动
+     （`app/rag/prototype_seed.py::load_manifest` 只遍历 `manifest.documents`），
+     该 README 不会被当成医学文档导入。
+  3. `backend/docs/PROTOTYPE_KNOWLEDGE.md`：删掉过期的「仓库尚无提交，不能误以为已有 Git 版本
+     备份」，改为已纳入版本库 + 明确「**纳入版本库 ≠ 审核通过**」；并记录本次复核数据库失败经过。
+  4. `backend/docs/HEALTH_RECORDS.md` 第 109 行：把「无 ECharts 依赖，未实现趋势图」更正为图表
+     已实现（ECharts 6.1.0 按需引入 Bar + Pie），范围限定为记录条数与分类构成。这是第 6 节
+     DSH 提给 Codex 的请求，现由我直接处理，第 6 节已标记「已处理」。
+- 验证：
+  - 语料进库：`git check-ignore` 逐项确认放行；`git status` 显示 `backend/data/` 为未跟踪待提交。
+  - **后端基线本次无法通过，原因是环境而非代码**：本机 Docker Desktop 未运行、PostgreSQL 连不上，
+    实测 `10 failed / 123 passed / 61 errors`，失败与错误**逐条核对全部为数据库连接类**。
+    本次 diff 不含 Python 代码，不可能影响测试结果。`ruff check app tests migrations` 结果见下。
+  - 前端基线未跑：本次未改动前端任何文件。
+- 阻塞：**PostgreSQL 未运行**。所有依赖数据库的后端工作（seed/embed/evaluate、语料导入核对、
+  独立题集检索评测、DB 测试）现在都做不了，需要先启动 Docker Desktop。
+- 下一步（接力点）：恢复数据库后 `docker compose up -d`，先核对 `developer_prototype_knowledge`
+  的文档 / 文本块 / 向量数量，再按 `PROTOTYPE_KNOWLEDGE.md` 的升级路径做**独立题集**的检索评测
+  （纯关键词 / 纯向量 / 混合对比，记录漏召回与误召回）。
 
 ### 2026-09-18 01:05 DSH 按 ADR-011 增加窄屏明确提示（e2e 24 项）
 - 决定：用户选择「移动端暂不纳入范围，但必须明确提示」→ 记入 `PROJECT_PROGRESS.md` 的

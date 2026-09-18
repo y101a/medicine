@@ -1,0 +1,117 @@
+{
+  "version": "prototype-2026-09-14.1",
+  "documents": [
+    {
+      "slug": "emergency-warning",
+      "title": "紧急危险表现与求助原型资料",
+      "file": "emergency-warning.md",
+      "topics": ["卒中识别", "胸痛", "严重过敏", "心肺复苏", "自伤风险"],
+      "reference_urls": [
+        "https://www.nhc.gov.cn/xcs/c100123/202405/73a4927142f34152abed875634a3c13b.shtml"
+      ]
+    },
+    {
+      "slug": "medicine-use",
+      "title": "合理用药与抗菌药物原型资料",
+      "file": "medicine-use.md",
+      "topics": ["合理用药", "抗菌药物", "普通感冒"],
+      "reference_urls": [
+        "https://www.nhc.gov.cn/xcs/c100123/202405/73a4927142f34152abed875634a3c13b.shtml"
+      ]
+    },
+    {
+      "slug": "animal-bite",
+      "title": "动物咬伤处理原型资料",
+      "file": "animal-bite.md",
+      "topics": ["动物咬伤", "狂犬病预防"],
+      "reference_urls": [
+        "https://www.nhc.gov.cn/xcs/c100123/202405/73a4927142f34152abed875634a3c13b.shtml"
+      ]
+    },
+    {
+      "slug": "chronic-health",
+      "title": "常见慢性健康问题原型资料",
+      "file": "chronic-health.md",
+      "topics": ["高血压", "低血糖", "健康生活方式"],
+      "body_systems": ["cardiovascular", "endocrine"],
+      "reference_urls": [
+        "https://www.nhc.gov.cn/xcs/c100123/202405/73a4927142f34152abed875634a3c13b.shtml"
+      ]
+    },
+    {
+      "slug": "infection-prevention",
+      "title": "呼吸道传染病个人防护原型资料",
+      "file": "infection-prevention.md",
+      "topics": ["传染病预防", "个人防护"],
+      "body_systems": ["respiratory"],
+      "reference_urls": ["https://www.chinacdc.cn/jkkp/"]
+    },
+    {
+      "slug": "allergic-rhinitis",
+      "title": "过敏性鼻炎常见表现原型资料",
+      "file": "allergic-rhinitis.md",
+      "topics": ["过敏性鼻炎", "鼻炎", "鼻痒", "喷嚏"],
+      "body_systems": ["respiratory"],
+      "reference_urls": ["https://www.nhc.gov.cn/xcs/c100122/202408/4d237f4151a543d4943caff389baa451.shtml"]
+    },
+    {
+      "slug": "asthma",
+      "title": "哮喘常见表现原型资料",
+      "file": "asthma.md",
+      "topics": ["哮喘", "反复喘息", "胸闷"],
+      "body_systems": ["respiratory"],
+      "reference_urls": ["https://www.nhc.gov.cn/jnr/xcrzsxx/201405/530e29d0ecce43ac981d2a9438474294.shtml"]
+    },
+    {
+      "slug": "gastroesophageal-reflux",
+      "title": "胃食管反流常见表现原型资料",
+      "file": "gastroesophageal-reflux.md",
+      "topics": ["胃食管反流", "反酸", "烧心"],
+      "body_systems": ["digestive"],
+      "reference_urls": ["https://www.niddk.nih.gov/health-information/digestive-diseases/acid-reflux-ger-gerd-adults/symptoms-causes"]
+    },
+    {
+      "slug": "norovirus-gastroenteritis",
+      "title": "诺如病毒急性胃肠炎原型资料",
+      "file": "norovirus-gastroenteritis.md",
+      "topics": ["诺如病毒", "急性胃肠炎", "呕吐", "腹泻"],
+      "body_systems": ["digestive"],
+      "reference_urls": ["https://icdc.chinacdc.cn/sjd/sjzxxx/sjhydt/202607/t20260703_1837772.html"]
+    },
+    {
+      "slug": "hypertension",
+      "title": "高血压认识与随访原型资料",
+      "file": "hypertension.md",
+      "topics": ["高血压", "血压监测", "慢病随访"],
+      "body_systems": ["cardiovascular"],
+      "reference_urls": ["https://www.nhc.gov.cn/kppypt/mxbb/202602/d1578b18a1b14372b037182b06085fbf.shtml"]
+    },
+    {
+      "slug": "coronary-heart-disease",
+      "title": "冠心病与胸痛就医原型资料",
+      "file": "coronary-heart-disease.md",
+      "topics": ["冠心病", "心绞痛", "胸痛"],
+      "body_systems": ["cardiovascular"],
+      "reference_urls": ["https://www.nhc.gov.cn/xcs/c100122/202411/81a60171b43d43ff98cc6110d65a4136.shtml"]
+    },
+    {
+      "slug": "diabetes",
+      "title": "糖尿病常见表现与随访原型资料",
+      "file": "diabetes.md",
+      "topics": ["糖尿病", "多饮", "多尿", "血糖监测"],
+      "body_systems": ["endocrine"],
+      "reference_urls": ["https://www.nhc.gov.cn/jnr/sjwsrzsxx/201603/0a38eb2543b44f91bbacd450499e91ee.shtml"]
+    },
+    {
+      "slug": "thyroid-conditions",
+      "title": "甲状腺常见问题概览原型资料",
+      "file": "thyroid-conditions.md",
+      "topics": ["甲状腺疾病", "甲亢", "甲减", "甲状腺结节", "甲状腺炎"],
+      "body_systems": ["endocrine"],
+      "reference_urls": [
+        "https://literature.chinacdc.cn/xuekefuwu/gonggongweishengxueshuredianzhuiz/202208/t20220822_260896.html",
+        "https://www.nhc.gov.cn/cms-search/downFiles/95b301aab5de437192f9fbda9baf522e.pdf"
+      ]
+    }
+  ]
+}

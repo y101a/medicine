@@ -21,8 +21,12 @@
 
 新资料的正文与 `manifest.json` 中的 `reference_urls` 可逐篇检查；它们是以官方公开
 信息为线索的自编简要概述，不是所列网页的复制件，也未经专业医学内容审核。
-官方 URL 是查阅线索，不等于来源已完成受控正式导入。正文与清单目前保存在
-本机项目目录；交接检查时仓库尚无提交，不能误以为已有 Git 版本备份。
+官方 URL 是查阅线索，不等于来源已完成受控正式导入。正文与清单原先只存在于本机项目目录
+（本文件此前即指出「仓库尚无提交，不能误以为已有 Git 版本备份」）；**2026-09-18 已纳入版本库**：
+`backend/.gitignore` 改为 `data/*` + `!data/prototype_knowledge/`（其余 `data/` 仍属运行期数据，
+继续忽略），同目录新增 `README.md` 把「未审核、仅开发原型」的边界随文携带。
+**纳入版本库不等于完成审核，也不等于可用于生产**：数据库仍只以 `prototype` 状态接纳这些记录，
+且仅 `APP_ENVIRONMENT=development` 时参与向量化与检索。
 文档元数据明确保存 `medical_reviewed: false` 和 `production_eligible: false`。
 
 **2026-09-15 当前库核对快照：**`developer_prototype_knowledge` 来源已有 13 篇文档、
@@ -32,6 +36,16 @@
 一次幂等重试后全部完成。哮喘和甲状腺两条具体病名查询的预期原型文档排第 1；
 相关导入、向量化、检索测试 17 项通过。未运行新增 8 篇的独立检索题集，也未经
 医学和版权审核。数据库快照可能变化，下次操作前仍须重新核对。
+
+**2026-09-18 复核尝试失败（环境原因，不是回归）：**本机 Docker Desktop 未运行
+（`docker compose ps` 报 `dockerDesktopLinuxEngine` 命名管道不存在），PostgreSQL 连不上，
+因此**未能复核上面的文档 / 文本块 / 向量数量**。后端套件实测 `10 failed / 123 passed / 61 errors`，
+失败与错误**逐条核对后全部是数据库连接类**（`test_auth_flow`、`test_consultations`、
+`test_embeddings`、`test_prototype_seed`、`test_retrieval`、`test_web_search_integration`、
+`test_controlled_ingestion`、`test_health_records`、`test_navigation_api`、`test_profile`），
+与当时的改动无关：那次只改 `.gitignore`、语料文件与文档，不含任何 Python 代码。
+**恢复数据库后请先 `docker compose up -d`，重新核对上述数量，再据实更新本节**；
+在此之前不要把上面的数字当作实时现状。
 
 ## 可复现命令
 
