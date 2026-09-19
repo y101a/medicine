@@ -303,6 +303,110 @@ async def test_keyword_recall_returns_unembedded_specific_disease(monkeypatch):
         await cleanup_retrieval_fixture(source_id)
 
 
+async def test_hybrid_keeps_unembedded_exact_term_ahead_of_vector_competitors(
+    monkeypatch,
+):
+    """A missing embedding must not cap an exact disease-name match at 15%."""
+    from app.rag import retrieval
+
+    settings = retrieval.get_settings().model_copy(
+        update={"app_environment": "production"}
+    )
+    monkeypatch.setattr(retrieval, "get_settings", lambda: settings)
+    source_id = uuid4()
+    now = datetime.now(UTC)
+    async with SessionLocal() as db:
+        source = KnowledgeSource(
+            id=source_id,
+            source_key=f"unembedded_exact_{uuid4().hex[:12]}",
+            priority=1,
+            organization="测试卫生机构",
+            channel_name="无向量精确命中测试渠道",
+            authority_level="test_authority",
+            entry_url="https://www.nhc.gov.cn/test/index.shtml",
+            ingestion_status="approved",
+        )
+        db.add(source)
+        await db.flush()
+
+        exact_document = KnowledgeDocument(
+            source_id=source_id,
+            canonical_url="https://www.nhc.gov.cn/test/crohn.shtml",
+            title="克罗恩病",
+            content_type="markdown",
+            review_status="approved",
+            license_type="test_permission",
+            legal_reviewed_at=now,
+            legal_reviewed_by="版权测试员",
+            medical_reviewed_at=now,
+            medical_reviewed_by="医学测试员",
+            content_hash="a" * 64,
+            content_text="克罗恩病科普资料。",
+        )
+        db.add(exact_document)
+        await db.flush()
+        db.add(
+            KnowledgeChunk(
+                document_id=exact_document.id,
+                chunk_index=0,
+                section_title="克罗恩病",
+                content="克罗恩病的常见表现与就医提示。",
+                content_hash="b" * 64,
+            )
+        )
+
+        for index in range(5):
+            document = KnowledgeDocument(
+                source_id=source_id,
+                canonical_url=f"https://www.nhc.gov.cn/test/vector-{index}.shtml",
+                title=f"普通向量候选 {index}",
+                content_type="markdown",
+                review_status="approved",
+                license_type="test_permission",
+                legal_reviewed_at=now,
+                legal_reviewed_by="版权测试员",
+                medical_reviewed_at=now,
+                medical_reviewed_by="医学测试员",
+                content_hash=f"{index + 1}" * 64,
+                content_text="与查询术语无关的向量候选。",
+            )
+            db.add(document)
+            await db.flush()
+            db.add(
+                KnowledgeChunk(
+                    document_id=document.id,
+                    chunk_index=0,
+                    section_title=f"普通主题 {index}",
+                    content="仅用于构造高相似度向量竞争候选。",
+                    content_hash=f"{index + 2}" * 64,
+                    embedding=unit_vector(0),
+                    embedding_model=settings.embedding_model,
+                    embedding_version=settings.embedding_version,
+                    embedding_dimensions=settings.embedding_dimensions,
+                )
+            )
+        await db.commit()
+
+    async def fake_embedder(_texts: list[str]) -> EmbeddingBatch:
+        return EmbeddingBatch([unit_vector(0)], 5)
+
+    try:
+        async with SessionLocal() as db:
+            result = await search_knowledge(
+                db,
+                "请问克罗恩病有什么表现？",
+                top_k=3,
+                embedder=fake_embedder,
+            )
+
+        assert result.items[0].title == "克罗恩病"
+        assert result.items[0].keyword_score == 1.0
+        assert result.items[0].vector_similarity is None
+        assert result.items[0].rerank_score == 1.0
+    finally:
+        await cleanup_retrieval_fixture(source_id)
+
+
 async def test_keyword_mode_never_calls_the_vector_service(monkeypatch):
     """keyword 模式必须完全不碰向量服务：既省成本，也能用于评测没有向量的语料。"""
     from app.rag import retrieval

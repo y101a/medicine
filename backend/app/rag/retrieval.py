@@ -259,17 +259,31 @@ async def search_knowledge(
     candidates: dict[UUID, dict[str, object]] = {}
     for chunk, document, source, score in keyword_rows:
         keyword_relevance = float(score)
+        has_current_embedding = (
+            chunk.embedding is not None
+            and chunk.embedding_model == settings.embedding_model
+            and chunk.embedding_version == settings.embedding_version
+            and chunk.embedding_dimensions == settings.embedding_dimensions
+        )
+        keyword_rerank_score = _fusion_score(
+            keyword_score=keyword_relevance,
+            vector_similarity=None,
+            mode=mode,
+        )
+        if mode == "hybrid" and not has_current_embedding:
+            # Missing embeddings are an ingestion state, not evidence that an exact
+            # disease/term match is weak. Applying the 15% keyword weight here would
+            # cap even a perfect match at 0.15 and let ordinary vector candidates
+            # push it out of top-k. Keep the native keyword relevance until this
+            # chunk receives a current, compatible embedding.
+            keyword_rerank_score = keyword_relevance
         candidates[chunk.id] = {
             "chunk": chunk,
             "document": document,
             "source": source,
             "keyword_score": keyword_relevance,
             "vector_similarity": None,
-            "rerank_score": _fusion_score(
-                keyword_score=keyword_relevance,
-                vector_similarity=None,
-                mode=mode,
-            ),
+            "rerank_score": keyword_rerank_score,
         }
     for chunk, document, source, row_distance in vector_rows:
         vector_similarity = max(-1.0, min(1.0, 1.0 - float(row_distance)))
