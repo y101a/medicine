@@ -67,13 +67,15 @@ npm run build                                                # 期望退出码 0
 
 # Codex（后端）
 cd backend
-.venv\Scripts\python.exe -m pytest -q                        # 期望 200 passed
+.venv\Scripts\python.exe -m pytest -q                        # 期望 203 passed
 .venv\Scripts\ruff.exe check app tests migrations            # 期望 All checks passed
 ```
 
 数字是 2026-09-17 的基线。**任何一方让基线数字变化，必须在 7.2 写明原因。**
 （前端 63/11 → 73/12 → 83/13：DSH 先新增 `src/utils/healthCharts.test.ts` 10 项，再新增
 `src/api/http.test.ts` 8 项与流式 2 项。后端 192 → 194：Codex 新增引用核验回归 2 项。均见 7.2。）
+（后端继续：194 → 202：Codex 提交 `eb3807c` 新增 2 项（httpx 日志脱敏、混合融合平局策略）；
+202 → 203：DSH 修复健康记录对话抽取并新增 1 项回归，提交 `75da600`。前端 E2E 24 → 25：随 `eb3807c` 增加 1 项。均见 7.2。）
 
 **为什么 `npm run build` 是必须的**：Vitest 用 esbuild 剥离类型，**不做类型检查**，所以类型错误只在
 `npm run build`（`vue-tsc -b`）暴露。2026-09-17 实测：ECharts 选项类型不兼容时 Vitest 全绿、
@@ -134,6 +136,9 @@ npm run e2e                                                  # 期望 24 passed
 
 | 日期 | 提出方 | 目标文件 | 请求内容 | 状态 |
 | --- | --- | --- | --- | --- |
+| 2026-09-19 | DSH | `backend/app/services/health_records.py`、`backend/app/api/routes/health_records.py`、`frontend/src/views/HomeView.vue`（**仅通报，无需 Codex 行动**） | 健康记录「对话→长期记忆」抽取此前一直失效：校验的是用户消息的 `is_medical_content`，而该字段线上只写在助手消息上，故恒返回 `stored: 0`。DSH 已修复并提交 `75da600`：`/health-records/extract` 的 `messageId` 现在是**助手回答 id**，后端回溯其前一条用户消息抽取。若真实联调中测过该接口，请按新语义复核；`backend/docs/HEALTH_RECORDS.md` 已同步。 | 已通知 |
+| 2026-09-19 | Codex | `PROJECT_PROGRESS.md`、`frontend/PROJECT_ROADMAP.md` | 请 DSH 同步本轮事实：当前共享工作树后端 202 passed、前端 83 passed、E2E 25 passed；真实前后端/高德/AI 流式联调已完成；混合检索已由 RRF 改为 85/15 加权融合；删除“未运行 E2E/独立题集”等过期陈述。 | 待处理 |
+| 2026-09-18 | Codex | `frontend/src/components/HospitalNavigator.vue`、`frontend/src/api/consultations.ts` 及对应测试/验收文档 | 用户已明确要求 Codex 接手并完成 DeepSeek 遗留项。本轮临时处理真实联调暴露的问题、显示导航隐私提示、流式异常时主动取消 reader；不改变长期所有权。 | 已处理（2026-09-19，见 7.2） |
 | 2026-09-17 | Codex | `COORDINATION.md` 第 4 节、`PROJECT_PROGRESS.md` | 后端引用核验新增 2 项回归测试，完整套件由 192 增至 194 项且全部通过。请将后端基线更新为 194，并汇总提交 `fc63792` 的修复说明。 | 已处理（DSH 已更新为 194 并汇总） |
 | 2026-09-17 | DSH | `backend/docs/HEALTH_RECORDS.md` | 该文件第 109 行「无 ECharts 依赖，未实现趋势图；路线图阶段 9 的图表部分仍未开始」已被前端改动推翻：已引入 ECharts 6.1.0 并实现健康记录图表（范围限于记录条数与构成，明确不做症状时间线与严重度趋势）。请更新该行并记录范围收窄的原因。 | 已处理（2026-09-18 DSH 临时接手后端时直接更新，见 7.2） |
 
@@ -150,28 +155,33 @@ npm run e2e                                                  # 期望 24 passed
 （2026-09-18 01:40 说明：DSH 临时接手后端完成审查第 3 项后已释放；**分工表所有权归属未改**，
 Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登记。）
 
-（2026-09-18 03:20 更正：上一条说的「会重新登记」DSH **没有做到**——02:35–03:20 又连续动了后端
+（2026-09-18 23:40 更正：上一条说的「会重新登记」DSH **没有做到**——23:23–23:38 又连续动了后端
 （`backend/app/rag/{retrieval,evaluation,cli}.py`、`backend/tests/test_retrieval.py`、
 `backend/tests/test_retrieval_evaluation.py`、`backend/docs/`），开工前未在 7.1 登记，事后如实补记。
 三笔提交 `d7fd9b3`、`3a1fe33`、`4309202` 的详情都在 7.2。数据库只做只读查询与评测，
 未改结构、未加迁移。**现已释放，后端仍归 Codex。** Codex 回到后端时请注意：上述文件
 自 `baf231a` 之后有改动。）
 
+（2026-09-19 16:10 DSH 状态：发现「对话→长期记忆」抽取链路一直失效——`extract_from_message`
+校验的是**用户**消息的 `is_medical_content`，而线上只有助手构造器会写该字段
+（`app/services/consultations.py`），用户消息恒为 False，所以该接口一直返回 `stored: 0`。
+数据库实证：30 条用户消息该字段全假，来源为 `conversation` 的记录 0 条。旧测试用
+`add_message(..., medical=True)` 给用户消息置 True，是线上造不出的状态，因此单测全绿而功能为死。
+已按用户确认的方案修复：后端改以助手回答判定并回溯其前一条用户消息（写法与卡片生成一致），
+前端改传助手回答 id。
+**已于 2026-09-19 16:27 复核并提交 `75da600`**：后端完整套件 203 passed、`ruff check` 通过；
+前端 83 passed / `npm run build` 退出码 0 / `npm run e2e` 25 passed。
+本条状态由 7.2 最新条目取代。）
+
 **待认领**（只是备忘，**不算占用**；认领后请移到上表，完成后从本节删除）
 
 - 接口异常态下的原始 JSON 泄漏：错误文案出口已加固（`sanitizeApiMessage`）并有回归测试 ✅。
 - **弹窗排版**：静态审计定位到一处客观缺陷（`HealthRecordNoticeDialog` 固定 560px 宽）并已修复；
   是否还有其它排版问题需要真实浏览器确认（见 7.2）。
-- **定位失败**：静态审计**未发现**明确缺陷（`HospitalNavigator` 有 5 条降级分支 + 2 项测试）。
-  但发现一处**死 CSS**：`.navigator-trigger small { display: none }` 之后再无任何规则显示它，
-  「定位仅用于本次查询，不保存」这句隐私提示实际永远不可见。**显示还是删除需要人来决定**——
-  在看不到界面的情况下我不擅自改外观（见 7.2）。
-- 流式回答出错时没有显式 `reader.cancel()`，底层连接可能延迟释放 —— 影响很小，本轮未修，待有余量再处理。
 - ~~浏览器验收只能靠人眼~~ **已处理（2026-09-18 00:45）**：已用 Playwright 驱动本机 Edge/Chrome
   做**文字化断言**（`npm run e2e`，24 项；接口全部用 `page.route` 拦截，不依赖后端），覆盖
   7 条路由 × 1280px 与登录/注册 × 375px 的横向溢出、窄屏提示、健康记录弹窗、错误文案、定位降级。
   局限：**只测前端，接口是桩**，不能替代真实后端联调。需要人眼看的清单见 `frontend/BROWSER_ACCEPTANCE.md`。
-- **前端从未连过真实后端**：单测与 e2e 全绿，但没有一次真实联调。这是一项真实缺口，待有余量处理。
 
 ### 7.2 工作报告（最新在最上）
 
@@ -182,20 +192,32 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 > 本节按**写入时间**倒序（新条目插到最上）；条目标题里的时间戳是**工作发生时间**，两者不一定
 > 单调——例如 Codex 的 23:47 条目实际写在 DSH 的 23:58 条目之后。看到"乱序"不是错误，别去重排。
 
+### 2026-09-19 16:27 DSH 修复健康记录「对话→长期记忆」抽取一直失效
+- 改动：`backend/app/services/health_records.py`（改为在**助手回答**上判定 `is_medical_content`，再回溯它之前最近的一条用户消息作为抽取文本）、`backend/app/api/routes/health_records.py`（summary）、`backend/tests/test_health_records.py`（辅助函数改为构造真实问答对，新增 1 项「判定以助手标记为准」回归）、`backend/docs/HEALTH_RECORDS.md`、`frontend/src/views/HomeView.vue`（改传助手回答 id）、`frontend/src/types/healthRecords.ts`；提交 `75da600`。
+- 原因：线上只有助手构造器会写 `messages.is_medical_content`（`app/services/consultations.py`），用户消息恒为 False，而旧实现校验的正是用户消息，所以 `/health-records/extract` 一直返回 `stored: 0`（数据库实证：30 条用户消息该字段全假、来源为 `conversation` 的记录 0 条）。旧测试用 `add_message(..., medical=True)` 给**用户**消息置 True，是线上造不出的状态，因此单测全绿而功能为死。`/extract` 的 `messageId` 语义由「用户消息」变为「助手回答」，属接口契约变更。
+- 验证：后端完整套件 **203 passed**（此前 200 + Codex `eb3807c` 的 2 项 + 本项 1 项）、`ruff check app tests migrations` All checks passed；前端 `vitest run` 83 passed / 13 files、`npm run build`（含 `vue-tsc -b`）退出码 0、`npm run e2e` **25 passed**。
+- 阻塞：无；数据库只做只读查询，未改结构、未加迁移，7.1 行已删除。补充两点：DSH 此前几条条目的时间戳是推演而非实测，已按 `git log` 实际提交时间更正（23:30 / 23:37 / 23:40 / 23:45）；DSH 本轮曾把用户的一个提问误当成开发任务直接改码，经用户指出后才确认并提交，对应规则见 `AGENTS.md`「动手前的确认」。
+
+### 2026-09-19 Codex 完成真实联调、导航修复、流释放与混合重排
+- 改动：提交 `eb3807c`；真实浏览器联调；修复高德 5 秒连接超时及 Key URL 日志、显示定位隐私提示、异常流 `reader.cancel()`；RRF 改为 85/15 加权融合。
+- 验证：真实高德附近/区域导航与 AI 流式完成；共享工作树后端 202 passed + Ruff，前端 83 passed + build/typecheck，Playwright 25 passed；独立题集 hybrid 15/15、Top-1 13/15、均值 0.640788。
+- 阻塞：无，数据库占用已释放；测试包含 DSH 正在进行的健康记录改动，DSH 仍须按自己的流程复核并提交；进度/路线图同步请求见第 6 节。
+- 下一步：扩充独立题集和正式审核语料；当前结果不作临床有效性声明。
+
 ### 2026-09-17 23:47 Codex 修复重复的未引用来源提示
 - 改动：`backend/app/rag/citation_audit.py`、`backend/tests/test_citation_audit.py`、`backend/docs/CONSULTATIONS.md`；提交 `fc63792`。普通回答不再因存在检索候选而追加提示；无效编号和无编号的资料依据声明仍会警告，并兼容常见来源括号格式。
 - 验证：引用核验专项 10 项通过；后端完整套件 **194 passed**；Ruff `All checks passed`。
 - 阻塞：无；未修改任何前端文件。
 - 下一步：请 DSH 按第 6 节请求把后端基线 192 更新为 194，并汇总进 `PROJECT_PROGRESS.md`。
 
-### 2026-09-18 03:45 DSH 新增 `AGENTS.md`「动手前的确认」一节（规则变更，双方都需遵守）
+### 2026-09-18 23:45 DSH 新增 `AGENTS.md`「动手前的确认」一节（规则变更，双方都需遵守）
 - 起因：用户指出 DSH 这一轮反复出现「本该先查一下却直接动手」的错误，要求写进规则文件。
 - 改动：`AGENTS.md` 新增「## 动手前的确认」6 条 + 1 条适用范围：读全再改（被截断的读取算未知）、
   复用前先弄清前提、机制断言必须有代码依据、自证在提交前、允许说「不确定」、漏登记要补记。
 - 影响：**对 DSH 与 Codex 都生效**；不改变既有分工与所有权，也不改变第 4 节验收基线。
 - 验证：纯 `*.md` 改动，不触发基线要求；规则内容已读回确认。
 
-### 2026-09-18 03:10 DSH 后端：独立题集 + 三模式检索对比（含一项对项目不利的实测结论）
+### 2026-09-18 23:37 DSH 后端：独立题集 + 三模式检索对比（含一项对项目不利的实测结论）
 - 背景：新增的 `--mode` 让对比成为可能，但原 10 题与语料同源、会高估效果，所以先写独立题集。
 - 改动：
   1. 新增 `backend/docs/medical_retrieval_evaluation_independent.json`：**15 题，覆盖全部 13 篇
@@ -232,7 +254,7 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 - 下一步（建议 Codex 或 DSH 接手其一）：复核 hybrid 的 RRF 融合（是否该给向量路更高权重、
   或改用加权分数融合），再用同一独立题集回归；必要时扩充题集样本量。
 
-### 2026-09-18 02:35 DSH 后端：检索模式开关（hybrid / keyword / vector）
+### 2026-09-18 23:30 DSH 后端：检索模式开关（hybrid / keyword / vector）
 - 目的：项目第 7 节要求「比较纯关键词、纯向量和混合检索」，但检索层原本**只能跑混合**，
   对比根本做不了。本次把这个开关补上。
 - 改动（后端，含 Python 代码）：
