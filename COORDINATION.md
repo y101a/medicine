@@ -62,7 +62,7 @@
 # DSH（前端）
 cd frontend
 npx vue-tsc --noEmit -p tsconfig.app.json                    # 期望退出码 0
-npx vitest run                                               # 期望 86 passed / 14 files
+npx vitest run                                               # 期望 96 passed / 14 files
 npm run build                                                # 期望退出码 0（含 vue-tsc -b，全量类型检查）
 
 # Codex（后端）
@@ -79,6 +79,8 @@ cd backend
 （后端继续：203 → 204：Codex 提交 `5ac1cab` 修复无向量精确术语被压制并新增 1 项回归。前端 83/13 → 86/14：
 DSH 设置页第一阶段新增 `src/views/settings.test.ts` 3 项，提交 `6ba4fe7`。E2E 仍为 25：DSH 路由矩阵减 1 项
 （`/app/profile`、`/app/health-records` 并入 `/app/settings`）并新增旧路径重定向 1 项。均见 7.2。）
+（后端 204 → 212：Codex 提交 `e18fdd9` 为自带模型 Key 新增 8 项。前端 86/14 → 96/14、E2E 25 → 29：
+DSH 设置页第三分栏「模型与密钥」，提交 `1b92149`。均见 7.2。）
 
 **为什么 `npm run build` 是必须的**：Vitest 用 esbuild 剥离类型，**不做类型检查**，所以类型错误只在
 `npm run build`（`vue-tsc -b`）暴露。2026-09-17 实测：ECharts 选项类型不兼容时 Vitest 全绿、
@@ -90,7 +92,7 @@ build 失败，最终是 build 拦下的。
 
 ```powershell
 cd frontend
-npm run e2e                                                  # 期望 25 passed
+npm run e2e                                                  # 期望 29 passed
 ```
 
 - 用 Playwright 驱动**本机已装的 Edge/Chrome**（不下载约 150MB 的 Chromium，可用
@@ -198,6 +200,12 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 >
 > 本节按**写入时间**倒序（新条目插到最上）；条目标题里的时间戳是**工作发生时间**，两者不一定
 > 单调——例如 Codex 的 23:47 条目实际写在 DSH 的 23:58 条目之后。看到"乱序"不是错误，别去重排。
+
+### 2026-09-19 22:50 DSH 设置页第三分栏「模型与密钥」：用户自带 API Key
+- 改动：新增 `frontend/src/components/settings/ModelCredentialsPanel.vue`（固定四家服务商、掩码 + 最近验证时间、填入/更换/删除、隐私披露）、`frontend/src/api/modelCredentials.ts`、`frontend/src/types/modelCredentials.ts`；`frontend/src/views/SettingsView.vue` 增加第三个分栏（首次打开才挂载，之后 `v-show` 保持挂载，避免切走再切回丢掉粘贴了一半的 Key）；`frontend/src/types/consultations.ts` 的 `AiModel` 增加 `keySource`；同步 `settings.test.ts`、`consultations.test.ts` 夹具、`e2e/{support.ts,settings.spec.ts}`、`BROWSER_ACCEPTANCE.md`。提交 `1b92149`（10 文件 +616/−11）。**按实现为准**：`/models` 字段为驼峰 `keySource`；GET 返回 `{items:[…]}`；PUT 返回单个摘要；DELETE 204；四种失败分别呈现（422 `MODEL_CREDENTIAL_INVALID` / 502 `…VERIFY_UNAVAILABLE` / 504 `…VERIFY_TIMEOUT` / 429 `…RATE_LIMITED`，后者额外提示「10 分钟内最多验证 5 次」）。前端不做明文回显：读接口只拿掩码，保存成功后立即清空输入框（e2e 断言输入框消失）。
+- 验证：前端 `vitest run` **96 passed / 14 files**（86 → 96，新增 10 项：默认分栏不请求凭据接口、四家服务商与隐私披露、只显示掩码、少于 8 位本地拦下、保存成功清明文、422 显示服务端文案、429 补可操作提示、删除需确认、取消删除、切分栏保留 Key 草稿）、`npm run build`（含 `vue-tsc -b`）退出码 0、`npm run e2e` **29 passed**（25 → 29，新增 4 项）。`npm run build` 拦下一次真实类型错误（测试夹具的字面量 `keySource` 被推成 `string`，不满足联合类型），已修后重跑全绿。
+- 阻塞：无。隐私披露按 `backend/docs/API.md` 的要求写进分栏：外发内容（本轮咨询 + 允许注入的健康记录摘要）、脱敏清单（姓名/手机号/身份证号/邮箱/详细地址）、「脱敏不等于健康文本已匿名化」、以及自带 Key 不改变安全规则。**真实密钥联调不在前端这一层**（本层接口全是桩，真 Key 打真服务商属于后端验证路径）；设置页观感需人眼过一眼（`BROWSER_ACCEPTANCE.md` 第 7 行）。
+- 下一步：两件可选、均未做、等指示——① 在对话的模型下拉里给 `keySource === 'user'` 的模型加「自带 Key」标记，让用户选模型时就能看出用的是自己的 Key；② 把 `ProfileView.vue` 里「个人资料已保存」「离开个人资料」两处文案与「账户信息」这一新命名对齐（纯文案，本轮避免为它单独再跑一次基线）。
 
 ### 2026-09-19 Codex 用户自带模型 API Key 后端（提交 `e18fdd9`）
 - 改动：迁移 `20260919_0014` 与加密凭据 CRUD；`/models` 用户/服务端 Key 并集及 `keySource`；聊天、病理卡片、健康记录抽取统一按用户解析；固定四家、1-token/8 秒验证、10 分钟 5 次限流；外发前移除显式姓名/手机/身份证/邮箱/详细地址。
