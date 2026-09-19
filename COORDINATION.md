@@ -62,12 +62,12 @@
 # DSH（前端）
 cd frontend
 npx vue-tsc --noEmit -p tsconfig.app.json                    # 期望退出码 0
-npx vitest run                                               # 期望 83 passed / 13 files
+npx vitest run                                               # 期望 86 passed / 14 files
 npm run build                                                # 期望退出码 0（含 vue-tsc -b，全量类型检查）
 
 # Codex（后端）
 cd backend
-.venv\Scripts\python.exe -m pytest -q                        # 期望 203 passed
+.venv\Scripts\python.exe -m pytest -q                        # 期望 212 passed
 .venv\Scripts\ruff.exe check app tests migrations            # 期望 All checks passed
 ```
 
@@ -76,6 +76,9 @@ cd backend
 `src/api/http.test.ts` 8 项与流式 2 项。后端 192 → 194：Codex 新增引用核验回归 2 项。均见 7.2。）
 （后端继续：194 → 202：Codex 提交 `eb3807c` 新增 2 项（httpx 日志脱敏、混合融合平局策略）；
 202 → 203：DSH 修复健康记录对话抽取并新增 1 项回归，提交 `75da600`。前端 E2E 24 → 25：随 `eb3807c` 增加 1 项。均见 7.2。）
+（后端继续：203 → 204：Codex 提交 `5ac1cab` 修复无向量精确术语被压制并新增 1 项回归。前端 83/13 → 86/14：
+DSH 设置页第一阶段新增 `src/views/settings.test.ts` 3 项，提交 `6ba4fe7`。E2E 仍为 25：DSH 路由矩阵减 1 项
+（`/app/profile`、`/app/health-records` 并入 `/app/settings`）并新增旧路径重定向 1 项。均见 7.2。）
 
 **为什么 `npm run build` 是必须的**：Vitest 用 esbuild 剥离类型，**不做类型检查**，所以类型错误只在
 `npm run build`（`vue-tsc -b`）暴露。2026-09-17 实测：ECharts 选项类型不兼容时 Vitest 全绿、
@@ -87,7 +90,7 @@ build 失败，最终是 build 拦下的。
 
 ```powershell
 cd frontend
-npm run e2e                                                  # 期望 24 passed
+npm run e2e                                                  # 期望 25 passed
 ```
 
 - 用 Playwright 驱动**本机已装的 Edge/Chrome**（不下载约 150MB 的 Chromium，可用
@@ -136,6 +139,10 @@ npm run e2e                                                  # 期望 24 passed
 
 | 日期 | 提出方 | 目标文件 | 请求内容 | 状态 |
 | --- | --- | --- | --- | --- |
+| 2026-09-19 | Codex | `frontend/src/views/SettingsView.vue`、设置页模型凭据组件/API/types | 后端已按冻结契约完成，无路径、字段、状态码或取值偏离：GET 凭据 → `{"items":[{"provider","maskedKey","updatedAt","lastVerifiedAt"}]}`；PUT 请求 `{"apiKey":"..."}`、响应单个同形摘要；DELETE 204；`GET /models` 每项新增 JSON 字段 `keySource: "server" \| "user"`（Python 字段 `key_source`）。provider 仅四家。保存验证使用固定 prompt、对应模型、`max_tokens=1`、HTTPS Authorization 头、8 秒超时；失败不落库，422 `MODEL_CREDENTIAL_INVALID`；已存用户 Key 失效时不会自动回落，删除后才回落服务端 Key。请继续第三分栏，并提示用户选择后脱敏咨询内容和健康摘要会发送给服务商。 | 待 DSH 对接第三分栏并更新前端类型/测试 |
+| 2026-09-19 | DSH | `backend/**`（**契约冻结确认，只需回一句**） | 用户已确认验证策略，与你 7.1 的任务名一致：**保存时验证**（同一模型 + `max_tokens=1`、仅走 HTTPS `Authorization: Bearer` 头、8s 超时、验证失败不落库）+ **密钥失效不自动回落服务端密钥**（明确报错，由用户在设置里更新或删除）。请在第 6 节或 7.2 回一句：是否按上一行「设置页需求」里冻结的路径/字段/错误码实现（`GET/PUT/DELETE /users/me/model-credentials`、`{provider, maskedKey, updatedAt, lastVerifiedAt}`、`ModelOut.key_source = "server" \| "user"`、422 `MODEL_CREDENTIAL_INVALID`）。**若有任何偏离——字段名、路径、状态码、`key_source` 取值——请写明偏差点**：DSH 打算按冻结契约先把前端做完（打桩验收），偏差点我单独改，避免等你落库期间两边空转。另外提醒一句：验证 ping 的 prompt 必须是固定字符串，**不得携带任何用户数据**。 | 已回应：按冻结契约完成，无偏离（`e18fdd9`） |
+| 2026-09-19 | DSH | `backend/**`（**新功能需求，来自用户；需一个新迁移**） | **需求：设置页支持「用户自带大模型 API Key 并自选模型」**（用户已确认：密钥**服务端加密存库**）。DSH 负责前端（侧边栏底部新增「设置」，把账户信息与健康记录并入设置页），后端请 Codex 实现。最小集：<br>**(1) 迁移 + 表** `user_model_credentials`：`user_id`(FK users，索引)、`provider`(deepseek/qwen/kimi/zhipuai)、`api_key_ciphertext`(复用 `core/security.py` 的 Fernet 字段加密)、`created_at`/`updated_at`/`last_verified_at`，唯一约束 `(user_id, provider)`。迁移编号由你定（当前 head `20260916_0013`）。<br>**(2) `/models` 扩展**：返回「服务端可用 ∪ 用户已配密钥」并集，`ModelOut` 增加 `key_source: "server" \| "user"`；列表非空时 `is_default` 必须存在。<br>**(3) 凭据 CRUD**（全部 `CurrentUser` + 按 user_id 隔离；读只回掩码、绝不回明文）：`GET /users/me/model-credentials` → `{provider, maskedKey, updatedAt, lastVerifiedAt}`；`PUT /users/me/model-credentials/{provider}`（幂等；写入前用一次极廉价调用验证，失败 422 `MODEL_CREDENTIAL_INVALID`）；`DELETE /users/me/model-credentials/{provider}`（204；删除后 `/models` 回落服务端密钥）。<br>**(4) 按用户解析模型**：取密钥路径支持「该用户配了 key 就用用户的，否则回落服务端」，且**所有**模型调用点都要走这条路径（`ai/provider.py`、`ai/graph/*`、追问卡生成、健康记录抽取），不能只让聊天生效。<br>**(5) 安全硬约束（DSH 坚持，请勿放宽）**：a. **v1 不做自定义 base_url**（只允许注册表里的 4 个提供商）——开放任意 base_url 等于让服务端变成 SSRF 跳板；b. 密钥**不得出现在响应明文、日志或 URL query**，只回掩码（如 `sk-…4f2a`）；c. 写入/验证接口**必须限流**，避免被用来探测 key；d. **安全提示词、红旗分流与引用审计对「用户自带密钥的模型」同样生效**，不得为其单开绕过路径（否则「不作确诊、不替代医生」的边界会被自带模型绕开）。<br>**(6) 测试**：密文落库（断言库内不等于明文）、掩码读取、跨用户隔离、删除后回落、非法 key 被拒、限流、解析优先级、`/models` 并集。<br>完成后请在 7.2 写明最终响应字段形状，前端按此对接。DSH 不动任何 backend 文件。 | 后端已完成（`e18fdd9`），待 DSH 对接第三分栏 |
+| 2026-09-19 | DSH | `backend/app/rag/retrieval.py`（**仅通报，DSH 不动实现**） | 用户要 DSH 确认「混合检索的无向量精确命中」是否与 Codex 在做的是同一件事。看板已给出答案：7.1 中 Codex 的任务「修复混合检索中无向量精确命中被压制并补回归测试」，状态 `进行中`、占用数据库=是，且 `retrieval.py`/`test_retrieval.py` 正在被修改 ⇒ **同一件事，DSH 不参与实现**，不动这两个文件、不占用数据库、不改融合逻辑。附 DSH 的独立诊断（纯函数实测，供你参考，不要求采纳）：`retrieval.py:121-124` 的 `float(vector_similarity or 0.0)` 把「缺少向量分」当作 0 分，因此只有关键词命中的候选只得 `0.15 × kw`；实测 `_fusion_score(kw=1.00, vec=None, hybrid)=0.15`，而仅向量 `vec=0.20` 得 `0.17`、`vec=0.30` 得 `0.255` ⇒ **任何向量相似度 > 0.1765 都能压过完全精确的关键词命中**（`keyword`/`vector` 两模式不受影响，各退化为 1.0 / 0.30）。提示一点：若只是把权重再平衡（例如 0.7/0.3），临界点仅平移到 `0.4286`，**「缺一路 = 0 分」这个结构性压制依然存在**；要消除它需对**存在的信号**做加权平均，或回到名次级融合。如需 DSH 补测试或跑评测复测，请在 7.1/第 6 节指派即可。 | 仅通报，不需要回应 |
 | 2026-09-19 | DSH | `backend/app/services/health_records.py`、`backend/app/api/routes/health_records.py`、`frontend/src/views/HomeView.vue`（**仅通报，无需 Codex 行动**） | 健康记录「对话→长期记忆」抽取此前一直失效：校验的是用户消息的 `is_medical_content`，而该字段线上只写在助手消息上，故恒返回 `stored: 0`。DSH 已修复并提交 `75da600`：`/health-records/extract` 的 `messageId` 现在是**助手回答 id**，后端回溯其前一条用户消息抽取。若真实联调中测过该接口，请按新语义复核；`backend/docs/HEALTH_RECORDS.md` 已同步。 | 已通知 |
 | 2026-09-19 | Codex | `PROJECT_PROGRESS.md`、`frontend/PROJECT_ROADMAP.md` | 请 DSH 同步本轮事实：当前共享工作树后端 202 passed、前端 83 passed、E2E 25 passed；真实前后端/高德/AI 流式联调已完成；混合检索已由 RRF 改为 85/15 加权融合；删除“未运行 E2E/独立题集”等过期陈述。 | 待处理 |
 | 2026-09-18 | Codex | `frontend/src/components/HospitalNavigator.vue`、`frontend/src/api/consultations.ts` 及对应测试/验收文档 | 用户已明确要求 Codex 接手并完成 DeepSeek 遗留项。本轮临时处理真实联调暴露的问题、显示导航隐私提示、流式异常时主动取消 reader；不改变长期所有权。 | 已处理（2026-09-19，见 7.2） |
@@ -191,6 +198,24 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 >
 > 本节按**写入时间**倒序（新条目插到最上）；条目标题里的时间戳是**工作发生时间**，两者不一定
 > 单调——例如 Codex 的 23:47 条目实际写在 DSH 的 23:58 条目之后。看到"乱序"不是错误，别去重排。
+
+### 2026-09-19 Codex 用户自带模型 API Key 后端（提交 `e18fdd9`）
+- 改动：迁移 `20260919_0014` 与加密凭据 CRUD；`/models` 用户/服务端 Key 并集及 `keySource`；聊天、病理卡片、健康记录抽取统一按用户解析；固定四家、1-token/8 秒验证、10 分钟 5 次限流；外发前移除显式姓名/手机/身份证/邮箱/详细地址。
+- 接口：GET 凭据返回 `{items:[{provider,maskedKey,updatedAt,lastVerifiedAt}]}`；PUT 请求 `{apiKey}` 并返回单个摘要；DELETE 204；无自定义 base URL、无明文响应。与 DSH 冻结契约无偏离。
+- 验证：迁移已应用且 current=`20260919_0014 (head)`；凭据专项 6 passed；完整后端 **212 passed**（204 → 212，新增 8 项）；Ruff 与 diff check 通过。Alembic check 仅报告三个既有 pg_trgm 索引未写入 ORM metadata，与本迁移无关。
+- 下一步：DSH 按第 6 节契约增加设置页第三分栏和隐私提示；同步后端基线 212。
+
+### 2026-09-19 21:47 DSH 设置页第一阶段：账户信息与健康记录并入设置分栏
+- 改动：新增 `frontend/src/views/SettingsView.vue`（「账户信息」「健康记录」两个分栏，初始分栏读 `?tab=`）；`frontend/src/router/index.ts` 新增 `/app/settings`，并把 `/app/profile`、`/app/health-records` 改为带 `?tab=` 的重定向；`frontend/src/layouts/WorkspaceLayout.vue` 主导航移除该两项、在侧边栏最下方新增「设置」入口（右上角头像下拉同步改指设置）；`frontend/src/views/ProfileView.vue` 去掉页面级「返回首页」按钮、卡片宽度改为 `min(760px, 100%)`；同步 `WorkspaceLayout.test.ts`、`e2e/layout.spec.ts`（路由矩阵 + 新增重定向用例）、`frontend/BROWSER_ACCEPTANCE.md`。提交 `6ba4fe7`（8 文件 +233/−34）。健康记录分栏改用 `defineAsyncComponent` 按需加载：SettingsView 包体 541.31 kB → 7.16 kB，ECharts（534.60 kB）只在真正打开该分栏时才下载。**未改任何后端文件**——用户自带 API Key 的后端部分已由 Codex 认领（其 7.1 行、`backend/app/models/model_credential.py`、迁移 `20260919_0014`），DSH 只按第 6 节清单提出需求。
+- 验证：前端 `vitest run` **86 passed / 14 files**（此前 83 passed / 13 files，新增 `src/views/settings.test.ts` 3 项）、`npm run build`（含 `vue-tsc -b`）退出码 0、`npm run e2e` **25 passed**。e2e 矩阵减 1 项（原 7 路由 ×1280px + 登录/注册 ×375px），新增「旧路径重定向到设置页的对应分栏」1 项，故总数不变。新增用例实测覆盖：默认分栏完全不加载健康记录接口、`?tab=health` 直达、切换分栏后账户分栏仍挂载且草稿不丢、两条旧路径确实 302 到 `/app/settings` 并带对 `tab`。
+- 阻塞：无。期间踩到并修掉两个**自己引入**的问题：健康记录原是静态导入，把 ECharts 拖进设置页包体（541 kB）；新用例的 `vi.waitFor` 用默认 1s 超时，整套用例并行运行时实测 993ms 贴着上限而偶发失败（已改为显式 5s，并留下注释说明原因）。
+- 下一步：**用户已决定（2026-09-19）等 Codex 的接口可用后再做第三个分栏「模型与密钥」**——DSH 不提前开工、不占用 7.1。接口就绪后按第 6 节冻结的契约对接；若 Codex 回「有偏离」，只改偏差项，不推翻已完成部分。届时一并把 `ProfileView.vue` 里「个人资料已保存」「离开个人资料」两处文案与新的「账户信息」命名对齐（本轮未改，避免在验证进行中改动文件）。
+
+### 2026-09-19 Codex 修复无向量精确术语在混合检索中被压制
+- 改动：`backend/app/rag/retrieval.py` 对无当前兼容向量的关键词候选保留原始关键词相关度；新增 5 个高相似度向量竞争项下的精确病名回归测试；同步 `backend/docs/EMBEDDINGS.md`。
+- 验证：检索专项 15 passed；后端完整套件 **204 passed**（203 → 204，新增 1 项）；Ruff All checks passed；`git diff --check` 无错误。
+- 阻塞：无；数据库占用已释放。
+- 下一步：后续用更大独立题集观察该保底策略的误召回，再决定是否增加强关键词阈值。
 
 ### 2026-09-19 16:27 DSH 修复健康记录「对话→长期记忆」抽取一直失效
 - 改动：`backend/app/services/health_records.py`（改为在**助手回答**上判定 `is_medical_content`，再回溯它之前最近的一条用户消息作为抽取文本）、`backend/app/api/routes/health_records.py`（summary）、`backend/tests/test_health_records.py`（辅助函数改为构造真实问答对，新增 1 项「判定以助手标记为准」回归）、`backend/docs/HEALTH_RECORDS.md`、`frontend/src/views/HomeView.vue`（改传助手回答 id）、`frontend/src/types/healthRecords.ts`；提交 `75da600`。
