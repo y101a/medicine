@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.health_context import render_health_context
 from app.ai.health_extract import extract_health_facts, is_safe_fact
-from app.ai.registry import ModelConfig, available_models
+from app.ai.registry import ModelConfig
 from app.core.errors import AppError
 from app.core.security import decrypt_sensitive, encrypt_sensitive
 from app.models import (
@@ -38,6 +38,7 @@ from app.schemas.health_records import (
     HealthRecordSettingsUpdate,
     HealthRecordUpdate,
 )
+from app.services.model_credentials import preferred_model_for_user
 
 MAX_LIST_ITEMS = 200
 MAX_CONTEXT_RECORDS = 20
@@ -269,9 +270,10 @@ async def build_health_context(db: AsyncSession, user_id: UUID) -> str | None:
     return render_health_context(json.dumps(entries, ensure_ascii=False))
 
 
-def extraction_model() -> ModelConfig | None:
-    models = available_models()
-    return models[0] if models else None
+async def extraction_model(
+    db: AsyncSession, user_id: UUID
+) -> ModelConfig | None:
+    return await preferred_model_for_user(db, user_id)
 
 
 async def _existing_fact_texts(db: AsyncSession, user_id: UUID, limit: int = 20) -> list[str]:
@@ -292,7 +294,7 @@ async def extract_and_store(
     row = await get_or_create_settings(db, user_id)
     if not row.collection_enabled or row.last_extracted_message_id == message_id:
         return 0
-    model = extraction_model()
+    model = await extraction_model(db, user_id)
     if model is None:
         return 0
     try:

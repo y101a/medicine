@@ -1,5 +1,6 @@
 import json
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 from app.api.routes import consultations as route
@@ -129,9 +130,15 @@ async def test_stream_final_message_saves_only_real_references_without_database(
     # 本用例刻意不使用数据库，健康记录上下文必须被桩掉。
     monkeypatch.setattr(route.health_service, "build_health_context", no_health_context)
     monkeypatch.setattr(route, "run_consultation_generation", context)
-    monkeypatch.setattr(route, "get_model", lambda *_: SimpleNamespace(
-        id="test", name="隔离模型", provider="test",
-    ))
+    monkeypatch.setattr(
+        route,
+        "get_model_for_user",
+        AsyncMock(
+            return_value=SimpleNamespace(
+                id="test", name="隔离模型", provider="test"
+            )
+        ),
+    )
     monkeypatch.setattr(route.provider, "stream_chat", chunks)
     response = await route.stream_answer(
         uuid4(), SimpleNamespace(model_id="test", answer_format="plain",

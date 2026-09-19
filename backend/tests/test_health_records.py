@@ -4,6 +4,7 @@ These need PostgreSQL. The router is mounted on a local app so the suite works b
 before and after registration in ``app.api.router``.
 """
 
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -262,7 +263,9 @@ async def test_extraction_stores_conversation_facts_once(health_context, monkeyp
         ]
 
     monkeypatch.setattr(service, "extract_health_facts", fake_extract)
-    monkeypatch.setattr(service, "extraction_model", lambda: object())
+    monkeypatch.setattr(
+        service, "extraction_model", AsyncMock(return_value=object())
+    )
     payload = {
         "consultationId": str(answer.consultation_id),
         "messageId": str(answer.id),
@@ -290,7 +293,9 @@ async def test_extraction_skips_small_talk_and_foreign_messages(health_context, 
         return []
 
     monkeypatch.setattr(service, "extract_health_facts", fake_extract)
-    monkeypatch.setattr(service, "extraction_model", lambda: object())
+    monkeypatch.setattr(
+        service, "extraction_model", AsyncMock(return_value=object())
+    )
 
     _, chat = await add_exchange(db, first, "你好", medical=False)
     authenticate(client, first)
@@ -317,7 +322,9 @@ async def test_extraction_is_driven_by_the_assistant_flag(health_context, monkey
         return [ExtractedFact(category=HealthRecordCategory.SYMPTOM, content="最近经常口渴")]
 
     monkeypatch.setattr(service, "extract_health_facts", fake_extract)
-    monkeypatch.setattr(service, "extraction_model", lambda: object())
+    monkeypatch.setattr(
+        service, "extraction_model", AsyncMock(return_value=object())
+    )
 
     # 契约：messageId 必须是助手回答，传用户消息一律 404。
     user_payload = {
@@ -350,7 +357,9 @@ async def test_extraction_respects_disabled_collection(health_context, monkeypat
         return [ExtractedFact(category=HealthRecordCategory.SYMPTOM, content="最近经常口渴")]
 
     monkeypatch.setattr(service, "extract_health_facts", fake_extract)
-    monkeypatch.setattr(service, "extraction_model", lambda: object())
+    monkeypatch.setattr(
+        service, "extraction_model", AsyncMock(return_value=object())
+    )
     await client.patch(f"{API}/settings", json={"collectionEnabled": False})
 
     payload = {"consultationId": str(answer.consultation_id), "messageId": str(answer.id)}

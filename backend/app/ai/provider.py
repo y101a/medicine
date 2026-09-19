@@ -7,6 +7,7 @@ import httpx
 from app.ai.registry import ModelConfig
 from app.core.config import get_settings
 from app.core.errors import AppError
+from app.core.privacy import redact_direct_identifiers
 
 SYSTEM_PROMPT = """你是“病理诊断科普助手”，面向普通用户提供健康科普和就医分流。
 必须遵守：
@@ -129,6 +130,18 @@ def history_for_model(history: list[dict[str, str]]) -> list[dict[str, str]]:
     return history
 
 
+def redact_history_for_provider(
+    history: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    return [
+        {
+            "role": item["role"],
+            "content": redact_direct_identifiers(item["content"])[0],
+        }
+        for item in history_for_model(history)
+    ]
+
+
 def chat_completions_url(base_url: str) -> str:
     normalized = base_url.rstrip("/")
     if normalized.endswith("/chat/completions"):
@@ -168,7 +181,7 @@ async def stream_chat(
                 "role": "system",
                 "content": system_content,
             },
-            *history_for_model(history),
+            *redact_history_for_provider(history),
         ],
         **model.extra_payload,
     }

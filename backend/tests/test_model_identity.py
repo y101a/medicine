@@ -105,3 +105,24 @@ def test_only_pure_identity_questions_drop_history(question, expected) -> None:
     ]
     selected = provider.history_for_model(history)
     assert (selected == history[-1:]) is expected
+
+
+def test_provider_history_redacts_direct_identifiers() -> None:
+    history = [
+        {
+            "role": "user",
+            "content": (
+                "我叫张三，手机号13800138000，身份证11010519491231002X，"
+                "邮箱test@example.com，最近头痛"
+            ),
+        }
+    ]
+
+    redacted = provider.redact_history_for_provider(history)
+
+    assert redacted[0]["role"] == "user"
+    assert "张三" not in redacted[0]["content"]
+    assert "13800138000" not in redacted[0]["content"]
+    assert "11010519491231002X" not in redacted[0]["content"]
+    assert "test@example.com" not in redacted[0]["content"]
+    assert "头痛" in redacted[0]["content"]

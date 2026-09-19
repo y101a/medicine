@@ -1,5 +1,6 @@
 import asyncio
 import json
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -120,7 +121,8 @@ async def test_stream_answer_is_incremental_and_persisted(profile_context, monke
         api_key=SecretStr("test-key"),
     )
     monkeypatch.setattr(
-        "app.api.routes.consultations.get_model", lambda model_id: selected_model
+        "app.api.routes.consultations.get_model_for_user",
+        AsyncMock(return_value=selected_model),
     )
 
     evidence = {
@@ -280,7 +282,8 @@ async def test_structured_follow_up_is_validated_persisted_and_restored(
         api_key=SecretStr("test-key"),
     )
     monkeypatch.setattr(
-        "app.api.routes.consultations.get_model", lambda model_id: selected_model
+        "app.api.routes.consultations.get_model_for_user",
+        AsyncMock(return_value=selected_model),
     )
     evidence = {
         "source_key": "developer_prototype_knowledge",
@@ -425,7 +428,10 @@ async def test_available_models_are_authenticated_and_safe(profile_context, monk
         base_url="https://example.test/v4",
         api_key=SecretStr("must-not-leak"),
     )
-    monkeypatch.setattr("app.api.routes.models.available_models", lambda: [configured])
+    monkeypatch.setattr(
+        "app.api.routes.models.available_models_for_user",
+        AsyncMock(return_value=[configured]),
+    )
     assert (await client.get("/api/v1/models")).status_code == 401
     client.cookies.set(ACCESS_COOKIE, create_access_token(user.id))
     response = await client.get("/api/v1/models")
@@ -439,6 +445,7 @@ async def test_available_models_are_authenticated_and_safe(profile_context, monk
                 "providerName": configured.provider_name,
                 "description": configured.description,
                 "isDefault": True,
+                "keySource": "server",
             }
         ]
     }
@@ -516,7 +523,8 @@ async def test_stream_without_evidence_never_persists_fake_citations(
         base_url="https://example.test/v1", api_key=SecretStr("test-only"),
     )
     monkeypatch.setattr(
-        "app.api.routes.consultations.get_model", lambda _model_id: selected,
+        "app.api.routes.consultations.get_model_for_user",
+        AsyncMock(return_value=selected),
     )
 
     async def fake_context(_text, _db):

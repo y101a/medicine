@@ -10,6 +10,7 @@ from sqlalchemy import and_, func, literal, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.core.privacy import redact_direct_identifiers
 from app.models import KnowledgeChunk, KnowledgeDocument, KnowledgeSource
 from app.rag.embeddings import EmbeddingBatch, EmbeddingError, embed_texts
 
@@ -27,14 +28,6 @@ HYBRID_CANDIDATE_LIMIT = 20
 HYBRID_VECTOR_WEIGHT = 0.85
 HYBRID_KEYWORD_WEIGHT = 0.15
 MIN_KEYWORD_SCORE = 0.1
-SENSITIVE_PATTERNS = (
-    re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)"),
-    re.compile(r"(?<!\d)\d{17}[0-9Xx](?!\w)"),
-    re.compile(r"(?<!\d)\d{15}(?!\d)"),
-    re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"),
-    re.compile(r"(?:姓名[:：]?|我叫)\s*[\u4e00-\u9fff·]{2,10}"),
-    re.compile(r"(?:住址|详细地址|家庭地址)[:：]?[^，。；\n]{4,80}"),
-)
 KEYWORD_NOISE_PATTERN = re.compile(
     r"个人信息已移除|请问|我想了解|想了解|我有|我得了|最近|"
     r"可能是|可能|有哪些|有什么|症状|表现|怎么治疗|如何治疗|"
@@ -79,10 +72,7 @@ class RetrievalResult:
 
 def sanitize_retrieval_query(query: str) -> tuple[str, bool]:
     normalized = unicodedata.normalize("NFKC", query).replace("\x00", " ")
-    redacted = False
-    for pattern in SENSITIVE_PATTERNS:
-        normalized, replacements = pattern.subn(" [个人信息已移除] ", normalized)
-        redacted = redacted or replacements > 0
+    normalized, redacted = redact_direct_identifiers(normalized)
     normalized = re.sub(r"\s+", " ", normalized).strip()
     if len(normalized) > MAX_QUERY_CHARS:
         normalized = normalized[:MAX_QUERY_CHARS].rstrip()

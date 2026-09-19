@@ -16,6 +16,7 @@ from app.ai.provider import chat_completions_url
 from app.ai.registry import ModelConfig
 from app.core.config import get_settings
 from app.core.errors import AppError
+from app.core.privacy import redact_direct_identifiers
 from app.models.health_record import CATEGORY_LABELS, HealthRecordCategory
 
 EXTRACTION_TIMEOUT_SECONDS = 20
@@ -61,9 +62,13 @@ def build_extraction_prompt(
     category_lines = "\n".join(
         f"- {category.value}：{label}" for category, label in CATEGORY_LABELS.items()
     )
+    safe_user_text = redact_direct_identifiers(user_text)[0]
     existing = "（暂无）"
     if existing_facts:
-        existing = "\n".join(f"- {item}" for item in existing_facts[:MAX_EXISTING_FACTS])
+        existing = "\n".join(
+            f"- {redact_direct_identifiers(item)[0]}"
+            for item in existing_facts[:MAX_EXISTING_FACTS]
+        )
     return f"""你是健康记录抽取器。只把“用户自己明确说出的”健康事实抽成结构化条目。
 
 规则：
@@ -85,7 +90,7 @@ category 只能取以下键之一：
 {existing}
 
 用户本轮消息：
-{user_text[:MAX_USER_TEXT_CHARS]}"""
+{safe_user_text[:MAX_USER_TEXT_CHARS]}"""
 
 
 def _strip_code_fence(raw: str) -> str:

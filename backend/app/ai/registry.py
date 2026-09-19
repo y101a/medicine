@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import Literal
 
 from pydantic import SecretStr
 
@@ -16,6 +17,7 @@ class ModelConfig:
     base_url: str
     api_key: SecretStr
     extra_payload: dict[str, object] = field(default_factory=dict)
+    key_source: Literal["server", "user"] = "server"
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +76,47 @@ MODEL_DEFINITIONS = (
 )
 
 
+def get_model_definition(model_id: str) -> ModelDefinition:
+    definition = next(
+        (item for item in MODEL_DEFINITIONS if item.id == model_id),
+        None,
+    )
+    if definition is None:
+        raise AppError(422, "MODEL_NOT_AVAILABLE", "所选模型不存在或尚未配置")
+    return definition
+
+
+def get_provider_definition(provider: str) -> ModelDefinition:
+    definition = next(
+        (item for item in MODEL_DEFINITIONS if item.provider == provider),
+        None,
+    )
+    if definition is None:
+        raise AppError(422, "MODEL_PROVIDER_UNSUPPORTED", "暂不支持该模型服务商")
+    return definition
+
+
+def model_config(
+    definition: ModelDefinition,
+    api_key: SecretStr,
+    *,
+    settings: Settings | None = None,
+    key_source: Literal["server", "user"] = "server",
+) -> ModelConfig:
+    current = settings or get_settings()
+    return ModelConfig(
+        id=definition.id,
+        name=definition.name,
+        provider=definition.provider,
+        provider_name=definition.provider_name,
+        description=definition.description,
+        base_url=getattr(current, definition.base_url_setting),
+        api_key=api_key,
+        extra_payload=definition.extra_payload,
+        key_source=key_source,
+    )
+
+
 def available_models(settings: Settings | None = None) -> list[ModelConfig]:
     current = settings or get_settings()
     models: list[ModelConfig] = []
@@ -81,18 +124,7 @@ def available_models(settings: Settings | None = None) -> list[ModelConfig]:
         api_key = getattr(current, definition.api_key_setting)
         if not api_key or not api_key.get_secret_value().strip():
             continue
-        models.append(
-            ModelConfig(
-                id=definition.id,
-                name=definition.name,
-                provider=definition.provider,
-                provider_name=definition.provider_name,
-                description=definition.description,
-                base_url=getattr(current, definition.base_url_setting),
-                api_key=api_key,
-                extra_payload=definition.extra_payload,
-            )
-        )
+        models.append(model_config(definition, api_key, settings=current))
     return models
 
 

@@ -12,6 +12,7 @@ from app.models.knowledge import (
     KnowledgeDocument,
     KnowledgeSource,
 )
+from app.models.model_credential import UserModelCredential
 from app.models.user import Gender, User, UserCredentials, UserRole, UserStatus
 
 __all__ = [
@@ -26,6 +27,7 @@ __all__ = [
     "KnowledgeDocument",
     "KnowledgeSource",
     "Message",
+    "UserModelCredential",
     "Gender",
     "User",
     "UserCredentials",

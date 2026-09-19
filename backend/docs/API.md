@@ -53,6 +53,46 @@ Cookie 和刷新 Cookie，并返回 `{ "user": AuthUser }`。
 居中裁切为 512×512 WebP。头像文件使用用户 UUID 命名并保存在
 `AVATAR_STORAGE_DIR`，用户只能上传和读取自己的头像。
 
+## 用户自带模型 API Key
+
+设置页只允许配置模型注册表中的四个服务商：`deepseek`、`qwen`、`kimi`、
+`zhipuai`。不接受自定义 `baseUrl`，避免服务器被用作任意外部请求入口。
+
+| 方法与路径 | 用途 |
+| --- | --- |
+| `GET /users/me/model-credentials` | 返回当前用户已配置的凭据摘要 |
+| `PUT /users/me/model-credentials/{provider}` | 验证并加密保存或替换凭据 |
+| `DELETE /users/me/model-credentials/{provider}` | 删除凭据 |
+
+PUT 请求为 `{"apiKey":"..."}`。保存前，后端只通过 HTTPS `Authorization`
+请求头向该服务商的固定官方地址发起一次 `max_tokens=1` 的验证请求；Key 不进入 URL
+或日志。验证失败返回 422 `MODEL_CREDENTIAL_INVALID`，服务商故障与超时分别返回
+502/504。验证接口按用户限制为 10 分钟 5 次。
+
+GET 响应只返回掩码，永不返回明文：
+
+~~~json
+{
+  "items": [
+    {
+      "provider": "deepseek",
+      "maskedKey": "sk-…4f2a",
+      "updatedAt": "2026-09-19T12:00:00Z",
+      "lastVerifiedAt": "2026-09-19T12:00:00Z"
+    }
+  ]
+}
+~~~
+
+`GET /models` 返回服务端可用模型与用户已配置模型的并集，并新增
+`keySource`（`server` 或 `user`）。同一服务商同时存在两类 Key 时使用用户 Key；
+删除用户 Key 后自动回落服务端 Key。用户 Key 只改变认证凭据，不改变固定官方地址、
+模型白名单、安全提示词、红旗分流、RAG 或引用核验流程。
+
+用户主动选择自带 Key 的模型后，本轮咨询内容及允许注入的健康记录摘要会发送到对应
+服务商。发送前会移除显式姓名、手机号、身份证号、邮箱和详细地址；前端必须在
+设置页明确披露该数据流向。脱敏降低直接身份暴露，但不代表健康文本已经匿名化。
+
 ## 错误响应
 
 ```json
@@ -141,7 +181,7 @@ status 可能为 completed、empty、failed 或 skipped。事件不会返回证�
 | `GET /health-records/settings` | 读取采集开关与首次通知状态 |
 | `PATCH /health-records/settings` | 关闭或重新开启自动采集 |
 | `POST /health-records/onboarding` | 提交首次采集的身体状况（也可跳过） |
-| `POST /health-records/extract` | 按某条用户消息增量提取事实，前端在回答完成后调用 |
+| `POST /health-records/extract` | 按某条助手回答回溯对应用户消息并增量提取事实 |
 | `GET /health-records` | 列出当前用户的健康记录 |
 | `POST /health-records` | 手动新增一条记录 |
 | `PATCH /health-records/{record_id}` | 修改一条记录，来源改为用户自述 |

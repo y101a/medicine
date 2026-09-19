@@ -14,7 +14,6 @@ from app.ai.follow_up import (
     split_follow_up_content,
 )
 from app.ai.graph import render_rag_context, run_consultation_generation
-from app.ai.registry import get_model
 from app.api.dependencies import CurrentUser, DbSession
 from app.core.errors import AppError
 from app.rag.citation_audit import audit_answer_citations
@@ -30,6 +29,7 @@ from app.schemas.consultations import (
 )
 from app.services import consultations as service
 from app.services import health_records as health_service
+from app.services.model_credentials import get_model_for_user
 
 router = APIRouter(prefix="/consultations", tags=["咨询"])
 
@@ -79,7 +79,7 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
             "EMERGENCY_TRIAGE_ACTIVE",
             "当前消息命中紧急分流规则，请优先拨打 120，不再生成普通 AI 回答",
         )
-    model = get_model(payload.model_id)
+    model = await get_model_for_user(db, user.id, payload.model_id)
     source_message_id = getattr(payload, "source_message_id", None)
     if source_message_id is not None:
         if payload.answer_format != "card":

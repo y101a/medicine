@@ -102,6 +102,19 @@ def test_prompt_truncates_overlong_message():
     assert "啊" * 1201 not in prompt
 
 
+def test_prompt_redacts_direct_identifiers_before_provider_call():
+    prompt = build_extraction_prompt(
+        "我叫张三，手机号13800138000，身份证11010519491231002X，最近总口渴",
+        ["联系邮箱 test@example.com"],
+    )
+
+    assert "张三" not in prompt
+    assert "13800138000" not in prompt
+    assert "11010519491231002X" not in prompt
+    assert "test@example.com" not in prompt
+    assert "总口渴" in prompt
+
+
 def test_health_context_block_states_the_safety_boundaries():
     block = render_health_context('[{"category":"近期症状","content":"夜间失眠"}]')
     assert "夜间失眠" in block
