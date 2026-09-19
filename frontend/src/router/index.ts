@@ -26,12 +26,10 @@ const router = createRouter({
         { path: 'chat', name: 'chat', component: () => import('../views/HomeView.vue') },
         { path: 'consultations/:id', name: 'consultation', component: () => import('../views/HomeView.vue') },
         { path: 'history', name: 'history', component: () => import('../views/HistoryView.vue') },
-        { path: 'profile', name: 'profile', component: () => import('../views/ProfileView.vue') },
-        {
-          path: 'health-records',
-          name: 'healthRecords',
-          component: () => import('../views/HealthRecordView.vue'),
-        },
+        { path: 'settings', name: 'settings', component: () => import('../views/SettingsView.vue') },
+        // 旧路径保留为重定向：账户信息与健康记录已并入设置页分栏，任何旧链接仍然可用。
+        { path: 'profile', redirect: { name: 'settings', query: { tab: 'account' } } },
+        { path: 'health-records', redirect: { name: 'settings', query: { tab: 'health' } } },
       ],
     },
     { path: '/:pathMatch(.*)*', redirect: '/login' },

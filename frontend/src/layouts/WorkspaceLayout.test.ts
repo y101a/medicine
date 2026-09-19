@@ -64,8 +64,7 @@ async function setup() {
       { path: '/app', name: 'home', component: { template: '<p>home</p>' } },
       { path: '/app/chat', name: 'chat', component: { template: '<p>chat</p>' } },
       { path: '/app/history', name: 'history', component: { template: '<p>history</p>' } },
-      { path: '/app/health-records', name: 'healthRecords', component: { template: '<p>records</p>' } },
-      { path: '/app/profile', name: 'profile', component: { template: '<p>profile</p>' } },
+      { path: '/app/settings', name: 'settings', component: { template: '<p>settings</p>' } },
     ],
   })
   await router.push('/app')
@@ -108,12 +107,15 @@ describe('工作区布局与健康记录接入', () => {
     wrapper.unmount()
   })
 
-  it('导航中提供健康记录入口', async () => {
+  it('导航底部提供设置入口，且不再单列健康记录与个人中心', async () => {
     const { wrapper } = await setup()
 
-    const link = wrapper.find('a[href="/app/health-records"]')
+    const link = wrapper.find('a[href="/app/settings"]')
     expect(link.exists()).toBe(true)
-    expect(link.text()).toContain('健康记录')
+    expect(link.text()).toContain('设置')
+    // 这两项已并入设置页分栏；断言它们确实从导航里消失，避免以为入口还留着。
+    expect(wrapper.find('a[href="/app/health-records"]').exists()).toBe(false)
+    expect(wrapper.find('a[href="/app/profile"]').exists()).toBe(false)
     wrapper.unmount()
   })
 

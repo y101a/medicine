@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { House, ChatDotRound, Clock, User, Plus, Fold, Expand, ArrowDown, FirstAidKit } from '@element-plus/icons-vue'
+import { House, ChatDotRound, Clock, Setting, Plus, Fold, Expand, ArrowDown } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../stores/auth'
 import { getApiErrorMessage } from '../api/http'
@@ -15,7 +15,7 @@ const healthRecords = useHealthRecordsStore()
 watch(() => store.user?.id, (id) => {
   if (id) {
     void consultations.load()
-    // 首次登录只提示一次；采集默认开启，用户可在健康记录页关闭。
+    // 首次登录只提示一次；采集默认开启，用户可在设置 → 健康记录里关闭。
     void healthRecords.checkFirstNotice()
   }
 }, { immediate: true })
@@ -32,21 +32,18 @@ const title = computed(() => ({
   chat: '智能咨询',
   consultation: '智能咨询',
   history: '咨询历史',
-  healthRecords: '健康记录',
-  profile: '个人中心',
+  settings: '设置',
 }[String(route.name)] || '病理诊断科普助手'))
 const links = [
   { path: '/app', label: '首页', icon: House, names: ['home'] },
   { path: '/app/chat', label: '智能咨询', icon: ChatDotRound, names: ['chat', 'consultation'] },
   { path: '/app/history', label: '咨询历史', icon: Clock, names: ['history'] },
-  { path: '/app/health-records', label: '健康记录', icon: FirstAidKit, names: ['healthRecords'] },
-  { path: '/app/profile', label: '个人中心', icon: User, names: ['profile'] },
 ]
 async function newChat() {
   await router.push({ path: '/app/chat', query: { new: String(Date.now()) } })
 }
 async function menu(command: string) {
-  if (command === 'profile') return router.push('/app/profile')
+  if (command === 'settings') return router.push('/app/settings')
   if (store.pendingAction === 'logout') return
   try {
     await store.logout()
@@ -78,6 +75,11 @@ async function menu(command: string) {
           :to="`/app/consultations/${item.id}`" :title="item.title"
           :class="{ active: route.params.id === item.id }">{{ item.title }}</router-link>
       </section>
+      <nav class="sidebar-settings" aria-label="设置">
+        <router-link to="/app/settings" title="设置" :class="{ selected: route.name === 'settings' }">
+          <el-icon><Setting /></el-icon><span v-if="!collapsed">设置</span>
+        </router-link>
+      </nav>
       <div class="sidebar-bottom">
         <span v-if="!collapsed" class="version">健康科普 · 个人工作区</span>
         <button class="icon-button" :aria-label="collapsed ? '展开侧栏' : '收起侧栏'" @click="collapsed = !collapsed">
@@ -96,7 +98,7 @@ async function menu(command: string) {
             <span>{{ displayName }}</span><el-icon><ArrowDown /></el-icon>
           </button>
           <template #dropdown><el-dropdown-menu>
-            <el-dropdown-item command="profile">个人资料</el-dropdown-item>
+            <el-dropdown-item command="settings">设置</el-dropdown-item>
             <el-dropdown-item command="logout" divided :disabled="store.pendingAction === 'logout'">退出登录</el-dropdown-item>
           </el-dropdown-menu></template>
         </el-dropdown>
@@ -154,8 +156,8 @@ nav { display: grid; gap: 5px; }
 nav a { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 8px; text-decoration: none; color: #647588; font-size: 14px; white-space: nowrap; }
 nav a:hover, .new-chat:hover { background: #edf3f9; }
 nav a.selected { background: #e7f0fa; color: #196db2; font-weight: 600; }
-.sidebar-note { margin: 38px 12px; font-size: 12px; color: #96a3b1; line-height: 1.8; }
-.sidebar-note span { color: #718497; }
+/* 设置钉在侧边栏最下方：.sidebar-bottom 的 margin-top:auto 会把这两块一起推到底部。 */
+.sidebar-settings { margin-top: 14px; padding-top: 12px; border-top: 1px solid #e8edf3; }
 .sidebar-bottom { margin-top: auto; display: flex; align-items: center; justify-content: space-between; }
 .version { font-size: 11px; color: #91a0af; }
 .icon-button { padding: 8px; background: none; border: none; color: #718497; cursor: pointer; }

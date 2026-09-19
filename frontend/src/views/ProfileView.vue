@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import { useRouter, onBeforeRouteLeave } from 'vue-router'
+import { onBeforeRouteLeave } from 'vue-router'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
-import { ArrowLeft, User } from '@element-plus/icons-vue'
+import { User } from '@element-plus/icons-vue'
 import { useAuthStore } from '../stores/auth'
 import { getApiErrorMessage } from '../api/http'
 import type { Gender, UpdateProfileRequest } from '../types/auth'
 
 const store = useAuthStore()
-const router = useRouter()
 const formRef = ref<FormInstance>()
 const saving = ref(false)
 const uploadingAvatar = ref(false)
@@ -122,9 +121,6 @@ onBeforeRouteLeave(async () => {
 <template>
   <main class="profile-page">
     <section class="profile-card" aria-labelledby="profile-title">
-      <el-button link :icon="ArrowLeft" :disabled="saving" @click="router.push('/app')">
-        返回首页
-      </el-button>
       <header class="profile-header">
         <div class="avatar-editor">
           <div class="avatar">
@@ -138,7 +134,7 @@ onBeforeRouteLeave(async () => {
         </div>
         <div>
           <p class="caption">病理诊断科普助手</p>
-          <h1 id="profile-title">个人资料</h1>
+          <h1 id="profile-title">账户信息</h1>
           <p class="subtitle">查看账户信息，更新头像、姓名与性别</p>
         </div>
       </header>
@@ -186,7 +182,7 @@ onBeforeRouteLeave(async () => {
 <style scoped>
 .profile-page { min-height: 100%; display: grid; place-items: center; padding: 40px;
   background: #fff; }
-.profile-card { width: 760px; padding: 32px 40px; border: 1px solid #dceaf5;
+.profile-card { width: min(760px, 100%); padding: 32px 40px; border: 1px solid #dceaf5;
   border-radius: 22px; background: #fff; box-shadow: 0 24px 64px rgb(30 82 124 / 10%); }
 .profile-header { display: flex; align-items: center; gap: 18px; margin: 28px 0; }
 .avatar-editor { display: grid; justify-items: center; gap: 7px; flex: 0 0 auto; }

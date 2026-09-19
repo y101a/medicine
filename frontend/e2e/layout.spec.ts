@@ -21,8 +21,7 @@ const ROUTE_NAMES: Record<string, string> = {
   '/app': '首页',
   '/app/chat': '智能咨询',
   '/app/history': '咨询历史',
-  '/app/profile': '个人中心',
-  '/app/health-records': '健康记录',
+  '/app/settings': '设置',
 }
 
 /** 未登录访客能访问、且已做移动端适配的页面。 */
@@ -53,6 +52,23 @@ for (const item of MATRIX) {
     ).toBeLessThanOrEqual(1)
   })
 }
+
+test('旧路径重定向到设置页的对应分栏', async ({ page }) => {
+  await installApiStubs(page)
+  await page.setViewportSize({ width: 1280, height: 800 })
+
+  await page.goto('/app/health-records')
+  await waitForRendered(page)
+  // 重定向本身必须断言：只看内容的话，万一重定向失效、旧路由仍渲染着页面，测试会照旧通过。
+  expect(new URL(page.url()).pathname, '/app/health-records 应重定向到 /app/settings').toBe('/app/settings')
+  expect(page.url(), '重定向应带上 tab=health').toContain('tab=health')
+  await expect(page.locator('.health-records__title')).toBeVisible()
+
+  await page.goto('/app/profile')
+  await waitForRendered(page)
+  expect(new URL(page.url()).pathname, '/app/profile 应重定向到 /app/settings').toBe('/app/settings')
+  await expect(page.locator('#profile-title')).toBeVisible()
+})
 
 test('移动端：记录工作区 1000px 桌面优先约束（已知范围问题，非缺陷）', async ({ page }) => {
   await installApiStubs(page)
