@@ -128,10 +128,22 @@ function defaultStubs(authenticated: boolean, noticeSeen: boolean): StubTable {
             providerName: 'DeepSeek',
             description: '仅用于界面验收',
             isDefault: true,
+            keySource: 'server',
           },
         ],
       },
     },
+
+    'GET /users/me/model-credentials': { body: { items: [] } },
+    'PUT /users/me/model-credentials/*': {
+      body: {
+        provider: 'deepseek',
+        maskedKey: 'sk-…4f2a',
+        updatedAt: '2026-09-19T12:00:00Z',
+        lastVerifiedAt: '2026-09-19T12:00:00Z',
+      },
+    },
+    'DELETE /users/me/model-credentials/*': { body: {} },
 
     'POST /navigation/nearby-hospitals': { body: HOSPITALS },
     'POST /navigation/hospitals-by-area': { body: HOSPITALS },

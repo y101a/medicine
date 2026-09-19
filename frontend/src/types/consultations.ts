@@ -69,4 +69,6 @@ export interface AiModel {
   providerName: string
   description: string
   isDefault: boolean
+  /** 该模型的密钥来自本站（server）还是用户自己配置的（user）。 */
+  keySource: 'server' | 'user'
 }

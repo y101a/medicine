@@ -1,17 +1,19 @@
 <script setup lang="ts">
-import { defineAsyncComponent, ref, type Component } from 'vue'
+import { defineAsyncComponent, ref, watch, type Component } from 'vue'
 import { useRoute } from 'vue-router'
-import { FirstAidKit, User } from '@element-plus/icons-vue'
+import { FirstAidKit, Key, User } from '@element-plus/icons-vue'
 import ProfileView from './ProfileView.vue'
+import ModelCredentialsPanel from '../components/settings/ModelCredentialsPanel.vue'
 
 // 健康记录分栏按需加载：它带 ECharts（构建后约 540 kB），只看账户信息的人不该为它付下载成本。
 const HealthRecordView = defineAsyncComponent(() => import('./HealthRecordView.vue'))
 
-type SettingsTab = 'account' | 'health'
+type SettingsTab = 'account' | 'health' | 'credentials'
 
 const TABS: { value: SettingsTab; label: string; icon: Component }[] = [
   { value: 'account', label: '账户信息', icon: User },
   { value: 'health', label: '健康记录', icon: FirstAidKit },
+  { value: 'credentials', label: '模型与密钥', icon: Key },
 ]
 
 const route = useRoute()
@@ -22,7 +24,19 @@ const route = useRoute()
  * 之后切换分栏只改本地状态、不动地址。原因：工作区是 `<router-view :key="route.fullPath">`，
  * 查询参数一变整个页面就会重挂载，账户分栏里未保存的姓名/性别草稿会被悄悄抹掉。
  */
-const tab = ref<SettingsTab>(String(route.query.tab) === 'health' ? 'health' : 'account')
+const requestedTab = String(route.query.tab)
+const tab = ref<SettingsTab>(
+  requestedTab === 'health' ? 'health' : requestedTab === 'credentials' ? 'credentials' : 'account',
+)
+
+/**
+ * 「模型与密钥」里可能正粘着一个还没保存的 Key，所以这个分栏一旦打开就保持挂载（v-show），
+ * 切走再切回不会把输入框清空。但首次打开前不挂载——账户分栏下不该白跑一次凭据接口。
+ */
+const credentialsOpened = ref(tab.value === 'credentials')
+watch(tab, value => {
+  if (value === 'credentials') credentialsOpened.value = true
+})
 </script>
 
 <template>
@@ -30,7 +44,7 @@ const tab = ref<SettingsTab>(String(route.query.tab) === 'health' ? 'health' : '
     <header class="settings__header">
       <h1 class="settings__title">设置</h1>
       <p class="settings__intro">
-        账户资料与健康记录都在这里。健康记录只保存你在对话中<strong>自己说过</strong>的信息，
+        账户资料、健康记录与模型密钥都在这里。健康记录只保存你在对话中<strong>自己说过</strong>的信息，
         是背景资料，不是诊断结论，也不能替代医生面诊。
       </p>
     </header>
@@ -57,6 +71,10 @@ const tab = ref<SettingsTab>(String(route.query.tab) === 'health' ? 'health' : '
       <!-- 健康记录分栏是重内容（列表 + 图表），按需挂载，避免在账户分栏里白跑接口、白建图表。 -->
       <section v-if="tab === 'health'" role="tabpanel" aria-label="健康记录">
         <HealthRecordView />
+      </section>
+      <!-- 首次打开才挂载（避免白跑凭据接口），之后保持挂载（避免丢掉粘贴了一半的 Key）。 -->
+      <section v-show="tab === 'credentials'" role="tabpanel" aria-label="模型与密钥">
+        <ModelCredentialsPanel v-if="credentialsOpened" />
       </section>
     </div>
   </main>

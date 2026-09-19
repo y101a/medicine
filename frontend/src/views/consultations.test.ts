@@ -20,8 +20,8 @@ const conversation = { id: 'c1', title: '头痛', messageCount: 1, createdAt: '2
 const message = { id: 'm1', role: 'user' as const, content: '头痛', sequence: 1, createdAt: '2026-09-06' }
 const answer = { id: 'm2', role: 'assistant' as const, content: '请先说明疼痛位置。', sequence: 2, provider: 'zhipuai', modelId: 'glm-4.7-flash', modelName: '智谱 GLM-4.7 Flash', generationStatus: 'completed' as const, answerFormat: 'plain' as const, medicalContent: true, sourceMessageId: null, createdAt: '2026-09-06' }
 const aiModels = [
-  { id: 'glm-4.7-flash', name: '智谱 GLM-4.7 Flash', provider: 'zhipuai', providerName: '智谱 AI', description: '免费轻量模型', isDefault: true },
-  { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', provider: 'deepseek', providerName: 'DeepSeek', description: '低价模型', isDefault: false },
+  { id: 'glm-4.7-flash', name: '智谱 GLM-4.7 Flash', provider: 'zhipuai', providerName: '智谱 AI', description: '免费轻量模型', isDefault: true, keySource: 'server' as const },
+  { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', provider: 'deepseek', providerName: 'DeepSeek', description: '低价模型', isDefault: false, keySource: 'server' as const },
 ]
 function authSetup() {
   const pinia = createPinia()
