@@ -46,5 +46,6 @@ export interface HealthRecordSettingsRequest {
 
 export interface HealthRecordExtractRequest {
   consultationId: string
+  /** 该轮助手回答的消息 id：医疗内容判定记录在助手消息上，后端据此回溯用户提问。 */
   messageId: string
 }

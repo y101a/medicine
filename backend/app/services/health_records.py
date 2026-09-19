@@ -320,7 +320,15 @@ async def extract_and_store(
 async def extract_from_message(
     db: AsyncSession, user_id: UUID, consultation_id: UUID, message_id: UUID
 ) -> int:
-    row = await db.scalar(
+    """message_id 是助手回答；抽取文本取它之前最近的一条用户消息。
+
+    医疗内容判定记在**助手**消息上：线上只有助手构造器会写 `is_medical_content`
+    （见 `app/services/consultations.py`），用户消息始终是模型默认的 False。因此必须先
+    定位助手回答、在它身上判定，再回溯对应的用户提问——长期记忆只记录用户自述的事实。
+    回溯写法与病理卡片生成取原始提问一致。
+    """
+
+    answer = await db.scalar(
         select(Message)
         .join(Consultation, Consultation.id == Message.consultation_id)
         .where(
@@ -329,10 +337,22 @@ async def extract_from_message(
             Consultation.user_id == user_id,
         )
     )
-    if row is None or row.role != "user":
-        raise AppError(404, "HEALTH_EXTRACT_SOURCE_NOT_FOUND", "找不到可用于更新的用户消息")
-    if not row.is_medical_content:
+    if answer is None or answer.role != "assistant":
+        raise AppError(404, "HEALTH_EXTRACT_SOURCE_NOT_FOUND", "找不到可用于更新的助手回答")
+    if not answer.is_medical_content:
+        return 0
+    question = await db.scalar(
+        select(Message)
+        .where(
+            Message.consultation_id == consultation_id,
+            Message.role == "user",
+            Message.sequence < answer.sequence,
+        )
+        .order_by(Message.sequence.desc())
+        .limit(1)
+    )
+    if question is None:
         return 0
     return await extract_and_store(
-        db, user_id, decrypt_sensitive(row.content_ciphertext), row.id
+        db, user_id, decrypt_sensitive(question.content_ciphertext), question.id
     )

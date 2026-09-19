@@ -62,7 +62,7 @@
 ## 自动更新（对话提取）
 
 - 触发方式：一次回答结束后，前端调用 `POST /health-records/extract`。项目当前没有任务队列/定时器（Redis 等按需引入），因此「定期更新」由对话事件驱动，而不是调度器。
-- 后端自行判定是否值得提取：取该用户消息，若 `messages.is_medical_content` 为假（问候、闲聊、产品功能提问）则直接返回 `stored: 0`，不产生模型调用。
+- 后端自行判定是否值得提取：`messageId` 传的是**该轮助手回答**，因为医疗内容判定记在助手消息上（`messages.is_medical_content` 线上只有助手构造器会写，用户消息始终为假）。该回答不是医疗内容（问候、闲聊、产品功能提问）时直接返回 `stored: 0`，不产生模型调用；是医疗内容时再回溯它之前最近的一条用户消息作为抽取文本。
 - 幂等：`last_extracted_message_id` 保证同一条消息只提取一次；`content_hash` 唯一约束兜底。
 - 失败处理：提取是**尽力而为**，任何 provider 报错都被吞掉并返回 0，绝不影响对话主流程。
 - 成本：每次有效提取会额外发起一次非流式模型调用（`temperature=0`、`max_tokens=600`、优先使用 `available_models()` 中成本最低的兜底模型）。闲聊被过滤可显著降低调用量。
@@ -93,7 +93,7 @@
 | POST | `` | 手动新增（来源 `user`），重复内容返回既有记录 |
 | PATCH | `/{record_id}` | 修改分类或内容；修改后来源变为 `user` |
 | DELETE | `/{record_id}` | 删除，返回 204 |
-| POST | `/extract` | 按 `consultationId` + `messageId` 增量更新，返回 `{"stored": n}` |
+| POST | `/extract` | 按 `consultationId` + **助手回答的** `messageId` 增量更新，返回 `{"stored": n}` |
 
 ## 隐私与数据安全
 

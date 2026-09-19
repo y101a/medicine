@@ -194,9 +194,9 @@ async function generateAnswer(
     generating.value = false
     generationController = undefined
     void recent.load()
-    // 回答完成后按本轮用户消息增量更新健康记录；后端自行判断是否属于医疗内容、
-    // 是否已处理过，失败也不影响对话。
-    void healthRecords.syncFromMessage(cid, userMessage.id)
+    // 回答完成后按本轮助手回答触发健康记录增量更新：医疗内容判定记在助手消息上，
+    // 后端会回溯对应的用户提问再抽取，失败也不影响对话。
+    void healthRecords.syncFromMessage(cid, completed.id)
     if (route.params.id !== cid) {
       await router.replace({ name: 'consultation', params: { id: cid } })
     } else {
