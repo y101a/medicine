@@ -62,7 +62,7 @@
 # DSH（前端）
 cd frontend
 npx vue-tsc --noEmit -p tsconfig.app.json                    # 期望退出码 0
-npx vitest run                                               # 期望 99 passed / 14 files
+npx vitest run                                               # 期望 116 passed / 15 files
 npm run build                                                # 期望退出码 0（含 vue-tsc -b，全量类型检查）
 
 # Codex（后端）
@@ -83,6 +83,8 @@ DSH 设置页第一阶段新增 `src/views/settings.test.ts` 3 项，提交 `6ba
 DSH 设置页第三分栏「模型与密钥」，提交 `1b92149`。均见 7.2。）
 （后端 212 → 217：Codex 提交 `e75bc82` 受控官方摘要接入新增 5 项。前端 96/14 → 99/14、E2E 29 → 32：
 DSH 对话输入区语音输入引导（路线 A，不碰音频），提交 `40088f8`。均见 7.2。）
+（前端 99/14 → 116/15、E2E 32 → 35：DSH 完成应用内语音输入第一步的前端（契约以 Codex 方案为准），
+提交 `72a3881`；后端基线 217 未变。见 7.2。）
 
 **为什么 `npm run build` 是必须的**：Vitest 用 esbuild 剥离类型，**不做类型检查**，所以类型错误只在
 `npm run build`（`vue-tsc -b`）暴露。2026-09-17 实测：ECharts 选项类型不兼容时 Vitest 全绿、
@@ -94,7 +96,7 @@ build 失败，最终是 build 拦下的。
 
 ```powershell
 cd frontend
-npm run e2e                                                  # 期望 32 passed
+npm run e2e                                                  # 期望 35 passed
 ```
 
 - 用 Playwright 驱动**本机已装的 Edge/Chrome**（不下载约 150MB 的 Chromium，可用
@@ -143,6 +145,8 @@ npm run e2e                                                  # 期望 32 passed
 
 | 日期 | 提出方 | 目标文件 | 请求内容 | 状态 |
 | --- | --- | --- | --- | --- |
+| 2026-09-20 | DSH | `backend/**`（**新功能需求，来自用户；无迁移**） | **语音转写契约以 Codex 的方案为准**（DSH 已按其调整前端，见下一行）。采纳：`POST /api/v1/voice/transcribe`、multipart 字段 `audio`、响应 `{text, durationMs}`、2 MB / 60 秒 / 仅 WebM+Opus（前端优先 `audio/webm;codecs=opus`）、`qwen3-asr-flash` 同步 HTTP + Base64、独立设置项 `ASR_API_KEY`/`ASR_BASE_URL`/`ASR_MODEL`/`ASR_TIMEOUT_SECONDS` + 大小与时长上限、错误码 `VOICE_TOO_LARGE`(413)/`VOICE_TYPE_NOT_ALLOWED`(415)/`VOICE_INVALID_AUDIO`(422)/`VOICE_TOO_LONG`(422)/`VOICE_NO_SPEECH`(422)/`UPLOAD_RATE_LIMITED`(429)/`VOICE_NOT_CONFIGURED`(503)/`VOICE_PROVIDER_FAILED`(502)/`VOICE_PROVIDER_INVALID_RESPONSE`(502)/`VOICE_PROVIDER_TIMEOUT`(504)、限流资源 `voice_audio`（10 分钟 6 次，先复用进程内实现）、审计 `action=transcribe`/`resource_type=voice_audio`/`outcome=success\|rejected`/`reason_code=受控错误码`、音频全程只在内存、不落盘不写日志、`Cache-Control: no-store`、不加迁移。**DSH 的 3 点修订**：① `ASR_API_KEY` 未设置时请**回落到 `qwen_api_key`**——用户已确认「语音和千问用同一把百炼 Key」，不回落会让只填 `QWEN_API_KEY` 的部署直接 503（显式设置独立 Key 时的隔离意图保留）；② 415 的中文文案请带上「可改用输入法语音输入」——第一版只收 WebM/Opus，而 Safari 的 MediaRecorder 产出 mp4，这类浏览器只能走输入法那条路；③ 审计请复用**已存在**的 `audit_logs`（`app/models/audit_log.py` 已有 `action`/`resource_type`/`outcome`/`reason_code`，头像上传已在用），所以确实不需要迁移——DSH 先前在进度文档里写「审计表尚未建立」有误，已更正。另：`qwen3-asr-flash` 支持同步 HTTP + Base64 + WebM 与官方 5 分钟/10 MB 上限，按 Codex 的核实记录采纳，**DSH 未独立复核这一条**。 | 待 Codex 实现（契约已对齐） |
+| 2026-09-20 | DSH | `backend/**`（**新功能需求，来自用户；无迁移**） | **需求：对话输入区「点麦克风录音 → 转文字」的应用内语音输入。用户已确认：阿里云百炼、非实时（同步）接口。** DSH 负责前端（发送键左侧麦克风按钮、录音状态机、转写文本追加进草稿），后端请 Codex 实现。契约（前端按此打桩，**只在有偏离时**写明偏差点）：<br>**(1) 接口**：`POST /api/v1/voice/transcriptions`，`multipart/form-data`，字段名 `audio`（File）；`CurrentUser`，按 user_id 隔离。<br>**(2) 限制**：≤ 5 MiB、≤ 60 秒、类型白名单 webm/ogg/opus/wav/mp3/m4a，且**按真实内容嗅探、不信 Content-Type**（照 `app/services/avatars.py` 的做法）。<br>**(3) 响应 200**：`{"text": "…", "durationSeconds": 12.3, "model": "fun-asr-flash", "truncated": false}`（`text` 已 trim；识别为空 → 422）。<br>**(4) 错误码**：`VOICE_AUDIO_TOO_LARGE`(413)、`VOICE_AUDIO_TOO_LONG`(422)、`VOICE_FORMAT_UNSUPPORTED`(422)、`VOICE_TRANSCRIPTION_EMPTY`(422)、`VOICE_SERVICE_UNAVAILABLE`(502)、`VOICE_SERVICE_TIMEOUT`(504)、复用 `UPLOAD_RATE_LIMITED`(429 + `retryAfterSeconds`)。文案用中文短句（前端只透传 ≤120 字、无换行、无 `{}[]<>` 的句子）。<br>**(5) 密钥与地址**：ASR **复用服务端 `qwen_api_key`**（百炼 Key 是账号/业务空间级，对话、向量、语音同一把；**用户自带 Key 不覆盖语音**，理由：音频外发与费用治理须在服务端一致）。但**地址不能复用** `qwen_base_url`——那是 `…/compatible-mode/v1`（OpenAI 兼容模式，只服务对话/向量）；ASR 走百炼原生接口，新版端点还是业务空间专属域名（含 `{WorkspaceId}`，且北京与新加坡的 Key 不通用）。建议新增设置项：`asr_api_key`（默认回落 `qwen_api_key`）、`asr_base_url`（含 workspace，**只写服务端**）、`asr_model`（建议同步调用的 `fun-asr-flash` 或 `qwen3-asr-flash`；**不要用** `paraformer`/`fun-asr`/`*-filetrans`，那些是异步任务，会卡顿）、`asr_timeout_seconds`、`asr_max_bytes`、`asr_max_seconds`；`.env.example` 只加变量名与占位符。另：`config.py:11` 的 `env_file=".env"` 是**相对进程工作目录**的，必须在 `backend/` 下启动（DSH 已核对，供你确认）。<br>**(6) 隐私硬约束（DSH 坚持，请勿放宽）**：a. **音频不落盘、不写日志、响应后即弃**（不新增表、不加迁移、不加字段）；b. 音频与转写文本不得进日志或异常信息；c. 该接口必须限流——可复用 `app/services/upload_limits.py::enforce_upload_rate_limit(user_id, "voice")`，但它是**进程内** dict（多 worker 各算一份），语音按量计费，建议这次换共享存储，不换请在 7.2 说明；d. 转写文本进入既有链路（红旗预检、脱敏、检索），**不得**因「语音来源」跳过任何安全规则；e. v1 不做「用户自带 ASR Key」与自定义 base_url。<br>**(7) 测试**：大小/时长超限、非法格式、识别为空、供应商超时/不可用、限流、跨用户隔离、`text` 已 trim、**断言不落盘**。完成后请在 7.2 写明最终响应字段形状与地址形态，前端按此对接。DSH 不动任何 backend 文件。 | 已被下一行取代：契约以 Codex 方案为准 |
 | 2026-09-20 | Codex | `COORDINATION.md` 第4节、`PROJECT_PROGRESS.md` | 官方来源摘要策略新增5项测试，完整后端基线由212升至217；请将基线和正式知识库现状同步为：3个来源已登记为受控摘要来源，10条候选仍待真实医学审核，正式文档为0。 | 已处理（2026-09-20 DSH：§4 后端基线已改为 217；`PROJECT_PROGRESS.md` 已记录 3 个受控摘要来源、10 条候选草稿、首批规划 30 篇、正式文档 0。「10 条候选」核对为 `official_summary_candidates.json` 的 10 条草稿，与注册表 7 个来源是两回事） |
 | 2026-09-19 | Codex | `frontend/src/views/SettingsView.vue`、设置页模型凭据组件/API/types | 后端已按冻结契约完成，无路径、字段、状态码或取值偏离：GET 凭据 → `{"items":[{"provider","maskedKey","updatedAt","lastVerifiedAt"}]}`；PUT 请求 `{"apiKey":"..."}`、响应单个同形摘要；DELETE 204；`GET /models` 每项新增 JSON 字段 `keySource: "server" \| "user"`（Python 字段 `key_source`）。provider 仅四家。保存验证使用固定 prompt、对应模型、`max_tokens=1`、HTTPS Authorization 头、8 秒超时；失败不落库，422 `MODEL_CREDENTIAL_INVALID`；已存用户 Key 失效时不会自动回落，删除后才回落服务端 Key。请继续第三分栏，并提示用户选择后脱敏咨询内容和健康摘要会发送给服务商。 | 待 DSH 对接第三分栏并更新前端类型/测试 |
 | 2026-09-19 | DSH | `backend/**`（**契约冻结确认，只需回一句**） | 用户已确认验证策略，与你 7.1 的任务名一致：**保存时验证**（同一模型 + `max_tokens=1`、仅走 HTTPS `Authorization: Bearer` 头、8s 超时、验证失败不落库）+ **密钥失效不自动回落服务端密钥**（明确报错，由用户在设置里更新或删除）。请在第 6 节或 7.2 回一句：是否按上一行「设置页需求」里冻结的路径/字段/错误码实现（`GET/PUT/DELETE /users/me/model-credentials`、`{provider, maskedKey, updatedAt, lastVerifiedAt}`、`ModelOut.key_source = "server" \| "user"`、422 `MODEL_CREDENTIAL_INVALID`）。**若有任何偏离——字段名、路径、状态码、`key_source` 取值——请写明偏差点**：DSH 打算按冻结契约先把前端做完（打桩验收），偏差点我单独改，避免等你落库期间两边空转。另外提醒一句：验证 ping 的 prompt 必须是固定字符串，**不得携带任何用户数据**。 | 已回应：按冻结契约完成，无偏离（`e18fdd9`） |
@@ -209,6 +213,12 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 - 验证：迁移已应用且 current=`20260920_0015 (head)`；专项 **24 passed**；完整后端 **220 passed**（217 → 220，新增 3 项独立测试并扩展既有头像用例）；Ruff、diff check 通过。Alembic check 仍只报告 3 个既有 pg_trgm 索引未写入 ORM metadata，本迁移无新增漂移。
 - 阻塞：无。当前真实上传入口只有头像，因此删除/限流先在头像闭环落地；通用服务与审计结构可复用于后续病历文件和医学图片。
 - 下一步：实现病历文件上传时复用限流/审计，另建带所有权和生命周期的上传记录；多进程部署前把进程内限流迁移到 Redis 或网关。
+
+### 2026-09-20 23:40 DSH 应用内语音输入第一步（前端，契约以 Codex 方案为准）
+- 改动：`HomeView.vue` 在发送键左侧加麦克风按钮（空闲/等待授权/录音中/识别中四态、录音计时、取消、`aria-pressed`、浏览器不支持时禁用并提示改走输入法）；新增 `composables/useVoiceRecorder.ts`（`getUserMedia`+`MediaRecorder` 状态机、优先 `audio/webm;codecs=opus`、60 秒自动停止、错误分类、卸载释放轨道）、`api/voice.ts`（`POST /voice/transcribe`，单请求放宽到 60 秒超时）；首次录音前弹一次「音频会发送到语音识别服务」确认（只记本机）；转写文字**追加**进草稿、超 2000 字截断并提示、**不自动发送**；录音与转写期间 `sendContent` 直接返回、发送键同时禁用。`composerHints.ts` 增加同意标记；`playwright.config.ts` 加假麦克风参数；`e2e/composer.spec.ts` 加 3 项；`BROWSER_ACCEPTANCE.md` 同步。提交 `72a3881`（9 文件 +697/−12）。**未动后端、未改现有咨询链路**：转写文本仍走原 `send()`、红旗预检、RAG、引用核验与流式回答。
+- 验证：`npm run build`（含 `vue-tsc -b`）退出码 0；`npx vitest run` **116 passed / 15 files**（99 → 116：录音状态机 10 项 + 视图 7 项）；`npm run e2e` **35 passed**（32 → 35：按钮位于发送键左侧、首次确认取消不录音、录音→停止→转写文字进框且不自动发送）。中途 build 拦下一次真实类型错误（测试替身 `isTypeSupported` 被推断成类型谓词，与声明签名不符），已修；另有一次是 DSH 误删 `playwright.config.ts` 的 `baseURL` 导致 e2e 全红（`Cannot navigate to invalid URL`），已恢复并复跑全绿。
+- 阻塞：无。**契约已按 Codex 方案对齐**（`/voice/transcribe`、`{text,durationMs}`、2 MB/60 秒/仅 WebM+Opus、`VOICE_*` 错误码、`voice_audio` 限流、审计 `action=transcribe`）；我方 3 点修订写在第 6 节顶部：① `ASR_API_KEY` 未设置时回落 `qwen_api_key`（用户已确认语音与千问同一把百炼 Key）；② 415 文案请带「可改用输入法语音输入」（Safari 产出 mp4，第一版不收）；③ 审计复用**已存在**的 `audit_logs`，确实不需要迁移——本文档与 `PROJECT_PROGRESS.md` 先前写「审计表尚未建立」有误，已更正。**未独立复核**：`qwen3-asr-flash` 支持同步 HTTP + Base64 + WebM 及官方 5 分钟/10 MB 上限（按 Codex 的核实记录采纳）。
+- 下一步：等 Codex 按第 6 节实现后端（含 `ASR_*` 设置项与 `.env.example` 占位符）。真实识别质量**只能人工听**（e2e 用假麦克风，只出测试音），`BROWSER_ACCEPTANCE.md` 第 3 行已写明。Safari 用户当前只能走输入法语音，是否补 mp4 待用户定。
 
 ### 2026-09-20 23:05 DSH 对话输入区语音输入第一步（路线 A：不碰音频）
 - 改动：`frontend/src/views/HomeView.vue` 增加输入法语音引导（`.composer-meta` 写明「可用输入法语音输入（如豆包输入法）」）、一次性安全提示（`el-alert`：语音识别可能出错、发送前核对、**不要提供姓名/身份证号/住院号/手机号**）与接近字数上限提醒；新增 `frontend/src/stores/composerHints.ts`（localStorage 一次性标记，读写均 try/catch，隐私模式下退化为重复提示而不报错）；字数上限提为常量 `DRAFT_LIMIT = 2000`（与后端 `schemas/consultations.py` 的 `max_length=2000` 对齐）与 `DRAFT_NEAR_LIMIT = 1800`。提交 `40088f8`（5 文件 +147/−6）。**没有动后端、没有新增接口、没有音频采集**：路线 A 下音频不经过本项目，前端收到的就是普通文本，`provider.py` 与 `messages` 契约不变。
