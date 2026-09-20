@@ -84,7 +84,8 @@ DSH 设置页第三分栏「模型与密钥」，提交 `1b92149`。均见 7.2�
 （后端 212 → 217：Codex 提交 `e75bc82` 受控官方摘要接入新增 5 项。前端 96/14 → 99/14、E2E 29 → 32：
 DSH 对话输入区语音输入引导（路线 A，不碰音频），提交 `40088f8`。均见 7.2。）
 （前端 99/14 → 116/15、E2E 32 → 35：DSH 完成应用内语音输入第一步的前端（契约以 Codex 方案为准），
-提交 `72a3881`；后端基线 217 未变。见 7.2。）
+提交 `72a3881`。**后端基线仍记 217，但 Codex 其后的 `902c308`（上传治理与审计表，迁移 `20260920_0015`）
+加了测试，新数字待 Codex 给出**；DSH 未复跑后端。见 7.2。）
 
 **为什么 `npm run build` 是必须的**：Vitest 用 esbuild 剥离类型，**不做类型检查**，所以类型错误只在
 `npm run build`（`vue-tsc -b`）暴露。2026-09-17 实测：ECharts 选项类型不兼容时 Vitest 全绿、
@@ -217,7 +218,7 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 ### 2026-09-20 23:40 DSH 应用内语音输入第一步（前端，契约以 Codex 方案为准）
 - 改动：`HomeView.vue` 在发送键左侧加麦克风按钮（空闲/等待授权/录音中/识别中四态、录音计时、取消、`aria-pressed`、浏览器不支持时禁用并提示改走输入法）；新增 `composables/useVoiceRecorder.ts`（`getUserMedia`+`MediaRecorder` 状态机、优先 `audio/webm;codecs=opus`、60 秒自动停止、错误分类、卸载释放轨道）、`api/voice.ts`（`POST /voice/transcribe`，单请求放宽到 60 秒超时）；首次录音前弹一次「音频会发送到语音识别服务」确认（只记本机）；转写文字**追加**进草稿、超 2000 字截断并提示、**不自动发送**；录音与转写期间 `sendContent` 直接返回、发送键同时禁用。`composerHints.ts` 增加同意标记；`playwright.config.ts` 加假麦克风参数；`e2e/composer.spec.ts` 加 3 项；`BROWSER_ACCEPTANCE.md` 同步。提交 `72a3881`（9 文件 +697/−12）。**未动后端、未改现有咨询链路**：转写文本仍走原 `send()`、红旗预检、RAG、引用核验与流式回答。
 - 验证：`npm run build`（含 `vue-tsc -b`）退出码 0；`npx vitest run` **116 passed / 15 files**（99 → 116：录音状态机 10 项 + 视图 7 项）；`npm run e2e` **35 passed**（32 → 35：按钮位于发送键左侧、首次确认取消不录音、录音→停止→转写文字进框且不自动发送）。中途 build 拦下一次真实类型错误（测试替身 `isTypeSupported` 被推断成类型谓词，与声明签名不符），已修；另有一次是 DSH 误删 `playwright.config.ts` 的 `baseURL` 导致 e2e 全红（`Cannot navigate to invalid URL`），已恢复并复跑全绿。
-- 阻塞：无。**契约已按 Codex 方案对齐**（`/voice/transcribe`、`{text,durationMs}`、2 MB/60 秒/仅 WebM+Opus、`VOICE_*` 错误码、`voice_audio` 限流、审计 `action=transcribe`）；我方 3 点修订写在第 6 节顶部：① `ASR_API_KEY` 未设置时回落 `qwen_api_key`（用户已确认语音与千问同一把百炼 Key）；② 415 文案请带「可改用输入法语音输入」（Safari 产出 mp4，第一版不收）；③ 审计复用**已存在**的 `audit_logs`，确实不需要迁移——本文档与 `PROJECT_PROGRESS.md` 先前写「审计表尚未建立」有误，已更正。**未独立复核**：`qwen3-asr-flash` 支持同步 HTTP + Base64 + WebM 及官方 5 分钟/10 MB 上限（按 Codex 的核实记录采纳）。
+- 阻塞：无。**契约已按 Codex 方案对齐**（`/voice/transcribe`、`{text,durationMs}`、2 MB/60 秒/仅 WebM+Opus、`VOICE_*` 错误码、`voice_audio` 限流、审计 `action=transcribe`）；我方 3 点修订写在第 6 节顶部：① `ASR_API_KEY` 未设置时回落 `qwen_api_key`（用户已确认语音与千问同一把百炼 Key）；② 415 文案请带「可改用输入法语音输入」（Safari 产出 mp4，第一版不收）；③ 审计复用 Codex 在 `902c308` 新建的 `audit_logs`（迁移 `20260920_0015`，头像上传已接入），语音**不需要再加迁移**；`PROJECT_PROGRESS.md` 先前写「审计表尚未建立」在写作当时是准确的，现已被该提交取代，已改述。**未独立复核**：`qwen3-asr-flash` 支持同步 HTTP + Base64 + WebM 及官方 5 分钟/10 MB 上限（按 Codex 的核实记录采纳）。
 - 下一步：等 Codex 按第 6 节实现后端（含 `ASR_*` 设置项与 `.env.example` 占位符）。真实识别质量**只能人工听**（e2e 用假麦克风，只出测试音），`BROWSER_ACCEPTANCE.md` 第 3 行已写明。Safari 用户当前只能走输入法语音，是否补 mp4 待用户定。
 
 ### 2026-09-20 23:05 DSH 对话输入区语音输入第一步（路线 A：不碰音频）

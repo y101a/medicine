@@ -31,7 +31,7 @@
 
 | 对象 | 本次实际状态 |
 | --- | --- |
-| 迁移 | 2026-09-16 核对时 `alembic current` = `20260916_0013`；**2026-09-20 未重跑 `alembic current`**，按迁移文件序号 head 为 `20260919_0014`（用户模型凭据表，Codex 提交 `e18fdd9`）。此前两个迁移：`20260916_0012`（病理卡片消息元数据：`answer_format`、`is_medical_content`、`source_message_id`）与 `20260916_0013`（健康记录两张表）。 |
+| 迁移 | 2026-09-16 核对时 `alembic current` = `20260916_0013`；**2026-09-20 未重跑 `alembic current`**，按迁移文件序号 head 为 `20260920_0015`（审计表 `audit_logs`，Codex 提交 `902c308`）；此前为 `20260919_0014`（用户模型凭据表，Codex 提交 `e18fdd9`）。此前两个迁移：`20260916_0012`（病理卡片消息元数据：`answer_format`、`is_medical_content`、`source_message_id`）与 `20260916_0013`（健康记录两张表）。 |
 | 自动化测试 | **2026-09-20 最新**：后端完整套件 **217 项通过**（Codex 报告，提交 `e75bc82`，DSH 未复跑）；前端单测 **116 项通过 / 15 个文件**；前端**浏览器文字断言**（Playwright 驱动本机 Edge/Chrome，接口用 `page.route` 拦截、不依赖后端）**35 项通过**，命令 `npm run e2e`；`npm run build`（含 `vue-tsc -b`，全量类型检查）退出码 0；`ruff check app tests migrations` 无问题。含数据库的测试在本机 PostgreSQL 可用时全部执行。 |
 | DSH 会话权限 | **本机已把新会话默认权限预设改为 `danger-full-access`**（沙箱不受限 + 审批 `never`），写在 `C:\Users\Lenovo\.dsh\settings.yaml` 的 `permission.defaultPreset`。因此之后的会话**没有沙箱约束**，可以读写工作区之外的文件；改写它的那一次会话仍是 `workspace-write` + `ask`。 |
 | Git | 已有版本控制：首个提交 `b7c4e88`（203 个文件 / 24001 行），其后按功能小步提交，`master` 工作树当前干净。切勿提交或粘贴 `.env`、密钥。`.dsh-backup/` 是接线时留下的改动前副本与 diff，**不是项目内容、不影响构建与测试**；2026-09-17 确认暂时保留，请勿删除，也不要提交进版本库。根 `.gitignore` 已建立（补齐 `.dsh-backup/`、`report-work/`、`*.docx`），`backend/.gitignore` 与 `frontend/.gitignore` 原本就已排除 `.env`、`.venv`、`data/`、`node_modules`、`dist`。**两个 AI 共用一个工作目录，禁止 `git add .`，只显式暂存自己的文件**（细则见 `COORDINATION.md` 第 1 节）。 |
@@ -259,7 +259,8 @@ Git、日志、截图、文档或聊天记录中。
 - 开工前必须先补两件：账号/数据删除路径（当前**没有**账号删除接口）与上传滥用限流（当前只有导航、密钥
   验证与上传有限流，登录/注册没有限流；且限流是**进程内**实现，多 worker 会各算一份）。**审计表不需要新建**：
   `audit_logs` 已存在（`app/models/audit_log.py`，字段 `actor_user_id`/`action`/`resource_type`/`resource_id`/
-  `outcome`/`reason_code`），头像上传已在写；本文档此前写「审计表（路线图阶段 3 仍未建立）」有误，2026-09-20 更正。
+  `outcome`/`reason_code`）。**审计表是 Codex 在提交 `902c308` 新建的**（迁移 `20260920_0015_audit_logs`），头像上传已接入；
+  本文档先前写「审计表（路线图阶段 3 仍未建立）」在写作当时是准确的，现已被该提交取代。
 - 技术前置（已核查）：模型链路只组装文本 messages、注册表无 vision/能力位、`messages` 无附件字段、
   加密是 Fernet 整串加解密不适合大文件、前端无图片/富文本渲染管线、上传校验与 e2e 桩缺失；图片与病历
   还会绕过现有**只针对文本**的脱敏与红旗预检——报告照片上的姓名、身份证号、住院号无法被现有脱敏覆盖。
