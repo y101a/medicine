@@ -35,11 +35,16 @@ export default defineConfig({
   reporter: [['list']],
   use: {
     baseURL: BASE_URL,
-    launchOptions: { executablePath: resolveBrowserPath() },
     // 截图和 trace 是给**人**看的；AI 读的是断言消息里的数字。
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
     locale: 'zh-CN',
+    // 语音输入要真实调起 MediaRecorder：喂假麦克风并自动同意权限提示。
+    // 边界：假设备只产生测试音、识别不出中文，所以「转写结果」仍来自桩接口。
+    launchOptions: {
+      executablePath: resolveBrowserPath(),
+      args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'],
+    },
   },
   // 只起前端：接口一律用 page.route 拦截，因此不依赖后端与数据库。
   webServer: {

@@ -9,7 +9,7 @@ import { useAuthStore } from '../stores/auth'
 import { useHealthRecordsStore } from '../stores/healthRecords'
 import { ApiError, getApiErrorMessage } from '../api/http'
 import type { AiModel, AnswerFormat, FollowUpAnswers, FollowUpCard, Message } from '../types/consultations'
-import { Top, ChatDotRound, Compass, Document, CloseBold } from '@element-plus/icons-vue'
+import { Top, ChatDotRound, Compass, Document, CloseBold, Microphone } from '@element-plus/icons-vue'
 import medicalAiAvatar from '../assets/medical-ai-avatar.png'
 import AssistantAnswerCard from '../components/AssistantAnswerCard.vue'
 import StructuredFollowUpCard from '../components/StructuredFollowUpCard.vue'
@@ -18,7 +18,11 @@ import ReferenceSources from '../components/ReferenceSources.vue'
 import HospitalNavigator from '../components/HospitalNavigator.vue'
 import PathologyCardOffer from '../components/PathologyCardOffer.vue'
 import { readRetrievalNotice, rememberRetrievalNotice } from '../stores/retrievalNotices'
-import { readVoiceTipSeen, rememberVoiceTipSeen } from '../stores/composerHints'
+import {
+  readVoiceTipSeen, rememberVoiceTipSeen, readVoiceConsentSeen, rememberVoiceConsentSeen,
+} from '../stores/composerHints'
+import { useVoiceRecorder } from '../composables/useVoiceRecorder'
+import { voiceApi } from '../api/voice'
 
 const route = useRoute()
 const router = useRouter()
@@ -61,6 +65,84 @@ function dismissVoiceTip() {
   voiceTipSeen.value = true
   rememberVoiceTipSeen()
 }
+const voiceConsentSeen = ref(readVoiceConsentSeen())
+const voiceNotice = ref('')
+const {
+  state: voiceState,
+  seconds: voiceSeconds,
+  error: voiceError,
+  supported: voiceSupported,
+  start: startRecorder,
+  stop: stopRecorder,
+  cancel: cancelRecorder,
+  reset: resetRecorder,
+} = useVoiceRecorder()
+
+async function startRecording() {
+  voiceNotice.value = ''
+  if (!voiceConsentSeen.value) {
+    try {
+      await ElMessageBox.confirm(
+        '录音会发送到语音识别服务转成文字，识别完成后不保存音频。请勿说出姓名、身份证号、住院号或手机号。',
+        '开始语音输入',
+        { confirmButtonText: '开始录音', cancelButtonText: '取消', type: 'info' },
+      )
+    } catch {
+      return
+    }
+    voiceConsentSeen.value = true
+    rememberVoiceConsentSeen()
+  }
+  await startRecorder()
+}
+
+/** 转写文本只追加到草稿，不覆盖用户已经输入的内容；超长按上限截断。 */
+function appendTranscript(text: string) {
+  const spoken = text.trim()
+  if (!spoken) {
+    voiceNotice.value = '没有听清，请再说一次'
+    return
+  }
+  const merged = draft.value ? `${draft.value}${spoken}` : spoken
+  if (merged.length > DRAFT_LIMIT) {
+    draft.value = merged.slice(0, DRAFT_LIMIT)
+    voiceNotice.value = `语音内容超过 ${DRAFT_LIMIT} 字上限，已截断，请分多次发送`
+    return
+  }
+  draft.value = merged
+  voiceNotice.value = ''
+}
+
+async function finishRecording() {
+  const audio = await stopRecorder()
+  if (!audio) {
+    resetRecorder()
+    return
+  }
+  try {
+    appendTranscript((await voiceApi.transcribe(audio)).text)
+  } catch (cause) {
+    voiceNotice.value = getApiErrorMessage(cause)
+  } finally {
+    resetRecorder()
+  }
+}
+
+function cancelRecording() {
+  cancelRecorder()
+  voiceNotice.value = ''
+}
+
+function toggleRecording() {
+  if (voiceState.value === 'recording') void finishRecording()
+  else void startRecording()
+}
+
+const voiceTitle = computed(() => {
+  if (!voiceSupported) return '当前浏览器不支持录音，请改用输入法语音输入'
+  if (voiceState.value === 'recording') return '停止录音并转写'
+  return '语音输入：录一段语音转成文字'
+})
 function modelName(message: Message) {
   if (message.modelName) return message.modelName
   if (!message.modelId) return ''
@@ -281,6 +363,8 @@ function formatFollowUpAnswers(card: FollowUpCard, answers: FollowUpAnswers) {
   return `补充信息：\n${lines.join('\n')}`
 }
 async function sendContent(content: string, clearDraft = false) {
+  // 录音与转写期间不接受发送：转写文字必须先让用户核对，避免识别错误被直接送进咨询链路。
+  if (voiceState.value !== 'idle') return
   if (!content || content.length > 2000 || saving.value || generating.value || loading.value || !ready.value) return
   if (!pending || pending.content !== content) pending = { content, id: crypto.randomUUID() }
   const userId = auth.user?.id
@@ -482,8 +566,10 @@ onBeforeRouteUpdate(canLeave)
       <form class="composer" @submit.prevent="send">
         <el-alert v-if="modelsError" class="model-error" :title="modelsError" type="warning" :closable="false" />
         <el-alert v-if="!voiceTipSeen" class="voice-tip" type="info" show-icon
-          title="可用输入法上的麦克风语音输入（如豆包输入法）。语音识别可能出错，发送前请核对文字；请不要在对话中提供姓名、身份证号、住院号或手机号。"
+          title="可用输入法上的麦克风语音输入（如豆包输入法），也可以点发送键左侧的麦克风按钮直接录音。语音识别可能出错，发送前请核对文字；请不要在对话中提供姓名、身份证号、住院号或手机号。"
           @close="dismissVoiceTip" />
+        <el-alert v-if="voiceNotice || voiceError" class="voice-notice" type="warning" show-icon
+          :title="voiceNotice || voiceError" :closable="false" />
         <label class="sr-only" for="symptom-input">症状或健康问题</label>
         <textarea id="symptom-input" ref="input" v-model="draft" :maxlength="DRAFT_LIMIT" rows="3" :disabled="saving || generating || !ready"
           placeholder="描述您的症状或健康疑问，例如：什么时候开始、持续多久……" @keydown="keydown"></textarea>
@@ -509,12 +595,26 @@ onBeforeRouteUpdate(canLeave)
             </el-select>
             <span>{{ draft.length }}/{{ DRAFT_LIMIT }}</span>
             <span v-if="nearDraftLimit" class="limit-hint">已接近 {{ DRAFT_LIMIT }} 字上限，可分多次发送</span>
+            <span v-if="voiceState === 'requesting'" class="voice-status">等待麦克风授权…</span>
+            <span v-else-if="voiceState === 'recording'" class="voice-status">录音中 {{ voiceSeconds }}s</span>
+            <span v-else-if="voiceState === 'transcribing'" class="voice-status">正在识别…</span>
+            <button v-if="voiceState === 'recording'" class="voice-cancel" type="button" @click="cancelRecording">取消</button>
+            <button
+              class="voice-button"
+              :class="{ recording: voiceState === 'recording' }"
+              type="button"
+              :disabled="!voiceSupported || voiceState === 'requesting' || voiceState === 'transcribing' || saving || generating || !ready"
+              :aria-label="voiceState === 'recording' ? '停止录音并转写' : '语音输入'"
+              :aria-pressed="voiceState === 'recording'"
+              :title="voiceTitle"
+              @click="toggleRecording"
+            ><el-icon :size="18"><Microphone /></el-icon></button>
             <button v-if="generating" class="stop-button" type="button" aria-label="停止生成" title="停止生成" @click="stopGeneration"><el-icon :size="15"><CloseBold /></el-icon></button>
-            <button v-else class="send-button" type="submit" :disabled="!draft.trim() || saving || loading || modelsLoading || !ready" aria-label="发送消息" title="发送消息"><el-icon :size="20"><Top /></el-icon></button>
+            <button v-else class="send-button" type="submit" :disabled="!draft.trim() || saving || loading || modelsLoading || !ready || voiceState !== 'idle'" aria-label="发送消息" title="发送消息"><el-icon :size="20"><Top /></el-icon></button>
           </div>
         </div>
       </form>
-      <div class="composer-meta"><span>仅提供健康科普与就医分流，不作确诊，不替代医生。</span><span>可用输入法语音输入（如豆包输入法） · Enter 发送 · Shift + Enter 换行</span></div>
+      <div class="composer-meta"><span>仅提供健康科普与就医分流，不作确诊，不替代医生。</span><span>可用输入法语音输入（如豆包输入法） · 也可点麦克风录音 · Enter 发送 · Shift + Enter 换行</span></div>
     </div>
   </main>
 </template>
@@ -544,9 +644,15 @@ textarea::placeholder { color: #99a5b0; }
 .model-select { width: 190px; }
 .model-option { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .model-option small { color: #93a1ae; }
-.model-error, .voice-tip { margin-bottom: 12px; }
+.model-error, .voice-tip, .voice-notice { margin-bottom: 12px; }
 .preview, .send-area > span { color: #9aa7b3; font-size: 11px; }
-.send-area > .limit-hint { color: #bf7a15; }
+.send-area > .limit-hint, .send-area > .voice-status { color: #bf7a15; }
+.voice-button { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid #d7e3ee; border-radius: 10px; background: #fff; color: #4b7ea6; cursor: pointer; }
+.voice-button:hover:not(:disabled) { border-color: #9cc3e0; background: #f4faff; }
+.voice-button:disabled { border-color: #e6ecf2; background: #f3f6f9; color: #b3c1cd; cursor: default; }
+.voice-button.recording { border-color: #e2b1ab; background: #fdf1f0; color: #c0492f; }
+.voice-cancel { border: none; padding: 0; background: transparent; color: #8798a8; font-size: 11px; cursor: pointer; }
+.voice-cancel:hover { color: #52697d; }
 .send-button { display: grid; place-items: center; width: 34px; height: 34px; border: none; border-radius: 10px; background: #237ac2; color: white; cursor: pointer; }
 .send-button:disabled { background: #e8eef4; color: #a2b3c3; cursor: default; }
 .composer-meta { display: flex; justify-content: space-between; gap: 12px; margin-top: 12px; color: #9ba7b3; font-size: 10px; line-height: 1.7; }

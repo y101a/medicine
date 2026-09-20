@@ -10,6 +10,7 @@ import { useAuthStore } from '../stores/auth'
 import { useConsultationsStore } from '../stores/consultations'
 import { consultationsApi } from '../api/consultations'
 import { modelsApi } from '../api/models'
+import { voiceApi } from '../api/voice'
 import { ApiError } from '../api/http'
 import { VOICE_TIP_STORAGE_KEY } from '../stores/composerHints'
 
@@ -17,6 +18,40 @@ vi.mock('../api/consultations', () => ({ consultationsApi: {
   create: vi.fn(), send: vi.fn(), stream: vi.fn(), get: vi.fn(), messages: vi.fn(), list: vi.fn(), remove: vi.fn(),
 } }))
 vi.mock('../api/models', () => ({ modelsApi: { list: vi.fn() } }))
+vi.mock('../api/voice', () => ({ voiceApi: { transcribe: vi.fn() } }))
+/** 录音状态机的替身：让视图测试能直接驱动「待录 / 录音中 / 识别中」三种状态。 */
+const voiceHarness = vi.hoisted(() => ({
+  supported: true,
+  api: null as null | {
+    state: { value: string }
+    seconds: { value: number }
+    error: { value: string }
+    supported: boolean
+    start: ReturnType<typeof vi.fn>
+    stop: ReturnType<typeof vi.fn>
+    cancel: ReturnType<typeof vi.fn>
+    reset: ReturnType<typeof vi.fn>
+  },
+}))
+vi.mock('../composables/useVoiceRecorder', async () => {
+  const { ref } = await import('vue')
+  return {
+    useVoiceRecorder: () => {
+      const api = {
+        state: ref('idle'),
+        seconds: ref(0),
+        error: ref(''),
+        supported: voiceHarness.supported,
+        start: vi.fn(async () => { api.state.value = 'recording'; return true }),
+        stop: vi.fn(async () => { api.state.value = 'transcribing'; return new Blob(['voice']) }),
+        cancel: vi.fn(() => { api.state.value = 'idle' }),
+        reset: vi.fn(() => { api.state.value = 'idle' }),
+      }
+      voiceHarness.api = api
+      return api
+    },
+  }
+})
 const conversation = { id: 'c1', title: '头痛', messageCount: 1, createdAt: '2026-09-06', updatedAt: '2026-09-06' }
 const message = { id: 'm1', role: 'user' as const, content: '头痛', sequence: 1, createdAt: '2026-09-06' }
 const answer = { id: 'm2', role: 'assistant' as const, content: '请先说明疼痛位置。', sequence: 2, provider: 'zhipuai', modelId: 'glm-4.7-flash', modelName: '智谱 GLM-4.7 Flash', generationStatus: 'completed' as const, answerFormat: 'plain' as const, medicalContent: true, sourceMessageId: null, createdAt: '2026-09-06' }
@@ -50,6 +85,8 @@ async function setup(path = '/app/chat') {
 beforeEach(() => {
   vi.resetAllMocks()
   localStorage.clear()
+  voiceHarness.supported = true
+  voiceHarness.api = null
   vi.mocked(consultationsApi.create).mockResolvedValue(conversation)
   vi.mocked(consultationsApi.send).mockResolvedValue(message)
   vi.mocked(consultationsApi.get).mockResolvedValue(conversation)
@@ -507,6 +544,106 @@ describe('语音输入引导与输入体验', () => {
     await wrapper.get('textarea').setValue('症'.repeat(1800))
     await flushPromises()
     expect(wrapper.get('.limit-hint').text()).toContain('已接近 2000 字上限，可分多次发送')
+    wrapper.unmount()
+  })
+})
+
+describe('应用内语音输入', () => {
+  type Wrapper = Awaited<ReturnType<typeof setup>>['wrapper']
+
+  async function clickMic(wrapper: Wrapper) {
+    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValueOnce(
+      'confirm' as Awaited<ReturnType<typeof ElMessageBox.confirm>>,
+    )
+    await wrapper.get('button[aria-label="语音输入"]').trigger('click')
+    await flushPromises()
+  }
+
+  it('麦克风按钮紧邻发送键左侧，并带无障碍标签', async () => {
+    const { wrapper } = await setup()
+    const labels = wrapper.findAll('.send-area > button')
+      .map(button => button.attributes('aria-label'))
+    expect(labels).toContain('语音输入')
+    expect(labels[labels.indexOf('发送消息') - 1]).toBe('语音输入')
+    wrapper.unmount()
+  })
+
+  it('首次录音前必须确认音频外发，取消则不录音', async () => {
+    const { wrapper } = await setup()
+    const confirm = vi.spyOn(ElMessageBox, 'confirm').mockRejectedValueOnce('cancel')
+    await wrapper.get('button[aria-label="语音输入"]').trigger('click')
+    await flushPromises()
+    expect(confirm).toHaveBeenCalled()
+    expect(String(confirm.mock.calls[0][0])).toContain('语音识别服务')
+    expect(String(confirm.mock.calls[0][0])).toContain('身份证号')
+    expect(voiceHarness.api?.start).not.toHaveBeenCalled()
+    expect(wrapper.text()).not.toContain('录音中')
+    wrapper.unmount()
+  })
+
+  it('同意后开始录音，停止转写并把文本追加到已有草稿', async () => {
+    vi.mocked(voiceApi.transcribe).mockResolvedValue({
+      text: ' 最近三天咳嗽 ', durationMs: 3000,
+    })
+    const { wrapper } = await setup()
+    await wrapper.get('textarea').setValue('补充：')
+    await clickMic(wrapper)
+    expect(voiceHarness.api?.start).toHaveBeenCalled()
+    expect(wrapper.text()).toContain('录音中')
+
+    await wrapper.get('button[aria-label="停止录音并转写"]').trigger('click')
+    await flushPromises()
+    expect(voiceApi.transcribe).toHaveBeenCalled()
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('补充：最近三天咳嗽')
+    // 转写结束不自动发送：必须由用户核对后点发送，才进入红旗预检与问答链路。
+    expect(consultationsApi.create).not.toHaveBeenCalled()
+    expect(consultationsApi.send).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('录音期间不允许发送，避免把半截文字送进咨询链路', async () => {
+    const { wrapper } = await setup()
+    await wrapper.get('textarea').setValue('已有草稿')
+    await clickMic(wrapper)
+    expect(wrapper.get('button[aria-label="发送消息"]').attributes('disabled')).toBeDefined()
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(consultationsApi.create).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('浏览器不支持录音时禁用麦克风并说明可用输入法', async () => {
+    voiceHarness.supported = false
+    const { wrapper } = await setup()
+    const mic = wrapper.get('button[aria-label="语音输入"]')
+    expect(mic.attributes('disabled')).toBeDefined()
+    expect(mic.attributes('title')).toContain('输入法语音输入')
+    wrapper.unmount()
+  })
+
+  it('转写失败显示服务端中文文案，草稿保持不变', async () => {
+    vi.mocked(voiceApi.transcribe).mockRejectedValue(
+      new ApiError('语音识别服务暂时不可用，请稍后再试', 'VOICE_SERVICE_UNAVAILABLE', 502),
+    )
+    const { wrapper } = await setup()
+    await clickMic(wrapper)
+    await wrapper.get('button[aria-label="停止录音并转写"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('语音识别服务暂时不可用')
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('')
+    wrapper.unmount()
+  })
+
+  it('转写文本超过字数上限时截断并提示分次发送', async () => {
+    vi.mocked(voiceApi.transcribe).mockResolvedValue({
+      text: '症'.repeat(2001), durationMs: 30_000,
+    })
+    const { wrapper } = await setup()
+    await clickMic(wrapper)
+    await wrapper.get('button[aria-label="停止录音并转写"]').trigger('click')
+    await flushPromises()
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toHaveLength(2000)
+    expect(wrapper.text()).toContain('已截断')
     wrapper.unmount()
   })
 })

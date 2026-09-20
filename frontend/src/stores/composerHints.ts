@@ -1,5 +1,7 @@
-// 输入区的一次性引导状态。只存「是否看过」，不含任何用户文本、引用或密钥。
+// 输入区的一次性状态：只存「是否看过/是否同意过」，不含任何用户文本、引用或密钥。
 export const VOICE_TIP_STORAGE_KEY = 'medical-assistant:voice-input-tip-seen'
+// 应用内录音会把音频发给语音识别服务，首次录音前要用户明确同意；同意结果只记在本机。
+export const VOICE_CONSENT_STORAGE_KEY = 'medical-assistant:voice-consent-seen'
 
 function readFlag(key: string): boolean {
   try {
@@ -24,4 +26,12 @@ export function readVoiceTipSeen(): boolean {
 
 export function rememberVoiceTipSeen(): void {
   writeFlag(VOICE_TIP_STORAGE_KEY)
+}
+
+export function readVoiceConsentSeen(): boolean {
+  return readFlag(VOICE_CONSENT_STORAGE_KEY)
+}
+
+export function rememberVoiceConsentSeen(): void {
+  writeFlag(VOICE_CONSENT_STORAGE_KEY)
 }
