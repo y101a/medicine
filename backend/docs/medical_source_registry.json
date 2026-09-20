@@ -1,6 +1,6 @@
 {
-  "schema_version": "1.0",
-  "reviewed_at": "2026-09-11",
+  "schema_version": "1.1",
+  "reviewed_at": "2026-09-20",
   "product_jurisdiction": "CN",
   "default_language": "zh-CN",
   "policy": {
@@ -11,7 +11,11 @@
     "require_legal_review": true,
     "require_source_attribution": true,
     "require_version_and_access_date": true,
-    "approved_for_ingestion": []
+    "approved_for_ingestion": [
+      "nhc_health_literacy_2024",
+      "nhc_clinical_guidance",
+      "nmpa_drug_verification"
+    ]
   },
   "sources": [
     {
@@ -25,10 +29,19 @@
       "entry_url": "https://www.nhc.gov.cn/xcs/c100123/202405/73a4927142f34152abed875634a3c13b.shtml",
       "content_scope": ["基础健康知识", "健康生活方式", "科学就医与合理用药", "基本急救技能"],
       "rag_role": "pilot_seed_candidate",
-      "ingestion_status": "pending_legal_and_medical_review",
+      "ingestion_status": "controlled_summary_only",
       "automated_collection": false,
       "review_interval_days": 30,
-      "notes": "首批单文档试点候选；只使用正式发布版本，不使用征求意见稿。"
+      "ingestion_policy": {
+        "allowed_content_modes": ["original_summary"],
+        "max_content_chars": 1600,
+        "max_verbatim_quotes": 2,
+        "max_verbatim_quote_chars_each": 60,
+        "max_verbatim_quote_chars_total": 100,
+        "require_source_attribution": true,
+        "initial_batch_limit": 2
+      },
+      "notes": "只允许逐篇自编摘要和少量短引用；只使用正式发布版本，不使用征求意见稿。每篇仍需真实医学审核。"
     },
     {
       "id": "nhc_rumor_refutation",
@@ -57,10 +70,19 @@
       "entry_url": "https://www.nhc.gov.cn/wjw/gfxwjj/list.shtml",
       "content_scope": ["国家级诊疗指南", "筛查与早诊早治方案", "医疗质量与公共卫生规范"],
       "rag_role": "clinician_review_reference",
-      "ingestion_status": "manual_document_review_required",
+      "ingestion_status": "controlled_summary_only",
       "automated_collection": false,
       "review_interval_days": 30,
-      "notes": "内容面向专业人员；不得直接转化为个体诊断或处方建议，必须识别被替代版本。"
+      "ingestion_policy": {
+        "allowed_content_modes": ["original_summary"],
+        "max_content_chars": 1800,
+        "max_verbatim_quotes": 2,
+        "max_verbatim_quote_chars_each": 60,
+        "max_verbatim_quote_chars_total": 100,
+        "require_source_attribution": true,
+        "initial_batch_limit": 16
+      },
+      "notes": "内容面向专业人员；仅入库自编摘要和少量短引用，不得直接转化为个体诊断或处方建议，必须识别被替代版本。每篇仍需真实医学审核。"
     },
     {
       "id": "china_cdc_health_education",
@@ -104,13 +126,23 @@
       "jurisdiction": "CN",
       "language": "zh-CN",
       "channel_name": "国家药监局药品数据与政务服务查询",
-      "entry_url": "https://www.nmpa.gov.cn/zwfwqjd/index.html",
+      "entry_url": "https://app.gjzwfw.gov.cn/jmopen/webapp/html5/datasearchgcyp/index.html",
       "content_scope": ["国产与进口药品注册信息", "药品生产经营主体信息", "医疗器械备案和注册信息"],
       "rag_role": "regulatory_verification_only",
-      "ingestion_status": "no_bulk_ingestion",
+      "ingestion_status": "regulatory_fact_summary_only",
       "automated_collection": false,
       "review_interval_days": 30,
-      "notes": "只用于核验监管事实；不能替代药品说明书、医生处方或药师指导。"
+      "ingestion_policy": {
+        "allowed_content_modes": ["original_summary"],
+        "max_content_chars": 1200,
+        "max_verbatim_quotes": 1,
+        "max_verbatim_quote_chars_each": 50,
+        "max_verbatim_quote_chars_total": 50,
+        "require_source_attribution": true,
+        "initial_batch_limit": 12
+      },
+      "legal_notice_url": "https://www.nmpa.gov.cn/zwfwqjd/index.html",
+      "notes": "国家药监局通过国家政务服务平台提供具体查询页。不批量抓取查询库；只允许按条核验后入库注册事实自编摘要，并保留对应具体查询页、核验日期和批准文号。不能替代药品说明书、医生处方或药师指导。"
     },
     {
       "id": "who_zh_fact_sheets",

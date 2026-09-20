@@ -12,6 +12,8 @@
   "legal_reviewed_by": "请填写版权审核人",
   "medical_reviewed_at": "2026-09-11T09:30:00+08:00",
   "medical_reviewed_by": "请填写医学审核人",
+  "content_mode": "original_summary",
+  "verbatim_quotes": [],
   "metadata": {
     "audience": "general_public",
     "topic": "请填写医学主题"

@@ -7,7 +7,12 @@ from sqlalchemy import delete, select
 
 from app.db.session import SessionLocal, engine
 from app.models import IngestionJob, KnowledgeChunk, KnowledgeDocument, KnowledgeSource
-from app.rag.markdown_importer import ControlledImportError, import_markdown_document
+from app.rag.markdown_importer import (
+    ControlledImportError,
+    DocumentReviewMetadata,
+    _enforce_source_ingestion_policy,
+    import_markdown_document,
+)
 from app.rag.source_sync import sync_approved_sources
 
 
@@ -57,6 +62,62 @@ def review_metadata(source_key: str) -> dict[str, object]:
         "medical_reviewed_by": "医学测试审核员",
         "metadata": {"topic": "test"},
     }
+
+
+def summary_only_source() -> KnowledgeSource:
+    return KnowledgeSource(
+        source_metadata={
+            "ingestion_policy": {
+                "allowed_content_modes": ["original_summary"],
+                "max_content_chars": 200,
+                "max_verbatim_quotes": 1,
+                "max_verbatim_quote_chars_each": 12,
+                "max_verbatim_quote_chars_total": 12,
+                "require_source_attribution": True,
+            }
+        }
+    )
+
+
+def summary_metadata() -> DocumentReviewMetadata:
+    payload = review_metadata("summary_source")
+    payload["content_mode"] = "original_summary"
+    payload["verbatim_quotes"] = ["及时就医"]
+    return DocumentReviewMetadata.model_validate(payload)
+
+
+def test_summary_only_policy_accepts_short_attributed_excerpt():
+    _enforce_source_ingestion_policy(
+        "这是项目自编摘要。危险表现需要及时就医。",
+        summary_metadata(),
+        summary_only_source(),
+    )
+
+
+def test_summary_only_policy_rejects_full_text_mode():
+    payload = review_metadata("summary_source")
+    metadata = DocumentReviewMetadata.model_validate(payload)
+
+    with pytest.raises(ControlledImportError, match="内容形式"):
+        _enforce_source_ingestion_policy("原始资料正文", metadata, summary_only_source())
+
+
+def test_summary_only_policy_rejects_oversized_or_untracked_quotes():
+    payload = review_metadata("summary_source")
+    payload["content_mode"] = "original_summary"
+    payload["verbatim_quotes"] = ["这是一条明显超过十二个字符的逐字引用"]
+    oversized = DocumentReviewMetadata.model_validate(payload)
+    with pytest.raises(ControlledImportError, match="单条逐字短引用"):
+        _enforce_source_ingestion_policy(
+            "这是一条明显超过十二个字符的逐字引用",
+            oversized,
+            summary_only_source(),
+        )
+
+    payload["verbatim_quotes"] = ["及时就医"]
+    missing = DocumentReviewMetadata.model_validate(payload)
+    with pytest.raises(ControlledImportError, match="原样出现在"):
+        _enforce_source_ingestion_policy("这是项目自编摘要。", missing, summary_only_source())
 
 
 async def test_sync_and_versioned_markdown_import_are_controlled(tmp_path):

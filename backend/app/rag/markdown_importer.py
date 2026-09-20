@@ -5,6 +5,7 @@ import unicodedata
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Literal
 from urllib.parse import urlparse
 from uuid import UUID
 
@@ -44,6 +45,10 @@ class DocumentReviewMetadata(BaseModel):
     legal_reviewed_by: str = Field(min_length=2, max_length=200)
     medical_reviewed_at: datetime
     medical_reviewed_by: str = Field(min_length=2, max_length=200)
+    content_mode: Literal["licensed_full_text", "original_summary"] = (
+        "licensed_full_text"
+    )
+    verbatim_quotes: list[str] = Field(default_factory=list, max_length=10)
     metadata: dict[str, object] = Field(default_factory=dict)
 
     @field_validator("canonical_url")
@@ -200,6 +205,52 @@ def _same_source_domain(document_url: str, source_url: str) -> bool:
     return document_host == source_host or document_host.endswith(f".{source_host}")
 
 
+def _policy_limit(policy: dict[str, object], key: str) -> int | None:
+    value = policy.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise ControlledImportError(f"来源入库策略字段 {key} 无效")
+    return value
+
+
+def _enforce_source_ingestion_policy(
+    content: str,
+    metadata: DocumentReviewMetadata,
+    source: KnowledgeSource,
+) -> None:
+    raw_policy = (source.source_metadata or {}).get("ingestion_policy")
+    if raw_policy is None:
+        return
+    if not isinstance(raw_policy, dict):
+        raise ControlledImportError("来源入库策略格式无效")
+
+    allowed_modes = raw_policy.get("allowed_content_modes")
+    if not isinstance(allowed_modes, list) or not all(
+        isinstance(mode, str) for mode in allowed_modes
+    ):
+        raise ControlledImportError("来源入库策略缺少 allowed_content_modes")
+    if metadata.content_mode not in allowed_modes:
+        raise ControlledImportError("该来源只允许自编摘要或明确获许可的内容形式")
+
+    max_content_chars = _policy_limit(raw_policy, "max_content_chars")
+    if max_content_chars is not None and len(content) > max_content_chars:
+        raise ControlledImportError("自编摘要超过该来源允许的最大长度")
+
+    quote_count = _policy_limit(raw_policy, "max_verbatim_quotes")
+    quote_each = _policy_limit(raw_policy, "max_verbatim_quote_chars_each")
+    quote_total = _policy_limit(raw_policy, "max_verbatim_quote_chars_total")
+    quotes = metadata.verbatim_quotes
+    if quote_count is not None and len(quotes) > quote_count:
+        raise ControlledImportError("逐字短引用数量超过该来源限制")
+    if quote_each is not None and any(len(quote) > quote_each for quote in quotes):
+        raise ControlledImportError("单条逐字短引用超过该来源限制")
+    if quote_total is not None and sum(map(len, quotes)) > quote_total:
+        raise ControlledImportError("逐字短引用总长度超过该来源限制")
+    if any(not quote.strip() or quote not in content for quote in quotes):
+        raise ControlledImportError("逐字短引用必须非空且原样出现在摘要正文中")
+
+
 async def import_markdown_document(
     db: AsyncSession,
     markdown_path: Path,
@@ -220,6 +271,7 @@ async def import_markdown_document(
         raise ControlledImportError("来源未同步或尚未批准入库")
     if not _same_source_domain(metadata.canonical_url, source.entry_url):
         raise ControlledImportError("文档 URL 与已批准来源域名不一致")
+    _enforce_source_ingestion_policy(content, metadata, source)
 
     duplicate = await db.scalar(
         select(KnowledgeDocument).where(
@@ -305,6 +357,8 @@ async def import_markdown_document(
                 supersedes_document_id=previous.id if previous else None,
                 document_metadata={
                     **metadata.metadata,
+                    "content_mode": metadata.content_mode,
+                    "verbatim_quotes": metadata.verbatim_quotes,
                     "parser_version": PARSER_VERSION,
                     "source_file_name": markdown_path.name,
                 },

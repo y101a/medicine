@@ -1,0 +1,101 @@
+{
+  "schema_version": "1.0",
+  "reviewed_at": "2026-09-20",
+  "strategy": "original_summary_with_minimal_quotes",
+  "policy": {
+    "automated_collection": false,
+    "require_original_url": true,
+    "require_legal_review": true,
+    "require_medical_review": true,
+    "max_documents_per_review_round": 5,
+    "latest_effective_version_only": true,
+    "superseded_documents_must_be_marked": true
+  },
+  "initial_batch_total": 30,
+  "allocation_by_document_type": [
+    {
+      "category": "nhc_health_literacy",
+      "limit": 2
+    },
+    {
+      "category": "nhc_clinical_pathway",
+      "limit": 6
+    },
+    {
+      "category": "nhc_clinical_guideline",
+      "limit": 5
+    },
+    {
+      "category": "nhc_technical_or_management_specification",
+      "limit": 3
+    },
+    {
+      "category": "nhc_public_health_action",
+      "limit": 2
+    },
+    {
+      "category": "nmpa_domestic_drug_registration",
+      "limit": 4
+    },
+    {
+      "category": "nmpa_imported_drug_registration",
+      "limit": 3
+    },
+    {
+      "category": "nmpa_vaccine_label",
+      "limit": 3
+    },
+    {
+      "category": "nmpa_medical_device_registration",
+      "limit": 2
+    }
+  ],
+  "coverage_targets": [
+    {
+      "topic": "general_health_and_safety",
+      "minimum": 2
+    },
+    {
+      "topic": "cardiovascular",
+      "minimum": 3
+    },
+    {
+      "topic": "respiratory",
+      "minimum": 3
+    },
+    {
+      "topic": "neurology",
+      "minimum": 3
+    },
+    {
+      "topic": "endocrine_and_metabolic",
+      "minimum": 3
+    },
+    {
+      "topic": "digestive",
+      "minimum": 2
+    },
+    {
+      "topic": "infectious_disease_and_immunization",
+      "minimum": 3
+    },
+    {
+      "topic": "maternal_child_and_adolescent",
+      "minimum": 2
+    },
+    {
+      "topic": "musculoskeletal",
+      "minimum": 2
+    },
+    {
+      "topic": "drug_and_device_regulatory_verification",
+      "minimum": 7
+    }
+  ],
+  "notes": [
+    "配额是首批上限，不是自动抓取数量；每轮最多审核并导入5篇。",
+    "同一疾病首批最多2篇，避免少数主题挤占召回。",
+    "药品和器械只保存逐条核验后的监管事实摘要，不保存查询库镜像。",
+    "药品剂量、疗程、换药或停药建议不从监管注册事实推导。"
+  ]
+}

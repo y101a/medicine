@@ -97,6 +97,7 @@ def _source_values(entry: dict[str, Any], registry: dict[str, Any]) -> dict[str,
             "registry_ingestion_status": entry.get("ingestion_status"),
             "content_scope": entry.get("content_scope", []),
             "rag_role": entry.get("rag_role"),
+            "ingestion_policy": entry.get("ingestion_policy"),
             "notes": entry.get("notes"),
         },
     }

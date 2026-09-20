@@ -1,0 +1,118 @@
+{
+  "schema_version": "1.0",
+  "verified_at": "2026-09-20",
+  "status": "pending_qualified_medical_review",
+  "content_mode": "original_summary",
+  "candidates": [
+    {
+      "id": "nhc-health-literacy-2024",
+      "source_key": "nhc_health_literacy_2024",
+      "document_kind": "nhc_health_literacy",
+      "title": "中国公民健康素养——基本知识与技能（2024年版）",
+      "canonical_url": "https://www.nhc.gov.cn/xcs/c100123/202405/73a4927142f34152abed875634a3c13b.shtml",
+      "published_at": "2024-05-30",
+      "summary_draft": "国家卫生健康委发布的2024年版健康素养基本知识与技能是在2015年版基础上的修订稿，正式版本包含基本知识和理念、健康生活方式与行为、基本技能三部分。项目拟将其用于一般健康教育、科学就医、合理用药意识和常见急救技能的科普，不把条目扩写为个体诊断或治疗方案。",
+      "verbatim_quotes": [],
+      "status": "pending_qualified_medical_review"
+    },
+    {
+      "id": "nhc-health-literacy-explanation-2024",
+      "source_key": "nhc_health_literacy_2024",
+      "document_kind": "nhc_health_literacy",
+      "title": "中国公民健康素养——基本知识与技能释义（2024年版）",
+      "canonical_url": "https://www.nhc.gov.cn/xcs/c100122/202405/f251e896a50a49ff8c632b4b3da93126.shtml",
+      "published_at": "2024-05-30",
+      "summary_draft": "该释义材料用于解释2024年版健康素养条目的含义和实践背景。项目只拟提炼适合普通用户的健康行为、信息识别和就医安全要点，并在回答中链接该正式释义页面；不复制整份释义，也不把它当作针对具体患者的诊疗指南。",
+      "verbatim_quotes": [],
+      "status": "pending_qualified_medical_review"
+    },
+    {
+      "id": "nhc-clinical-pathways-2016",
+      "source_key": "nhc_clinical_guidance",
+      "document_kind": "nhc_clinical_pathway",
+      "title": "国家卫生计生委办公厅关于实施有关病种临床路径的通知",
+      "canonical_url": "https://www.nhc.gov.cn/yzygj/c100068/201612/cd2903219a93440eac585ec0ffb54b5d.shtml",
+      "published_at": "2016-12-08",
+      "summary_draft": "该通知说明有关部门组织制修订并整理了多专业病种临床路径，供卫生行政部门和医疗机构参考实施。项目将临床路径作为专业流程和版本核验入口；具体病种必须再定位到对应路径原文，逐篇核对现行状态后才能形成面向公众的摘要。",
+      "verbatim_quotes": [],
+      "status": "pending_qualified_medical_review"
+    },
+    {
+      "id": "nhc-cdss-management-2023",
+      "source_key": "nhc_clinical_guidance",
+      "document_kind": "nhc_technical_or_management_specification",
+      "title": "医疗机构临床决策支持系统应用管理规范（试行）",
+      "canonical_url": "https://www.nhc.gov.cn/yzygj/c100068/202307/d5239ed63d324aaa8ea85922b5fb1310.shtml",
+      "published_at": "2023-07-26",
+      "summary_draft": "该规范将临床决策支持系统定位为辅助医务人员临床决策的工具，要求临床知识来源具有权威性、知识更新具备审核机制和记录，并要求开展安全、权限、质量监测与风险告知。项目据此保留人工审核、版本追踪和不替代医生的边界。",
+      "verbatim_quotes": [],
+      "status": "pending_qualified_medical_review"
+    },
+    {
+      "id": "nhc-stroke-guidance-2021",
+      "source_key": "nhc_clinical_guidance",
+      "document_kind": "nhc_clinical_guideline",
+      "title": "中国脑卒中防治指导规范（2021年版）",
+      "canonical_url": "https://www.nhc.gov.cn/yzygj/c100068/202108/682b5a958a7443b2b8269ab9303cfbeb.shtml",
+      "published_at": "2021-08-31",
+      "summary_draft": "国家卫生健康委发布该规范以指导脑卒中防治并提高规范化水平。项目首批只拟形成脑卒中风险识别、及时就医和防治框架的公众摘要；涉及检查选择、再灌注治疗、药物和手术的专业内容不得转换为针对个人的治疗建议。",
+      "verbatim_quotes": [],
+      "status": "pending_qualified_medical_review"
+    },
+    {
+      "id": "nhc-diabetes-action-2024-2030",
+      "source_key": "nhc_clinical_guidance",
+      "document_kind": "nhc_public_health_action",
+      "title": "健康中国行动——糖尿病防治行动实施方案（2024—2030年）",
+      "canonical_url": "https://www.nhc.gov.cn/ylyjs/gzdt/202407/330feafa9cd7458080c05dcdfd380af8.shtml",
+      "published_at": "2024-07-29",
+      "summary_draft": "该实施方案从健康教育、危险因素干预、筛查管理、规范诊疗和并发症管理等方面部署糖尿病防治工作。项目拟将其用于解释糖尿病长期管理和规范转诊的重要性，不把公共卫生行动目标解释为个人诊断标准、用药方案或疗效承诺。",
+      "verbatim_quotes": [],
+      "status": "pending_qualified_medical_review"
+    },
+    {
+      "id": "nmpa-domestic-drug-query",
+      "source_key": "nmpa_drug_verification",
+      "document_kind": "nmpa_domestic_drug_registration",
+      "title": "国家药品监督管理局国产药品查询",
+      "canonical_url": "https://app.gjzwfw.gov.cn/jmopen/webapp/html5/datasearchgcyp/index.html",
+      "published_at": null,
+      "summary_draft": "国家药品监督管理局提供的国产药品查询服务支持按药品批准文号或通用名称核验注册信息。项目只保存逐条查询后的批准文号、通用名称、生产企业、核验时间和原始查询页，不据此推导适应证、剂量、疗程或购买建议。",
+      "verbatim_quotes": [],
+      "status": "pending_qualified_medical_review"
+    },
+    {
+      "id": "nmpa-imported-drug-query",
+      "source_key": "nmpa_drug_verification",
+      "document_kind": "nmpa_imported_drug_registration",
+      "title": "国家药品监督管理局进口药品查询",
+      "canonical_url": "https://app.gjzwfw.gov.cn/jmopen/webapp/html5/datasearchjkyp/index.html",
+      "published_at": null,
+      "summary_draft": "国家药品监督管理局提供的进口药品查询服务支持按批准文号或通用名称核验注册信息。项目只把经人工核验的注册事实作为来源追溯线索，不将境外名称、历史注册状态或查询结果自动转换为用药建议。",
+      "verbatim_quotes": [],
+      "status": "pending_qualified_medical_review"
+    },
+    {
+      "id": "nmpa-vaccine-label-query",
+      "source_key": "nmpa_drug_verification",
+      "document_kind": "nmpa_vaccine_label",
+      "title": "国家药品监督管理局疫苗说明书和标签数据库查询",
+      "canonical_url": "https://app.gjzwfw.gov.cn/jmopen/webapp/html5/apiymsmshbqsjkcx/index.html",
+      "published_at": null,
+      "summary_draft": "该官方服务支持按批准文号、产品中文名称或生产企业查询疫苗说明书和标签信息。项目只在用户明确查询具体疫苗时按条核验，并保留产品名称、批准文号、企业、核验时间和原始页面；接种适用性仍需结合接种单位评估。",
+      "verbatim_quotes": [],
+      "status": "pending_qualified_medical_review"
+    },
+    {
+      "id": "nmpa-domestic-device-registration-query",
+      "source_key": "nmpa_drug_verification",
+      "document_kind": "nmpa_medical_device_registration",
+      "title": "国家药品监督管理局境内医疗器械（注册）查询",
+      "canonical_url": "https://app.gjzwfw.gov.cn/jmopen/webapp/html5/apigcylqxcpzccx/index.html",
+      "published_at": null,
+      "summary_draft": "该官方服务支持按注册证编号、产品名称或注册人名称核验境内医疗器械注册信息。项目只保存经人工核验的监管事实和原始查询页，不根据注册状态判断某一器械是否适合具体用户，也不替代医疗机构或专业人员的选择。",
+      "verbatim_quotes": [],
+      "status": "pending_qualified_medical_review"
+    }
+  ]
+}
