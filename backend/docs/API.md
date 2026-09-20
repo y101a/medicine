@@ -48,10 +48,17 @@ Cookie 和刷新 Cookie，并返回 `{ "user": AuthUser }`。
 
 - `PUT /users/me/avatar`：使用 `multipart/form-data` 上传字段 `avatar`。
 - `GET /users/me/avatar`：读取当前登录用户头像。
+- `DELETE /users/me/avatar`：删除当前登录用户头像；头像已不存在时仍返回 204。
 
 仅支持 JPG、PNG、WebP，文件最大 3 MB。后端校验真实图片内容、移除元数据并统一
 居中裁切为 512×512 WebP。头像文件使用用户 UUID 命名并保存在
 `AVATAR_STORAGE_DIR`，用户只能上传和读取自己的头像。
+
+头像上传按账户限制为 10 分钟 10 次，超限返回 429 `UPLOAD_RATE_LIMITED`，并在
+`details.retryAfterSeconds` 返回建议等待秒数。当前限流状态保存在单个应用进程内；部署
+多个后端进程前应迁移到 Redis 或网关限流。成功上传、校验拒绝和删除会写入最小化审计表，
+但不会记录原始文件名、文件内容、磁盘路径、IP 或患者文本。为避免攻击者利用被限流请求
+持续写数据库，命中 429 的每次重试不单独写审计行。
 
 ## 用户自带模型 API Key
 

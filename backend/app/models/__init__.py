@@ -1,3 +1,4 @@
+from app.models.audit_log import AuditLog
 from app.models.auth_session import AuthSession
 from app.models.consultation import Consultation, Message
 from app.models.health_record import (
@@ -17,6 +18,7 @@ from app.models.user import Gender, User, UserCredentials, UserRole, UserStatus
 
 __all__ = [
     "AuthSession",
+    "AuditLog",
     "Consultation",
     "HealthRecord",
     "HealthRecordCategory",

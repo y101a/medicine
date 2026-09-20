@@ -21,6 +21,17 @@ def avatar_path(user_id: UUID) -> Path:
     return storage / f"{user_id.hex}.webp"
 
 
+def delete_avatar(user_id: UUID) -> bool:
+    target = avatar_path(user_id)
+    try:
+        target.unlink()
+    except FileNotFoundError:
+        return False
+    except OSError as exc:
+        raise AppError(500, "AVATAR_DELETE_FAILED", "头像删除失败，请稍后再试") from exc
+    return True
+
+
 async def save_avatar(user_id: UUID, upload: UploadFile) -> Path:
     if upload.content_type not in ALLOWED_CONTENT_TYPES:
         raise AppError(415, "AVATAR_TYPE_NOT_ALLOWED", "头像仅支持 JPG、PNG 或 WebP 格式")

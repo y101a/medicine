@@ -4,14 +4,23 @@ from uuid import uuid4
 import pytest
 from httpx import ASGITransport, AsyncClient
 from PIL import Image
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app.core.config import get_settings
 from app.core.security import create_access_token, decrypt_sensitive, encrypt_sensitive
 from app.db.session import get_db
 from app.main import app
-from app.models import Gender, User
+from app.models import AuditLog, Gender, User
+from app.services import upload_limits
 from app.services.auth import ACCESS_COOKIE
+
+
+@pytest.fixture(autouse=True)
+def reset_upload_limits():
+    upload_limits._reset_upload_limits()
+    yield
+    upload_limits._reset_upload_limits()
 
 
 @pytest.fixture
@@ -120,7 +129,7 @@ def avatar_bytes(color: str) -> bytes:
 
 
 async def test_avatar_upload_replace_and_user_isolation(profile_context, tmp_path, monkeypatch):
-    client, _, (first, second) = profile_context
+    client, db, (first, second) = profile_context
     monkeypatch.setattr(get_settings(), "avatar_storage_dir", str(tmp_path))
     endpoint = "/api/v1/users/me/avatar"
 
@@ -156,6 +165,24 @@ async def test_avatar_upload_replace_and_user_isolation(profile_context, tmp_pat
     client.cookies.set(ACCESS_COOKIE, create_access_token(second.id))
     assert (await client.get(endpoint)).status_code == 404
 
+    client.cookies.set(ACCESS_COOKIE, create_access_token(first.id))
+    assert (await client.delete(endpoint)).status_code == 204
+    assert (await client.get(endpoint)).status_code == 404
+    assert (await client.delete(endpoint)).status_code == 204
+
+    events = (
+        await db.scalars(
+            select(AuditLog).where(
+                AuditLog.actor_user_id == first.id,
+                AuditLog.resource_type == "avatar",
+            )
+        )
+    ).all()
+    assert sum(event.action == "upload" for event in events) == 2
+    assert sum(event.action == "delete" for event in events) == 2
+    assert {event.outcome for event in events} == {"success"}
+    assert sum(event.reason_code == "AVATAR_ALREADY_ABSENT" for event in events) == 1
+
 
 @pytest.mark.parametrize(
     ("filename", "content", "content_type", "status", "code"),
@@ -169,7 +196,7 @@ async def test_avatar_upload_replace_and_user_isolation(profile_context, tmp_pat
 async def test_invalid_avatar_is_rejected(
     profile_context, tmp_path, monkeypatch, filename, content, content_type, status, code
 ):
-    client, _, (user, _) = profile_context
+    client, db, (user, _) = profile_context
     monkeypatch.setattr(get_settings(), "avatar_storage_dir", str(tmp_path))
     client.cookies.set(ACCESS_COOKIE, create_access_token(user.id))
     response = await client.put(
@@ -179,3 +206,56 @@ async def test_invalid_avatar_is_rejected(
     assert response.status_code == status
     assert response.json()["code"] == code
     assert list(tmp_path.iterdir()) == []
+    event = await db.scalar(
+        select(AuditLog).where(
+            AuditLog.actor_user_id == user.id,
+            AuditLog.action == "upload",
+            AuditLog.resource_type == "avatar",
+        )
+    )
+    assert event is not None
+    assert event.outcome == "rejected"
+    assert event.reason_code == code
+
+
+async def test_avatar_upload_is_rate_limited_per_user(
+    profile_context, tmp_path, monkeypatch
+):
+    client, db, (user, other_user) = profile_context
+    monkeypatch.setattr(get_settings(), "avatar_storage_dir", str(tmp_path))
+    monkeypatch.setattr(upload_limits, "UPLOAD_LIMIT", 2)
+    client.cookies.set(ACCESS_COOKIE, create_access_token(user.id))
+    endpoint = "/api/v1/users/me/avatar"
+
+    for color in ("blue", "red"):
+        response = await client.put(
+            endpoint,
+            files={"avatar": ("avatar.png", avatar_bytes(color), "image/png")},
+        )
+        assert response.status_code == 200
+
+    rejected = await client.put(
+        endpoint,
+        files={"avatar": ("avatar.png", avatar_bytes("green"), "image/png")},
+    )
+    assert rejected.status_code == 429
+    assert rejected.json()["code"] == "UPLOAD_RATE_LIMITED"
+    assert rejected.json()["details"]["retryAfterSeconds"] > 0
+
+    client.cookies.set(ACCESS_COOKIE, create_access_token(other_user.id))
+    other_upload = await client.put(
+        endpoint,
+        files={"avatar": ("avatar.png", avatar_bytes("green"), "image/png")},
+    )
+    assert other_upload.status_code == 200
+
+    events = (
+        await db.scalars(
+            select(AuditLog).where(
+                AuditLog.actor_user_id == user.id,
+                AuditLog.action == "upload",
+            )
+        )
+    ).all()
+    assert len(events) == 2
+    assert all(event.outcome == "success" for event in events)
