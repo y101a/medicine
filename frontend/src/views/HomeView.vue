@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref, onMounted } from 'vue'
+import { computed, nextTick, ref, onMounted } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { consultationsApi, type RetrievalProgress } from '../api/consultations'
@@ -18,6 +18,7 @@ import ReferenceSources from '../components/ReferenceSources.vue'
 import HospitalNavigator from '../components/HospitalNavigator.vue'
 import PathologyCardOffer from '../components/PathologyCardOffer.vue'
 import { readRetrievalNotice, rememberRetrievalNotice } from '../stores/retrievalNotices'
+import { readVoiceTipSeen, rememberVoiceTipSeen } from '../stores/composerHints'
 
 const route = useRoute()
 const router = useRouter()
@@ -31,6 +32,7 @@ const saving = ref(false)
 const generating = ref(false)
 const error = ref('')
 const retrievalNotice = ref('')
+const voiceTipSeen = ref(readVoiceTipSeen())
 const ready = ref(!route.params.id)
 const hasOlder = ref(false)
 const title = ref('')
@@ -50,6 +52,15 @@ const suggestions = [
   { title: '就医指引', text: '不知道该挂哪个科，先聊一聊', icon: Compass, prompt: '我想了解应该去哪个科室就诊。我的情况是：' },
   { title: '读懂术语', text: '把陌生的医学名词讲明白', icon: Document, prompt: '请用通俗的语言解释这个医学术语：' },
 ]
+// 与后端 `schemas/consultations.py` 的 content max_length 保持一致。
+const DRAFT_LIMIT = 2000
+// 语音输入多为连续长句，容易不知不觉逼近上限；接近时提醒用户分次发送。
+const DRAFT_NEAR_LIMIT = 1800
+const nearDraftLimit = computed(() => draft.value.length >= DRAFT_NEAR_LIMIT)
+function dismissVoiceTip() {
+  voiceTipSeen.value = true
+  rememberVoiceTipSeen()
+}
 function modelName(message: Message) {
   if (message.modelName) return message.modelName
   if (!message.modelId) return ''
@@ -470,8 +481,11 @@ onBeforeRouteUpdate(canLeave)
     <div class="composer-area">
       <form class="composer" @submit.prevent="send">
         <el-alert v-if="modelsError" class="model-error" :title="modelsError" type="warning" :closable="false" />
+        <el-alert v-if="!voiceTipSeen" class="voice-tip" type="info" show-icon
+          title="可用输入法上的麦克风语音输入（如豆包输入法）。语音识别可能出错，发送前请核对文字；请不要在对话中提供姓名、身份证号、住院号或手机号。"
+          @close="dismissVoiceTip" />
         <label class="sr-only" for="symptom-input">症状或健康问题</label>
-        <textarea id="symptom-input" ref="input" v-model="draft" maxlength="2000" rows="3" :disabled="saving || generating || !ready"
+        <textarea id="symptom-input" ref="input" v-model="draft" :maxlength="DRAFT_LIMIT" rows="3" :disabled="saving || generating || !ready"
           placeholder="描述您的症状或健康疑问，例如：什么时候开始、持续多久……" @keydown="keydown"></textarea>
         <div class="composer-bottom">
           <HospitalNavigator />
@@ -493,13 +507,14 @@ onBeforeRouteUpdate(canLeave)
                 <div class="model-option"><span>{{ model.name }}</span><small>{{ model.providerName }}</small></div>
               </el-option>
             </el-select>
-            <span>{{ draft.length }}/2000</span>
+            <span>{{ draft.length }}/{{ DRAFT_LIMIT }}</span>
+            <span v-if="nearDraftLimit" class="limit-hint">已接近 {{ DRAFT_LIMIT }} 字上限，可分多次发送</span>
             <button v-if="generating" class="stop-button" type="button" aria-label="停止生成" title="停止生成" @click="stopGeneration"><el-icon :size="15"><CloseBold /></el-icon></button>
             <button v-else class="send-button" type="submit" :disabled="!draft.trim() || saving || loading || modelsLoading || !ready" aria-label="发送消息" title="发送消息"><el-icon :size="20"><Top /></el-icon></button>
           </div>
         </div>
       </form>
-      <div class="composer-meta"><span>仅提供健康科普与就医分流，不作确诊，不替代医生。</span><span>Enter 发送 · Shift + Enter 换行</span></div>
+      <div class="composer-meta"><span>仅提供健康科普与就医分流，不作确诊，不替代医生。</span><span>可用输入法语音输入（如豆包输入法） · Enter 发送 · Shift + Enter 换行</span></div>
     </div>
   </main>
 </template>
@@ -529,8 +544,9 @@ textarea::placeholder { color: #99a5b0; }
 .model-select { width: 190px; }
 .model-option { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .model-option small { color: #93a1ae; }
-.model-error { margin-bottom: 12px; }
+.model-error, .voice-tip { margin-bottom: 12px; }
 .preview, .send-area > span { color: #9aa7b3; font-size: 11px; }
+.send-area > .limit-hint { color: #bf7a15; }
 .send-button { display: grid; place-items: center; width: 34px; height: 34px; border: none; border-radius: 10px; background: #237ac2; color: white; cursor: pointer; }
 .send-button:disabled { background: #e8eef4; color: #a2b3c3; cursor: default; }
 .composer-meta { display: flex; justify-content: space-between; gap: 12px; margin-top: 12px; color: #9ba7b3; font-size: 10px; line-height: 1.7; }

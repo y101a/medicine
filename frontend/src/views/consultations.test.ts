@@ -11,6 +11,7 @@ import { useConsultationsStore } from '../stores/consultations'
 import { consultationsApi } from '../api/consultations'
 import { modelsApi } from '../api/models'
 import { ApiError } from '../api/http'
+import { VOICE_TIP_STORAGE_KEY } from '../stores/composerHints'
 
 vi.mock('../api/consultations', () => ({ consultationsApi: {
   create: vi.fn(), send: vi.fn(), stream: vi.fn(), get: vi.fn(), messages: vi.fn(), list: vi.fn(), remove: vi.fn(),
@@ -48,6 +49,7 @@ async function setup(path = '/app/chat') {
 }
 beforeEach(() => {
   vi.resetAllMocks()
+  localStorage.clear()
   vi.mocked(consultationsApi.create).mockResolvedValue(conversation)
   vi.mocked(consultationsApi.send).mockResolvedValue(message)
   vi.mocked(consultationsApi.get).mockResolvedValue(conversation)
@@ -470,6 +472,41 @@ describe('真实咨询界面', () => {
     expect(consultationsApi.remove).toHaveBeenCalledWith('c1')
     expect(wrapper.text()).toContain('还没有咨询记录')
     confirm.mockRestore()
+    wrapper.unmount()
+  })
+})
+
+describe('语音输入引导与输入体验', () => {
+  it('输入区说明可用输入法语音输入，首次进入给出一次性安全提示', async () => {
+    const { wrapper } = await setup()
+    expect(wrapper.text()).toContain('可用输入法语音输入')
+    const tip = wrapper.get('.voice-tip')
+    expect(tip.text()).toContain('可用输入法上的麦克风语音输入')
+    expect(tip.text()).toContain('请不要在对话中提供姓名、身份证号、住院号或手机号')
+    wrapper.unmount()
+  })
+
+  it('关闭提示后写入一次性标记，再次进入不再显示', async () => {
+    const first = await setup()
+    await first.wrapper.get('.voice-tip .el-alert__close-btn').trigger('click')
+    await flushPromises()
+    expect(first.wrapper.find('.voice-tip').exists()).toBe(false)
+    expect(localStorage.getItem(VOICE_TIP_STORAGE_KEY)).toBe('true')
+    first.wrapper.unmount()
+
+    const second = await setup()
+    expect(second.wrapper.find('.voice-tip').exists(), '已看过提示时不应重复打扰').toBe(false)
+    second.wrapper.unmount()
+  })
+
+  it('接近字数上限时提示可分多次发送', async () => {
+    const { wrapper } = await setup()
+    await wrapper.get('textarea').setValue('症'.repeat(1799))
+    await flushPromises()
+    expect(wrapper.find('.limit-hint').exists(), '未接近上限时不应提示').toBe(false)
+    await wrapper.get('textarea').setValue('症'.repeat(1800))
+    await flushPromises()
+    expect(wrapper.get('.limit-hint').text()).toContain('已接近 2000 字上限，可分多次发送')
     wrapper.unmount()
   })
 })
