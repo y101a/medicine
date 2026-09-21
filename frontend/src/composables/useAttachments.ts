@@ -3,10 +3,12 @@ import { attachmentsApi } from '../api/attachments'
 import { getApiErrorMessage } from '../api/http'
 import type { Attachment, AttachmentKind } from '../types/consultations'
 
-/** 与后端 `schemas/consultations.py` 的 `attachment_ids` max_length 一致。 */
-export const ATTACHMENT_LIMIT = 3
-/** 与后端 `attachment_max_bytes` 默认值一致；真正判定仍以服务端为准。 */
-export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024
+/** 与后端 `schemas/consultations.py` 的 `attachment_ids` max_length 一致（2026-09-21 由 3 放宽到 5）。 */
+export const ATTACHMENT_LIMIT = 5
+/** 与后端 `attachment_max_bytes` 一致（2026-09-21 由 10 MB 放宽到 30 MB）；真正判定仍以服务端为准。 */
+export const ATTACHMENT_MAX_BYTES = 30 * 1024 * 1024
+const ATTACHMENT_MAX_MB = ATTACHMENT_MAX_BYTES / (1024 * 1024)
+const ATTACHMENT_MAX_LABEL = `${Number.isInteger(ATTACHMENT_MAX_MB) ? ATTACHMENT_MAX_MB : ATTACHMENT_MAX_MB.toFixed(1)} MB`
 
 const KIND_BY_EXTENSION: Record<string, AttachmentKind> = {
   pdf: 'pdf',
@@ -56,7 +58,8 @@ export function useAttachments() {
         continue
       }
       if (file.size > ATTACHMENT_MAX_BYTES) {
-        error.value = '单个文档不能超过 10 MB'
+        // 文案从常量派生，避免上限调整后提示还写着旧数字。
+        error.value = `单个文档不能超过 ${ATTACHMENT_MAX_LABEL}`
         continue
       }
       accepted.push(file)

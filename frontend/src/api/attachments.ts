@@ -7,8 +7,12 @@ import type { Attachment } from '../types/consultations'
  */
 export const DOCUMENT_NOTICE_VERSION = 'document-upload-v1'
 
-/** 上传要等服务端解析整份文档（服务端解析超时上限 30 秒），所以单独放宽客户端超时。 */
-const UPLOAD_TIMEOUT_MS = 60_000
+/**
+ * 上传要等服务端解析整份文档，所以客户端超时必须**明显长于**服务端解析上限
+ * （`ATTACHMENT_PARSE_TIMEOUT_SECONDS`，2026-09-21 由 30 秒放宽到 60 秒），
+ * 否则会出现「服务端还在解析、客户端已经超时」的假失败。
+ */
+const UPLOAD_TIMEOUT_MS = 120_000
 
 export const attachmentsApi = {
   /** 上传挂在会话下：调用方必须先确保有 `consultation_id`（见 HomeView 的静默建会话）。 */

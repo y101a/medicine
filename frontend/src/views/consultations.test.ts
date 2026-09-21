@@ -15,6 +15,7 @@ import { attachmentsApi } from '../api/attachments'
 import { ApiError } from '../api/http'
 import { VOICE_TIP_STORAGE_KEY, DOCUMENT_NOTICE_STORAGE_KEY } from '../stores/composerHints'
 import type { Attachment } from '../types/consultations'
+import { ATTACHMENT_MAX_BYTES } from '../composables/useAttachments'
 
 vi.mock('../api/consultations', () => ({ consultationsApi: {
   create: vi.fn(), send: vi.fn(), stream: vi.fn(), get: vi.fn(), messages: vi.fn(), list: vi.fn(), remove: vi.fn(),
@@ -532,6 +533,23 @@ describe('语音输入引导与输入体验', () => {
     wrapper.unmount()
   })
 
+  it('灰色安全提示短暂展示后自动消失，并写入一次性标记', async () => {
+    vi.useFakeTimers()
+    const { wrapper } = await setup()
+    try {
+      expect(wrapper.find('.voice-tip').exists()).toBe(true)
+
+      await vi.advanceTimersByTimeAsync(8_000)
+      await flushPromises()
+
+      expect(wrapper.find('.voice-tip').exists()).toBe(false)
+      expect(localStorage.getItem(VOICE_TIP_STORAGE_KEY)).toBe('true')
+    } finally {
+      wrapper.unmount()
+      vi.useRealTimers()
+    }
+  })
+
   it('关闭提示后写入一次性标记，再次进入不再显示', async () => {
     const first = await setup()
     await first.wrapper.get('.voice-tip .el-alert__close-btn').trigger('click')
@@ -643,6 +661,31 @@ describe('应用内语音输入', () => {
     wrapper.unmount()
   })
 
+  it('黄色语音错误只短暂展示，也允许用户提前关闭', async () => {
+    vi.useFakeTimers()
+    const { wrapper } = await setup()
+    try {
+      if (!voiceHarness.api) throw new Error('voice harness not initialized')
+      voiceHarness.api.error.value = '没有识别到清晰语音，请重新录制'
+      await flushPromises()
+      expect(wrapper.get('.voice-notice').text()).toContain('没有识别到清晰语音')
+
+      await vi.advanceTimersByTimeAsync(5_000)
+      await flushPromises()
+      expect(wrapper.find('.voice-notice').exists()).toBe(false)
+
+      voiceHarness.api.error.value = ''
+      await flushPromises()
+      voiceHarness.api.error.value = '请重新录制'
+      await flushPromises()
+      await wrapper.get('.voice-notice .el-alert__close-btn').trigger('click')
+      expect(wrapper.find('.voice-notice').exists()).toBe(false)
+    } finally {
+      wrapper.unmount()
+      vi.useRealTimers()
+    }
+  })
+
   it('转写文本超过字数上限时截断并提示分次发送', async () => {
     vi.mocked(voiceApi.transcribe).mockResolvedValue({
       text: '症'.repeat(2001), durationMs: 30_000,
@@ -727,19 +770,41 @@ describe('病历文档附件', () => {
     wrapper.unmount()
   })
 
+  it('未输入文字时可直接发送附件，并使用安全的默认解读请求', async () => {
+    const { wrapper } = await setup()
+    acceptNotice()
+    await pickFiles(wrapper, [docxFile()])
+    expect(wrapper.get('textarea').attributes('placeholder')).toContain('可直接发送文档')
+    const sendButton = wrapper.get('button[aria-label="发送消息"]')
+    expect(sendButton.attributes('disabled')).toBeUndefined()
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(consultationsApi.send).toHaveBeenCalledWith(
+      'c1',
+      '请帮我解读上传的病历文档，解释其中的医学术语和指标，并在必要时给出就医分流建议；不要作出确诊。',
+      expect.any(String),
+      ['a1'],
+    )
+    wrapper.unmount()
+  })
+
   it('扩展名、体积与数量都在本地拦下，不打上传接口', async () => {
     const { wrapper } = await setup()
     acceptNotice()
     await pickFiles(wrapper, [new File(['x'], '片子.xlsx')])
     expect(wrapper.text()).toContain('只支持 PDF、Word（.docx）、PPT（.pptx）、txt、md 文件')
-    await pickFiles(wrapper, [new File([new Uint8Array(10 * 1024 * 1024 + 1)], '大文件.pdf')])
-    expect(wrapper.text()).toContain('单个文档不能超过 10 MB')
+    // 用 size 属性模拟超限，避免真的分配 30 MB 把测试进程拖慢。
+    const oversized = new File(['体积由 size 属性模拟'], '大文件.pdf')
+    Object.defineProperty(oversized, 'size', { value: ATTACHMENT_MAX_BYTES + 1 })
+    await pickFiles(wrapper, [oversized])
+    expect(wrapper.text()).toContain('单个文档不能超过 30 MB')
     expect(attachmentsApi.upload).not.toHaveBeenCalled()
     await pickFiles(wrapper, [
-      docxFile('a.docx'), docxFile('b.docx'), docxFile('c.docx'), docxFile('d.docx'),
+      docxFile('a.docx'), docxFile('b.docx'), docxFile('c.docx'),
+      docxFile('d.docx'), docxFile('e.docx'), docxFile('f.docx'),
     ])
     expect(wrapper.text()).toContain('多余的已忽略')
-    expect(attachmentsApi.upload).toHaveBeenCalledTimes(3)
+    expect(attachmentsApi.upload).toHaveBeenCalledTimes(5)
     wrapper.unmount()
   })
 

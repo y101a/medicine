@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, onMounted } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { consultationsApi, type RetrievalProgress } from '../api/consultations'
@@ -63,8 +63,14 @@ const suggestions = [
 const DRAFT_LIMIT = 2000
 // 语音输入多为连续长句，容易不知不觉逼近上限；接近时提醒用户分次发送。
 const DRAFT_NEAR_LIMIT = 1800
+const DEFAULT_ATTACHMENT_PROMPT = '请帮我解读上传的病历文档，解释其中的医学术语和指标，并在必要时给出就医分流建议；不要作出确诊。'
+const VOICE_TIP_AUTO_HIDE_MS = 8_000
+const VOICE_NOTICE_AUTO_HIDE_MS = 5_000
+let voiceTipTimer: ReturnType<typeof setTimeout> | undefined
 const nearDraftLimit = computed(() => draft.value.length >= DRAFT_NEAR_LIMIT)
 function dismissVoiceTip() {
+  if (voiceTipTimer !== undefined) clearTimeout(voiceTipTimer)
+  voiceTipTimer = undefined
   voiceTipSeen.value = true
   rememberVoiceTipSeen()
 }
@@ -80,6 +86,23 @@ const {
   cancel: cancelRecorder,
   reset: resetRecorder,
 } = useVoiceRecorder()
+
+const displayedVoiceNotice = computed(() => voiceNotice.value || voiceError.value)
+const voiceNoticeVisible = ref(false)
+let voiceNoticeTimer: ReturnType<typeof setTimeout> | undefined
+
+function dismissVoiceNotice() {
+  if (voiceNoticeTimer !== undefined) clearTimeout(voiceNoticeTimer)
+  voiceNoticeTimer = undefined
+  voiceNoticeVisible.value = false
+}
+
+watch(displayedVoiceNotice, (message) => {
+  dismissVoiceNotice()
+  if (!message) return
+  voiceNoticeVisible.value = true
+  voiceNoticeTimer = setTimeout(dismissVoiceNotice, VOICE_NOTICE_AUTO_HIDE_MS)
+}, { immediate: true })
 
 async function startRecording() {
   voiceNotice.value = ''
@@ -164,6 +187,10 @@ const {
 const attachTitle = computed(() => attachments.value.length >= ATTACHMENT_LIMIT
   ? `一次最多带上 ${ATTACHMENT_LIMIT} 份文档`
   : '添加病历文档：解析成文字后随问题一起交给模型')
+const composerPlaceholder = computed(() => attachments.value.length
+  ? '可直接发送文档，或补充你希望重点了解的问题……'
+  : '描述您的症状或健康疑问，例如：什么时候开始、持续多久……')
+
 
 function chooseFiles() {
   if (!attachmentUploading.value) fileInput.value?.click()
@@ -293,6 +320,13 @@ onMounted(() => {
   void loadModels()
   if (cid) void load()
   else if (draft.value) nextTick(() => input.value?.focus())
+  if (!voiceTipSeen.value) {
+    voiceTipTimer = setTimeout(dismissVoiceTip, VOICE_TIP_AUTO_HIDE_MS)
+  }
+})
+onBeforeUnmount(() => {
+  if (voiceTipTimer !== undefined) clearTimeout(voiceTipTimer)
+  if (voiceNoticeTimer !== undefined) clearTimeout(voiceNoticeTimer)
 })
 const retryableModelErrors = new Set([
   'AI_PROVIDER_TIMEOUT',
@@ -468,7 +502,8 @@ async function sendContent(content: string, clearDraft = false) {
   finally { saving.value = false }
 }
 async function send() {
-  await sendContent(draft.value.trim(), true)
+  const content = draft.value.trim() || (attachments.value.length ? DEFAULT_ATTACHMENT_PROMPT : '')
+  await sendContent(content, true)
 }
 async function submitFollowUp(message: Message, answers: FollowUpAnswers) {
   if (!message.followUp || followUpAnswered(message)) return
@@ -653,8 +688,8 @@ onBeforeRouteUpdate(canLeave)
         <el-alert v-if="!voiceTipSeen" class="voice-tip" type="info" show-icon
           title="可用输入法上的麦克风语音输入（如豆包输入法），也可以点发送键左侧的麦克风按钮直接录音。语音识别可能出错，发送前请核对文字；请不要在对话中提供姓名、身份证号、住院号或手机号。"
           @close="dismissVoiceTip" />
-        <el-alert v-if="voiceNotice || voiceError" class="voice-notice" type="warning" show-icon
-          :title="voiceNotice || voiceError" :closable="false" />
+        <el-alert v-if="voiceNoticeVisible && displayedVoiceNotice" class="voice-notice" type="warning" show-icon
+          :title="displayedVoiceNotice" @close="dismissVoiceNotice" />
         <el-alert v-if="attachmentError" class="attachment-notice" type="warning" show-icon
           :title="attachmentError" :closable="false" />
         <div v-if="attachments.length || attachmentUploading" class="attachment-tray">
@@ -668,7 +703,7 @@ onBeforeRouteUpdate(canLeave)
         <input ref="fileInput" class="sr-only" type="file" multiple accept=".pdf,.docx,.pptx,.txt,.md" @change="onFilePicked" />
         <label class="sr-only" for="symptom-input">症状或健康问题</label>
         <textarea id="symptom-input" ref="input" v-model="draft" :maxlength="DRAFT_LIMIT" rows="3" :disabled="saving || generating || !ready"
-          placeholder="描述您的症状或健康疑问，例如：什么时候开始、持续多久……" @keydown="keydown"></textarea>
+          :placeholder="composerPlaceholder" @keydown="keydown"></textarea>
         <div class="composer-bottom">
           <HospitalNavigator />
           <div class="send-area">
@@ -714,7 +749,7 @@ onBeforeRouteUpdate(canLeave)
               @click="toggleRecording"
             ><el-icon :size="18"><Microphone /></el-icon></button>
             <button v-if="generating" class="stop-button" type="button" aria-label="停止生成" title="停止生成" @click="stopGeneration"><el-icon :size="15"><CloseBold /></el-icon></button>
-            <button v-else class="send-button" type="submit" :disabled="!draft.trim() || saving || loading || modelsLoading || !ready || voiceState !== 'idle' || attachmentUploading" aria-label="发送消息" title="发送消息"><el-icon :size="20"><Top /></el-icon></button>
+            <button v-else class="send-button" type="submit" :disabled="(!draft.trim() && !attachments.length) || saving || loading || modelsLoading || !ready || voiceState !== 'idle' || attachmentUploading" aria-label="发送消息" title="发送消息"><el-icon :size="20"><Top /></el-icon></button>
           </div>
         </div>
       </form>
