@@ -24,8 +24,14 @@ export interface Message {
   createdAt: string
 }
 
-/** 后端只接受这五种病历文档；判定以文件名扩展名为准。 */
-export type AttachmentKind = 'pdf' | 'docx' | 'pptx' | 'txt' | 'md'
+/** 后端接受这五种病历文档（按文件名扩展名判定），以及图片。 */
+export type AttachmentKind = 'pdf' | 'docx' | 'pptx' | 'txt' | 'md' | 'image'
+
+/**
+ * 图片类别，上传时由用户自己选。后端把它当作**处理提示**而不是可信事实：
+ * 三类都不输出疾病判断，差别只在能读到什么、以及给出哪段能力边界文案。
+ */
+export type ImageCategory = 'report' | 'medical_imaging' | 'body_photo'
 
 /** 上传并解析成功的文档（原件不保存，只留加密文字）。 */
 export interface Attachment {
@@ -38,6 +44,14 @@ export interface Attachment {
   preview: string
   status: 'ready'
   createdAt: string
+  /** 以下字段只有图片附件有值；`mimeType` 是后端规范化后的类型（无元数据 WebP）。 */
+  imageCategory?: ImageCategory | null
+  mimeType?: string | null
+  width?: number | null
+  height?: number | null
+  /** 规范化图片是否还在 90 天保留期内；为 false 时字节已被清理，只能看识别文字。 */
+  imageAvailable?: boolean | null
+  imageExpiresAt?: string | null
 }
 
 /**
@@ -49,6 +63,10 @@ export interface MessageAttachment {
   displayName: string
   kind?: AttachmentKind | null
   status: 'ready' | 'deleted'
+  /** 图片附件才有：类别、是否还在保留期内、到期时间。 */
+  imageCategory?: ImageCategory | null
+  imageAvailable?: boolean | null
+  imageExpiresAt?: string | null
 }
 
 export interface MessageCitation {

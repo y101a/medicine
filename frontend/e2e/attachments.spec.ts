@@ -45,7 +45,8 @@ async function openComposer(page: Page) {
 }
 
 function pickFile(page: Page) {
-  return page.locator('input[type="file"]').setInputFiles({
+  // 输入区现在有两个文件入口（图片 / 文档），这里按 accept 精确定位文档那个。
+  return page.locator('input[type="file"][accept*=".pdf"]').setInputFiles({
     name: '血常规报告.pdf',
     mimeType: 'application/pdf',
     buffer: Buffer.from('%PDF-1.4\n% e2e 用的最小结构，仅前端验收\n'),

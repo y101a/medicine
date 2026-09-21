@@ -4,6 +4,8 @@ export const VOICE_TIP_STORAGE_KEY = 'medical-assistant:voice-input-tip-seen'
 export const VOICE_CONSENT_STORAGE_KEY = 'medical-assistant:voice-consent-seen'
 // 上传病历文档会把解析出的文字随提问交给模型；首次上传前弹一次说明，之后本机记住。
 export const DOCUMENT_NOTICE_STORAGE_KEY = 'medical-assistant:document-notice-seen'
+// 上传图片会把照片发给服务端固定的视觉模型识别；与文档说明分开，首次上传图片前单独确认一次。
+export const IMAGE_CONSENT_STORAGE_KEY = 'medical-assistant:image-consent-seen'
 
 function readFlag(key: string): boolean {
   try {
@@ -44,4 +46,12 @@ export function readDocumentNoticeSeen(): boolean {
 
 export function rememberDocumentNoticeSeen(): void {
   writeFlag(DOCUMENT_NOTICE_STORAGE_KEY)
+}
+
+export function readImageConsentSeen(): boolean {
+  return readFlag(IMAGE_CONSENT_STORAGE_KEY)
+}
+
+export function rememberImageConsentSeen(): void {
+  writeFlag(IMAGE_CONSENT_STORAGE_KEY)
 }

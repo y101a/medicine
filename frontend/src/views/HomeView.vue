@@ -9,7 +9,7 @@ import { useAuthStore } from '../stores/auth'
 import { useHealthRecordsStore } from '../stores/healthRecords'
 import { ApiError, getApiErrorMessage } from '../api/http'
 import type { AiModel, AnswerFormat, FollowUpAnswers, FollowUpCard, Message } from '../types/consultations'
-import { Top, ChatDotRound, Compass, Document, CloseBold, Microphone, Paperclip } from '@element-plus/icons-vue'
+import { Top, ChatDotRound, Compass, Document, CloseBold, Microphone, Paperclip, Picture } from '@element-plus/icons-vue'
 import medicalAiAvatar from '../assets/medical-ai-avatar.png'
 import AssistantAnswerCard from '../components/AssistantAnswerCard.vue'
 import StructuredFollowUpCard from '../components/StructuredFollowUpCard.vue'
@@ -21,10 +21,12 @@ import PathologyCardOffer from '../components/PathologyCardOffer.vue'
 import { readRetrievalNotice, rememberRetrievalNotice } from '../stores/retrievalNotices'
 import {
   readVoiceTipSeen, rememberVoiceTipSeen, readVoiceConsentSeen, rememberVoiceConsentSeen,
-  readDocumentNoticeSeen, rememberDocumentNoticeSeen,
+  readDocumentNoticeSeen, rememberDocumentNoticeSeen, readImageConsentSeen, rememberImageConsentSeen,
 } from '../stores/composerHints'
 import { useVoiceRecorder } from '../composables/useVoiceRecorder'
-import { useAttachments, formatAttachmentSize, ATTACHMENT_LIMIT } from '../composables/useAttachments'
+import { useAttachments, formatAttachmentSize, ATTACHMENT_LIMIT, IMAGE_LIMIT } from '../composables/useAttachments'
+import { isUndecodableImage, type ImageCategory } from '../composables/imagePrep'
+import ImageUploadDialog from '../components/ImageUploadDialog.vue'
 import { voiceApi } from '../api/voice'
 
 const route = useRoute()
@@ -64,6 +66,8 @@ const DRAFT_LIMIT = 2000
 // 语音输入多为连续长句，容易不知不觉逼近上限；接近时提醒用户分次发送。
 const DRAFT_NEAR_LIMIT = 1800
 const DEFAULT_ATTACHMENT_PROMPT = '请帮我解读上传的病历文档，解释其中的医学术语和指标，并在必要时给出就医分流建议；不要作出确诊。'
+// 只传图片时的默认提问：仍然只要「整理可见信息 + 下一步看什么科」，不要疾病判断。
+const IMAGE_ATTACHMENT_PROMPT = '请根据我上传的图片，帮我整理能读到的信息（报告上的指标，或片子和照片上肉眼可见、非诊断性的情况），并说明下一步该看什么科；不要作出确诊，也不要判读影像。'
 const VOICE_TIP_AUTO_HIDE_MS = 8_000
 const VOICE_NOTICE_AUTO_HIDE_MS = 5_000
 let voiceTipTimer: ReturnType<typeof setTimeout> | undefined
@@ -171,29 +175,45 @@ const voiceTitle = computed(() => {
 })
 
 const documentNoticeSeen = ref(readDocumentNoticeSeen())
+const imageConsentSeen = ref(readImageConsentSeen())
 const fileInput = ref<HTMLInputElement>()
+const imageInput = ref<HTMLInputElement>()
 const dragging = ref(false)
+const imageDialogVisible = ref(false)
+/** 已选入、等待用户在弹窗里确认类别的图片（还没上传任何字节）。 */
+const pendingImageFiles = ref<File[]>([])
 const {
   items: attachments,
+  previews: attachmentPreviews,
+  imageCount,
   pendingName: attachmentPendingName,
   uploading: attachmentUploading,
   error: attachmentError,
   addFiles: addAttachments,
+  addImages: addImageAttachments,
   load: loadAttachments,
   remove: removeAttachment,
   reset: resetAttachments,
+  releasePreviews: releaseAttachmentPreviews,
 } = useAttachments()
 
 const attachTitle = computed(() => attachments.value.length >= ATTACHMENT_LIMIT
-  ? `一次最多带上 ${ATTACHMENT_LIMIT} 份文档`
+  ? `一次最多带上 ${ATTACHMENT_LIMIT} 份附件`
   : '添加病历文档：解析成文字后随问题一起交给模型')
+const imageTitle = computed(() => imageCount.value >= IMAGE_LIMIT
+  ? `一次最多带上 ${IMAGE_LIMIT} 张图片`
+  : '添加图片：报告单、片子或患处照片，识别出的内容会随问题一起交给模型')
 const composerPlaceholder = computed(() => attachments.value.length
-  ? '可直接发送文档，或补充你希望重点了解的问题……'
+  ? '可直接发送文档或图片，或补充你希望重点了解的问题……'
   : '描述您的症状或健康疑问，例如：什么时候开始、持续多久……')
 
 
 function chooseFiles() {
   if (!attachmentUploading.value) fileInput.value?.click()
+}
+
+function chooseImages() {
+  if (!attachmentUploading.value) imageInput.value?.click()
 }
 
 /**
@@ -231,9 +251,45 @@ function onFilePicked(event: Event) {
   void handleFiles(files)
 }
 
+/** 拖进来的可能是文档也可能是图片，也可能是 HEIC（浏览器解不开，要单独给说法）。 */
+function looksLikeImage(file: File) {
+  return file.type.startsWith('image/') || isUndecodableImage(file)
+}
+
+function openImageDialog(files: File[]) {
+  if (!files.length) return
+  pendingImageFiles.value = files
+  imageDialogVisible.value = true
+}
+
+function onImagePicked(event: Event) {
+  const target = event.target as HTMLInputElement
+  const files = Array.from(target.files || [])
+  target.value = ''
+  openImageDialog(files)
+}
+
+/**
+ * 类别由用户在弹窗里选；首次上传还要勾选敏感信息与外发说明（服务端也会校验 `noticeAccepted`）。
+ * 选完只上传、不发送——识别结果要用户自己核对后再点发送。
+ */
+async function confirmImages(category: ImageCategory) {
+  imageDialogVisible.value = false
+  const files = pendingImageFiles.value
+  pendingImageFiles.value = []
+  if (!imageConsentSeen.value) {
+    imageConsentSeen.value = true
+    rememberImageConsentSeen()
+  }
+  await addImageAttachments(files, category, ensureConsultation)
+}
+
 function onDrop(event: DragEvent) {
   dragging.value = false
-  void handleFiles(Array.from(event.dataTransfer?.files || []))
+  const files = Array.from(event.dataTransfer?.files || [])
+  const images = files.filter(looksLikeImage)
+  if (images.length) openImageDialog(images)
+  void handleFiles(files.filter(file => !looksLikeImage(file)))
 }
 function modelName(message: Message) {
   if (message.modelName) return message.modelName
@@ -327,6 +383,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
   if (voiceTipTimer !== undefined) clearTimeout(voiceTipTimer)
   if (voiceNoticeTimer !== undefined) clearTimeout(voiceNoticeTimer)
+  // 本地缩略图是内存里的 Object URL，卸载时必须释放。
+  releaseAttachmentPreviews()
 })
 const retryableModelErrors = new Set([
   'AI_PROVIDER_TIMEOUT',
@@ -502,7 +560,11 @@ async function sendContent(content: string, clearDraft = false) {
   finally { saving.value = false }
 }
 async function send() {
-  const content = draft.value.trim() || (attachments.value.length ? DEFAULT_ATTACHMENT_PROMPT : '')
+  // 没写文字时按附件类型给默认提问：图片不能被当成病历文档解读（反之亦然）。
+  const fallback = attachments.value.some(item => item.kind === 'image')
+    ? IMAGE_ATTACHMENT_PROMPT
+    : DEFAULT_ATTACHMENT_PROMPT
+  const content = draft.value.trim() || (attachments.value.length ? fallback : '')
   await sendContent(content, true)
 }
 async function submitFollowUp(message: Message, answers: FollowUpAnswers) {
@@ -606,7 +668,7 @@ async function canLeave() {
   }
   if (attachmentUploading.value) {
     try {
-      await ElMessageBox.confirm('文档正在上传解析，离开会中断本次上传。确定离开吗？', '中断上传', {
+      await ElMessageBox.confirm('附件正在上传解析，离开会中断本次上传。确定离开吗？', '中断上传', {
         confirmButtonText: '中断并离开', cancelButtonText: '继续等待',
       })
       return true
@@ -694,13 +756,20 @@ onBeforeRouteUpdate(canLeave)
           :title="attachmentError" :closable="false" />
         <div v-if="attachments.length || attachmentUploading" class="attachment-tray">
           <span v-for="item in attachments" :key="item.id" class="attachment-item">
+            <img v-if="item.kind === 'image' && attachmentPreviews[item.id]" class="attachment-thumb"
+              :src="attachmentPreviews[item.id]" :alt="`待上传图片：${item.displayName}`" />
             <span class="attachment-name">{{ item.displayName }}</span>
-            <span class="attachment-meta">{{ formatAttachmentSize(item.byteSize) }} · {{ item.charCount }} 字<template v-if="item.pageCount"> · {{ item.pageCount }} 页</template></span>
+            <span class="attachment-meta">
+              <template v-if="item.kind === 'image'">{{ formatAttachmentSize(item.byteSize) }}<template v-if="item.width && item.height"> · {{ item.width }}×{{ item.height }}</template> · {{ item.charCount }} 字</template>
+              <template v-else>{{ formatAttachmentSize(item.byteSize) }} · {{ item.charCount }} 字<template v-if="item.pageCount"> · {{ item.pageCount }} 页</template></template>
+            </span>
             <button type="button" class="attachment-remove" :aria-label="`移除 ${item.displayName}`" title="移除" @click="removeAttachment(item.id)">移除</button>
           </span>
           <span v-if="attachmentUploading" class="attachment-item pending">正在解析 {{ attachmentPendingName }}…</span>
         </div>
         <input ref="fileInput" class="sr-only" type="file" multiple accept=".pdf,.docx,.pptx,.txt,.md" @change="onFilePicked" />
+        <input ref="imageInput" class="sr-only" type="file" multiple
+          accept="image/jpeg,image/png,image/webp" @change="onImagePicked" />
         <label class="sr-only" for="symptom-input">症状或健康问题</label>
         <textarea id="symptom-input" ref="input" v-model="draft" :maxlength="DRAFT_LIMIT" rows="3" :disabled="saving || generating || !ready"
           :placeholder="composerPlaceholder" @keydown="keydown"></textarea>
@@ -733,6 +802,14 @@ onBeforeRouteUpdate(canLeave)
             <button
               class="attach-button"
               type="button"
+              :disabled="attachmentUploading || saving || generating || !ready || attachments.length >= ATTACHMENT_LIMIT || imageCount >= IMAGE_LIMIT"
+              aria-label="添加图片"
+              :title="imageTitle"
+              @click="chooseImages"
+            ><el-icon :size="18"><Picture /></el-icon></button>
+            <button
+              class="attach-button"
+              type="button"
               :disabled="attachmentUploading || saving || generating || !ready || attachments.length >= ATTACHMENT_LIMIT"
               aria-label="添加病历文档"
               :title="attachTitle"
@@ -753,8 +830,15 @@ onBeforeRouteUpdate(canLeave)
           </div>
         </div>
       </form>
-      <div class="composer-meta"><span>仅提供健康科普与就医分流，不作确诊，不替代医生；上传的文档不会被用来下诊断。</span><span>可用输入法语音输入（如豆包输入法） · 也可点麦克风录音 · 回形针上传病历文档 · Enter 发送 · Shift + Enter 换行</span></div>
+      <div class="composer-meta"><span>仅提供健康科普与就医分流，不作确诊，不替代医生；上传的文档不会被用来下诊断。</span><span>可用输入法语音输入（如豆包输入法） · 也可点麦克风录音 · 回形针上传病历文档 · 图片按钮上传报告、片子或患处照片 · Enter 发送 · Shift + Enter 换行</span></div>
     </div>
+    <ImageUploadDialog
+      v-model="imageDialogVisible"
+      :files="pendingImageFiles"
+      :consent-seen="imageConsentSeen"
+      :uploading="attachmentUploading"
+      @confirm="confirmImages"
+    />
   </main>
 </template>
 
@@ -800,6 +884,7 @@ textarea::placeholder { color: #99a5b0; }
 .attachment-item { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid #dbe7f1; border-radius: 10px; background: #f7fbff; color: #4b6480; font-size: 11px; }
 .attachment-item.pending { border-style: dashed; color: #bf7a15; }
 .attachment-name { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attachment-thumb { width: 28px; height: 28px; border-radius: 6px; object-fit: cover; background: #eaf2f9; }
 .attachment-meta { color: #90a0ae; }
 .attachment-remove { border: none; padding: 0; background: transparent; color: #8798a8; font-size: 11px; cursor: pointer; }
 .attachment-remove:hover { color: #c0492f; }

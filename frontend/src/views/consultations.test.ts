@@ -774,7 +774,7 @@ describe('病历文档附件', () => {
     const { wrapper } = await setup()
     acceptNotice()
     await pickFiles(wrapper, [docxFile()])
-    expect(wrapper.get('textarea').attributes('placeholder')).toContain('可直接发送文档')
+    expect(wrapper.get('textarea').attributes('placeholder')).toContain('可直接发送文档或图片')
     const sendButton = wrapper.get('button[aria-label="发送消息"]')
     expect(sendButton.attributes('disabled')).toBeUndefined()
     await wrapper.get('form').trigger('submit')
