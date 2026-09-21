@@ -13,6 +13,7 @@ from app.core.errors import AppError
 from app.core.security import decrypt_sensitive, encrypt_sensitive
 from app.models import Consultation, Message
 from app.safety.triage import deserialize_triage, serialize_triage
+from app.schemas.attachments import MessageAttachmentOut
 from app.schemas.consultations import (
     ConsultationOut,
     ConsultationPage,
@@ -22,6 +23,7 @@ from app.schemas.consultations import (
     MessagePage,
     TriageResult,
 )
+from app.services import attachments as attachment_service
 
 
 def summary(row: Consultation) -> ConsultationOut:
@@ -34,7 +36,10 @@ def summary(row: Consultation) -> ConsultationOut:
     )
 
 
-def message_out(row: Message) -> MessageOut:
+def message_out(
+    row: Message,
+    attachments: list[MessageAttachmentOut] | None = None,
+) -> MessageOut:
     stored_content = decrypt_sensitive(row.content_ciphertext)
     follow_up = parse_follow_up(stored_content)
     triage = deserialize_triage(
@@ -60,6 +65,7 @@ def message_out(row: Message) -> MessageOut:
         follow_up=follow_up,
         triage=triage,
         citations=citations,
+        attachments=attachments or [],
         created_at=row.created_at,
     )
 
@@ -141,8 +147,12 @@ async def list_messages(db: AsyncSession, user_id: UUID, cid: UUID, before: int 
     if before is not None:
         query = query.where(Message.sequence < before)
     rows = (await db.scalars(query.order_by(Message.sequence.desc()).limit(limit + 1))).all()
+    visible = list(reversed(rows[:limit]))
+    refs = await attachment_service.message_attachment_refs(
+        db, [row.id for row in visible]
+    )
     return MessagePage(
-        items=[message_out(row) for row in reversed(rows[:limit])],
+        items=[message_out(row, refs.get(row.id, [])) for row in visible],
         has_more=len(rows) > limit,
     )
 
@@ -166,7 +176,7 @@ async def ai_history(db: AsyncSession, user_id: UUID, cid: UUID, limit: int = 30
     triage = deserialize_triage(
         decrypt_sensitive(rows[0].triage_ciphertext) if rows[0].triage_ciphertext else None
     )
-    return history, triage
+    return history, triage, rows[0].id
 
 
 async def card_generation_history(
@@ -249,9 +259,16 @@ async def append_message(db: AsyncSession, user_id: UUID, cid: UUID, payload: Cr
         )
     )
     if existing is not None:
-        if decrypt_sensitive(existing.content_ciphertext) != payload.content:
+        existing_attachment_ids = await attachment_service.attachment_ids_for_message(
+            db, existing.id
+        )
+        if (
+            decrypt_sensitive(existing.content_ciphertext) != payload.content
+            or existing_attachment_ids != payload.attachment_ids
+        ):
             raise AppError(409, "REQUEST_CONFLICT", "该请求编号已用于其他消息")
-        result = message_out(existing)
+        refs = await attachment_service.message_attachment_refs(db, [existing.id])
+        result = message_out(existing, refs.get(existing.id, []))
         await db.commit()
         return result
     conversation.message_count += 1
@@ -271,7 +288,10 @@ async def append_message(db: AsyncSession, user_id: UUID, cid: UUID, payload: Cr
     )
     db.add(row)
     await db.flush()
-    result = message_out(row)
+    refs = await attachment_service.bind_message_attachments(
+        db, user_id, cid, row.id, payload.attachment_ids
+    )
+    result = message_out(row, refs)
     await db.commit()
     return result
 
@@ -309,7 +329,8 @@ async def append_assistant_message(
             or existing.source_message_id != source_message_id
         ):
             raise AppError(409, "REQUEST_CONFLICT", "该请求编号已用于其他模型")
-        result = message_out(existing)
+        refs = await attachment_service.message_attachment_refs(db, [existing.id])
+        result = message_out(existing, refs.get(existing.id, []))
         await db.commit()
         return result
     if source_message_id is not None:
@@ -344,7 +365,23 @@ async def append_assistant_message(
     )
     db.add(row)
     await db.flush()
-    result = message_out(row)
+    if source_message_id is None:
+        user_message_id = await db.scalar(
+            select(Message.id)
+            .where(
+                Message.consultation_id == cid,
+                Message.role == "user",
+                Message.sequence < row.sequence,
+            )
+            .order_by(Message.sequence.desc())
+            .limit(1)
+        )
+        if user_message_id is not None:
+            await attachment_service.copy_message_attachments(
+                db, user_message_id, row.id
+            )
+    refs = await attachment_service.message_attachment_refs(db, [row.id])
+    result = message_out(row, refs.get(row.id, []))
     await db.commit()
     return result
 

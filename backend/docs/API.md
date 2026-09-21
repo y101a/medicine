@@ -235,3 +235,45 @@ status 可能为 completed、empty、failed 或 skipped。事件不会返回证�
 - 跨用户访问一律返回 404，不区分“不存在”和“无权限”。
 - 健康记录不参与红旗预检。`POST /consultations/{cid}/stream` 只把记录作为受限背景注入
   系统提示词，要求不得据记录推断病因，也不得因记录中存在某项情况而降低对红旗症状的警惕。
+
+## 病历文档附件
+
+全部接口要求登录，且附件必须属于当前用户的指定咨询：
+
+| 方法与路径 | 用途 |
+| --- | --- |
+| `POST /consultations/{consultation_id}/attachments` | 上传、在本机隔离进程解析并加密保存文字 |
+| `GET /consultations/{consultation_id}/attachments` | 列出该咨询仍保留的附件 |
+| `DELETE /attachments/{attachment_id}` | 永久删除附件及全部文本分块 |
+
+上传为单文件 `multipart/form-data`，字段为 `file`、`noticeAccepted=true` 和
+`noticeVersion=document-upload-v1`。响应字段为 `id`、`displayName`、`kind`、
+`byteSize`、`pageCount`、`charCount`、`preview`、`status=ready`、`createdAt`。
+PDF/PPTX 返回页数或幻灯片数；DOCX/TXT/MD 的 `pageCount` 为 `null`。
+
+第一版只支持带文本层 PDF、DOCX、PPTX、UTF-8 TXT/MD：单文件最大 10 MB，
+PDF/PPTX 最多 30 页，提取文字最多 500000 字符，解析最长 30 秒；每个用户每
+10 分钟最多上传 5 个。扫描件、加密 PDF、图片、Excel、旧版 DOC/PPT、宏文档、
+压缩包和一次多文件均拒绝。原件不落盘、不保存；提取文字自动按约 2000 字分块并加密。
+
+发送用户消息时可增加 `attachmentIds`（最多 3 个不同 UUID）。同一附件可在同一咨询的
+多条消息复用；不能跨咨询或跨用户引用。`MessageOut.attachments` 与流式 `start` 事件的
+`attachmentsUsed` 返回 `{id, displayName, kind, status}`。删除后历史消息保留
+`{id:null, displayName:"附件已删除", kind:null, status:"deleted"}` 墓碑，不再有正文。
+
+只有用户在本轮消息明确选择的附件片段才进入模型上下文，且会先移除直接身份信息。
+文档文字被标记为不可信数据，不能覆盖系统指令；模型只可提取事实、解释术语/指标和提供
+就医分流，不得据此确诊、判读影像、开处方或给出具体剂量。红旗预检第一版仍只检查本轮
+用户输入文本，不读取附件。原件不外发；用户发送问题后，仅预算内相关文字片段随问答外发。
+
+稳定错误码包括：`DOCUMENT_NOTICE_REQUIRED`、`FILE_TOO_LARGE`、
+`FILE_TYPE_NOT_ALLOWED`、`FILE_PAGE_LIMIT`、`FILE_ENCRYPTED`、`FILE_NO_TEXT`、
+`FILE_TEXT_TOO_LARGE`、`FILE_ZIP_UNSAFE`、`FILE_PARSE_TIMEOUT`、
+`FILE_PARSE_FAILED`、`UPLOAD_RATE_LIMITED`、`ATTACHMENT_NOT_FOUND`。
+
+## 删除账号
+
+`DELETE /users/me`，请求为 `{"currentPassword":"当前密码"}`。密码错误返回 422
+`ACCOUNT_PASSWORD_INVALID`；每个用户每 10 分钟最多尝试 5 次。成功返回 204、清除认证
+Cookie，并通过数据库级联永久删除用户的会话、消息、健康记录、模型密钥、附件及加密分块；
+头像文件同步删除。最小化审计事件保留，但用户外键变为 `null`，不保留附件名或正文。

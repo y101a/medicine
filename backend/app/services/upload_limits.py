@@ -8,7 +8,11 @@ from app.core.errors import AppError
 
 UPLOAD_WINDOW_SECONDS = 600
 UPLOAD_LIMIT = 10
-RESOURCE_UPLOAD_LIMITS = {"voice_audio": 6}
+RESOURCE_UPLOAD_LIMITS = {
+    "account_delete": 5,
+    "medical_document": 5,
+    "voice_audio": 6,
+}
 
 _upload_lock = Lock()
 _upload_calls: dict[tuple[str, str], deque[float]] = {}

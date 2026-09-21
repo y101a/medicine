@@ -13,13 +13,14 @@ from app.schemas.model_credentials import (
     ModelCredentialOut,
     ModelCredentialWrite,
 )
-from app.schemas.users import UpdateProfileRequest
+from app.schemas.users import DeleteAccountRequest, UpdateProfileRequest
+from app.services.account_deletion import delete_account
 from app.services.audit_logs import (
     AUDIT_OUTCOME_REJECTED,
     AUDIT_OUTCOME_SUCCESS,
     add_audit_log,
 )
-from app.services.auth import to_auth_user
+from app.services.auth import clear_auth_cookies, to_auth_user
 from app.services.avatars import avatar_path, delete_avatar, save_avatar
 from app.services.model_credentials import (
     delete_credential,
@@ -61,6 +62,19 @@ async def patch_me(
     payload: UpdateProfileRequest, current_user: CurrentUser, db: DbSession
 ) -> AuthUser:
     return await update_profile(current_user, payload, db)
+
+
+@router.delete("/me", status_code=204, summary="验证当前密码并删除账号及个人数据")
+async def delete_me(
+    payload: DeleteAccountRequest,
+    current_user: CurrentUser,
+    db: DbSession,
+) -> Response:
+    enforce_upload_rate_limit(current_user.id, "account_delete")
+    await delete_account(db, current_user.id, payload.current_password)
+    response = Response(status_code=204)
+    clear_auth_cookies(response)
+    return response
 
 
 @router.get(

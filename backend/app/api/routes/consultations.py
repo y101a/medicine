@@ -6,6 +6,7 @@ from fastapi import APIRouter, Query, Response
 from fastapi.responses import StreamingResponse
 
 from app.ai import provider
+from app.ai.attachment_context import build_attachment_context
 from app.ai.follow_up import (
     FOLLOW_UP_PREFIX,
     is_follow_up_prefix_fragment,
@@ -15,6 +16,7 @@ from app.ai.follow_up import (
 )
 from app.ai.graph import render_rag_context, run_consultation_generation
 from app.api.dependencies import CurrentUser, DbSession
+from app.core.config import get_settings
 from app.core.errors import AppError
 from app.rag.citation_audit import audit_answer_citations
 from app.rag.web_search import broad_coverage_limited, generic_topic
@@ -27,6 +29,7 @@ from app.schemas.consultations import (
     MessageOut,
     MessagePage,
 )
+from app.services import attachments as attachment_service
 from app.services import consultations as service
 from app.services import health_records as health_service
 from app.services.model_credentials import get_model_for_user
@@ -81,6 +84,7 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
         )
     model = await get_model_for_user(db, user.id, payload.model_id)
     source_message_id = getattr(payload, "source_message_id", None)
+    user_message_id: UUID | None = None
     if source_message_id is not None:
         if payload.answer_format != "card":
             raise AppError(
@@ -95,7 +99,11 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
             source_message_id,
         )
     else:
-        history, _ = await service.ai_history(db, user.id, cid)
+        history_result = await service.ai_history(db, user.id, cid)
+        history = history_result[0]
+        # Two-item compatibility keeps lightweight route tests and older service
+        # doubles valid; the real service supplies the selected user message ID.
+        user_message_id = history_result[2] if len(history_result) > 2 else None
         user_text = history[-1]["content"]
     graph_result = await run_consultation_generation(user_text, db)
     if graph_result["triage_route"] == "emergency":
@@ -107,6 +115,23 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
     # 用户自述健康记录：只用于避免重复询问、贴合科普与提醒就医；
     # 上面的紧急分流完全不依赖它。
     health_context = await health_service.build_health_context(db, user.id)
+    attachment_context = None
+    attachment_refs = []
+    if user_message_id is not None:
+        settings = get_settings()
+        attachment_context = await build_attachment_context(
+            db,
+            user_id=user.id,
+            consultation_id=cid,
+            message_id=user_message_id,
+            question=user_text,
+            max_chars=settings.attachment_context_max_chars,
+        )
+        refs = await attachment_service.message_attachment_refs(db, [user_message_id])
+        attachment_refs = refs.get(user_message_id, [])
+    private_context = "\n\n".join(
+        item for item in (health_context, attachment_context) if item
+    ) or None
     rag_context = render_rag_context(graph_result["retrieval_items"])
     topic = generic_topic(user_text)
     coverage_limited = bool(
@@ -148,6 +173,10 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
                     "name": model.name,
                     "provider": model.provider,
                 },
+                "attachmentsUsed": [
+                    item.model_dump(by_alias=True, mode="json")
+                    for item in attachment_refs
+                ],
                 "retrieval": {
                     "status": graph_result["retrieval_status"],
                     "gateReason": graph_result["retrieval_gate_reason"],
@@ -177,7 +206,7 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
                 model,
                 payload.answer_format,
                 rag_context,
-                health_context,
+                private_context,
             ):
                 remaining = 12000 - total_length
                 if remaining <= 0:

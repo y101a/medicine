@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.schemas.attachments import MessageAttachmentOut
+
 
 class FollowUpOption(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -99,11 +101,19 @@ class CreateConsultation(BaseModel):
 
 class CreateMessage(CreateConsultation):
     content: str = Field(min_length=1, max_length=2000)
+    attachment_ids: list[UUID] = Field(default_factory=list, alias="attachmentIds", max_length=3)
 
     @field_validator("content", mode="before")
     @classmethod
     def trim_content(cls, value: object) -> object:
         return value.strip() if isinstance(value, str) else value
+
+    @field_validator("attachment_ids")
+    @classmethod
+    def unique_attachment_ids(cls, value: list[UUID]) -> list[UUID]:
+        if len(value) != len(set(value)):
+            raise ValueError("附件不能重复选择")
+        return value
 
 
 class CreateGeneration(CreateConsultation):
@@ -143,6 +153,7 @@ class MessageOut(BaseModel):
     follow_up: FollowUpCard | None = Field(default=None, serialization_alias="followUp")
     triage: TriageResult | None = None
     citations: list[MessageCitation] = Field(default_factory=list)
+    attachments: list[MessageAttachmentOut] = Field(default_factory=list)
     created_at: datetime = Field(serialization_alias="createdAt")
 
 

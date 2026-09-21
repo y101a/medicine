@@ -15,7 +15,7 @@
 | GET | /models | 返回当前已配置并允许用户选择的模型 |
 
 创建请求：{"clientRequestId":"UUID"}。
-发送请求：{"clientRequestId":"UUID","content":"症状描述"}。
+发送请求：{"clientRequestId":"UUID","content":"症状描述","attachmentIds":["UUID"]}。
 内容去首尾空白后为 1–2000 字符。消息角色为 user 或 assistant。
 列表响应均为 {"items": [...], "hasMore": true/false}。
 消息页按序号升序返回，before 是不包含该序号的上界。
@@ -100,7 +100,7 @@ docker compose up -d
 .\.venv\Scripts\alembic.exe upgrade head
 ```
 
-最新迁移版本：20260916_0012。无需重新创建数据库或删除数据卷。
+最新迁移版本：20260921_0016。无需重新创建数据库或删除数据卷。
 
 ## 模型配置
 

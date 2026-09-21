@@ -64,6 +64,16 @@ class Settings(BaseSettings):
     asr_max_bytes: int = Field(default=2 * 1024 * 1024, ge=64 * 1024, le=2 * 1024 * 1024)
     asr_max_seconds: float = Field(default=60, ge=1, le=60)
 
+    # Consultation document extraction stays local until the user sends a question.
+    attachment_max_bytes: int = Field(
+        default=10 * 1024 * 1024, ge=64 * 1024, le=10 * 1024 * 1024
+    )
+    attachment_max_pages: int = Field(default=30, ge=1, le=30)
+    attachment_max_chars: int = Field(default=500_000, ge=10_000, le=500_000)
+    attachment_chunk_chars: int = Field(default=2_000, ge=500, le=4_000)
+    attachment_context_max_chars: int = Field(default=12_000, ge=2_000, le=30_000)
+    attachment_parse_timeout_seconds: float = Field(default=30, ge=5, le=30)
+
     kimi_api_key: SecretStr | None = None
     kimi_base_url: str = "https://api.moonshot.cn/v1"
 

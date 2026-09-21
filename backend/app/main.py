@@ -10,6 +10,10 @@ from sqlalchemy import text
 
 from app.ai.mcp.server import MCPApplicationSlot, build_medical_mcp_server
 from app.api.router import api_router
+from app.core.attachment_upload_middleware import (
+    AttachmentUploadBodyLimitMiddleware,
+    configure_attachment_multipart_memory,
+)
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.core.voice_upload_middleware import (
@@ -22,6 +26,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 
 settings = get_settings()
 configure_voice_multipart_memory(settings.asr_max_bytes)
+configure_attachment_multipart_memory(settings.attachment_max_bytes)
 mcp_enabled = settings.app_environment == "development" and settings.mcp_enabled
 mcp_slot = MCPApplicationSlot()
 
@@ -65,6 +70,11 @@ app.add_middleware(
     VoiceUploadBodyLimitMiddleware,
     max_audio_bytes=settings.asr_max_bytes,
     path=f"{settings.api_v1_prefix}/voice/transcribe",
+)
+app.add_middleware(
+    AttachmentUploadBodyLimitMiddleware,
+    max_file_bytes=settings.attachment_max_bytes,
+    path_pattern=rf"{settings.api_v1_prefix}/consultations/[^/]+/attachments",
 )
 app.include_router(api_router, prefix=settings.api_v1_prefix)
 if mcp_enabled:

@@ -6,6 +6,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.models import Gender
 
 
+class DeleteAccountRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    current_password: str = Field(alias="currentPassword", min_length=6, max_length=32)
+
+
 class UpdateProfileRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     real_name: str | None = Field(default=None, alias="realName", min_length=2, max_length=20)
