@@ -62,12 +62,12 @@
 # DSH（前端）
 cd frontend
 npx vue-tsc --noEmit -p tsconfig.app.json                    # 期望退出码 0
-npx vitest run                                               # 期望 116 passed / 15 files
+npx vitest run                                               # 期望 128 passed / 15 files
 npm run build                                                # 期望退出码 0（含 vue-tsc -b，全量类型检查）
 
 # Codex（后端）
 cd backend
-.venv\Scripts\python.exe -m pytest -q                        # 期望 217 passed
+.venv\Scripts\python.exe -m pytest -q                        # 期望 254 passed（Codex 报告，见 7.2；DSH 未复跑）
 .venv\Scripts\ruff.exe check app tests migrations            # 期望 All checks passed
 ```
 
@@ -86,6 +86,8 @@ DSH 对话输入区语音输入引导（路线 A，不碰音频），提交 `400
 （前端 99/14 → 116/15、E2E 32 → 35：DSH 完成应用内语音输入第一步的前端（契约以 Codex 方案为准），
 提交 `72a3881`。**后端基线仍记 217，但 Codex 其后的 `902c308`（上传治理与审计表，迁移 `20260920_0015`）
 加了测试，新数字待 Codex 给出**；DSH 未复跑后端。见 7.2。）
+（前端 116/15 → 128/15、E2E 35 → 39：DSH 完成病历文档附件前端与账号删除入口，后端 217 → 254
+按 Codex 的 `c4392b3` 与 7.2 报告采信（**DSH 未复跑 `pytest`**，它需要数据库）。见 7.2。）
 
 **为什么 `npm run build` 是必须的**：Vitest 用 esbuild 剥离类型，**不做类型检查**，所以类型错误只在
 `npm run build`（`vue-tsc -b`）暴露。2026-09-17 实测：ECharts 选项类型不兼容时 Vitest 全绿、
@@ -97,7 +99,7 @@ build 失败，最终是 build 拦下的。
 
 ```powershell
 cd frontend
-npm run e2e                                                  # 期望 35 passed（用例上限 45 秒；30 秒在满负载下会随机超时）
+npm run e2e                                                  # 期望 39 passed（用例上限 45 秒；30 秒在满负载下会随机超时）
 ```
 
 - 用 Playwright 驱动**本机已装的 Edge/Chrome**（不下载约 150MB 的 Chromium，可用
@@ -168,6 +170,7 @@ npm run e2e                                                  # 期望 35 passed�
 
 | 执行者 | 任务 | 正在改的文件 | 迁移编号 | 占用数据库 | 开始时间 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
+| DSH | 附件前端：上传/读取/删除、说明确认（`noticeAccepted`+`document-upload-v1`）、无会话时静默建会话、发送带 `attachmentIds`、上传中禁发、附件条与「附件已删除」墓碑、回答引用来源；另加账号删除入口 | `frontend/src/api/attachments.ts`（新）、`frontend/src/api/consultations.ts`、`frontend/src/api/users.ts`、`frontend/src/types/consultations.ts`、`frontend/src/composables/useAttachments.ts`（新）、`frontend/src/views/HomeView.vue`、`frontend/src/views/ProfileView.vue`、`frontend/src/views/consultations.test.ts`、`frontend/src/views/profile.test.ts`、`frontend/e2e/composer.spec.ts`、`frontend/e2e/attachments.spec.ts`（新）、`frontend/BROWSER_ACCEPTANCE.md` | 无 | 否 | 2026-09-21 | 已释放（2026-09-21 提交后释放；报告见 7.2） |
 | — | — | — | — | — | — | — |
 
 （2026-09-18 01:40 说明：DSH 临时接手后端完成审查第 3 项后已释放；**分工表所有权归属未改**，
@@ -209,6 +212,11 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 >
 > 本节按**写入时间**倒序（新条目插到最上）；条目标题里的时间戳是**工作发生时间**，两者不一定
 > 单调——例如 Codex 的 23:47 条目实际写在 DSH 的 23:58 条目之后。看到"乱序"不是错误，别去重排。
+### 2026-09-21 DSH 病历文档附件前端 + 账号删除入口（提交 `dedde9b`）
+- 改动（全部在 `frontend/`）：新增 `src/api/attachments.ts`（multipart `file`+`noticeAccepted`+`noticeVersion=document-upload-v1`，客户端 60 秒超时）、`src/composables/useAttachments.ts`（选取/上传/删除、≤3 份、10 MB 与扩展名本地预检、服务端错误码映射）、`src/components/MessageAttachments.vue`（附件条只渲染纯文本，**不走 `v-html`**）；`api/consultations.ts` 的 `send` 增加第 4 个参数 `attachmentIds`（空数组不发该字段，既有调用方不受影响）、`types/consultations.ts` 增加 `Attachment`/`MessageAttachment`/`AttachmentKind` 与 `Message.attachments`、`api/users.ts`+`stores/auth.ts` 增加 `deleteAccount`（`DELETE /users/me` 后 `clearSession`）；`HomeView.vue`：回形针按钮（顺序 附件 | 麦克风 | 发送）、拖拽上传、首次上传的说明确认（解析出的文字随问题外发、勿传他人病历）、**无会话时静默创建会话再上传**（按用户确认的做法，不发消息、不触发问答链路）、文件卡片（名称/大小/字数/页数/移除）、解析期间禁止发送与离开需确认、发送成功后清空草稿区、消息上的附件条与「（已删除）」墓碑、回答上方「本次回答参考了：」（直接读 `message.attachments`，不需要改流式协议）；`ProfileView.vue`：删除账号入口（先讲清后果再验证当前密码，422 `ACCOUNT_PASSWORD_INVALID` 时保留会话）。
+- 验证：`npm run build`（含 `vue-tsc -b`）退出码 0；`npx vitest run` **128 passed / 15 files**（116 → 128：附件 9 项 + 账号删除 3 项）；`npm run e2e` **39 passed**（35 → 39：新增 `e2e/attachments.spec.ts` 4 项，用 `setInputFiles` 喂真实字节，所以这条链路不依赖假设备）。中途 e2e 红过 1 项：我把输入区文案里的「（如豆包输入法）」删掉，撞了既有断言 `e2e/composer.spec.ts:20`，**是我改文案造成的、不是回归**，改回并复跑全绿。后端 `pytest` 未由 DSH 复跑（需要数据库，且属 Codex 所有权）；Codex 报的附件专项 19 项、完整 254 项按其 7.2 报告采信。
+- 阻塞：无。**未验证项**：①真实 PDF/DOCX/PPTX 的解析质量与真实前后端联调（e2e 全部走桩接口）；②账号删除整条链路同样只有桩验收。两项都已记入 `frontend/BROWSER_ACCEPTANCE.md`（第 9、10 行人工验收）。
+- 下一步：图片上传（用户提的第三类输入）仍未开工。另有两处已知取舍：`useAttachments` 顺序上传、**中途失败即停止**（后续文件不会继续上传，也不回滚已成功的）；`remove` 是永久删除，没有回收站。
 ### 2026-09-21 DSH 复核语音后端落地与前端对接（前端业务代码无需改）
 - 改动：只有 `frontend/playwright.config.ts` 的用例超时 30 秒 → 45 秒，提交 `ef4cf75`。**前端业务代码一行未改**：逐项核对 Codex 的 `edbfd9d` 后，接口 `/voice/transcribe`、multipart 字段 `audio`、响应 `{text,durationMs}`、`VOICE_*` 错误码、415 文案（含「可改用输入法语音输入」）、`asr_api_key or qwen_api_key` 回落（`services/voice_transcription.py:41`）、限流 `voice_audio`（`upload_limits.py:14`，10 分钟 6 次）、审计 `action=transcribe` 且 429 不复写审计（`routes/voice.py:61`）、`Cache-Control: no-store`、2 MB/60 秒/仅 WebM+Opus 且**按内容嗅探而不看 Content-Type**（`services/audio_validation.py:34`，所以前端发的 `audio/webm;codecs=opus` 不受影响）全部与前端预期一致；`asr_api_key` 留空即回落 `qwen_api_key`，本机 `backend/.env` 只设了 `QWEN_API_KEY`，因此**零配置可用**。
 - 验证：`npm run build`（含 `vue-tsc -b`）退出码 0；`npx vitest run` **116 passed / 15 files**；`npm run e2e` **35 passed**（含 3 项语音流程）。**修复前**满负载跑出 3 项超时（`composer.spec.ts:28`、`health-notice.spec.ts:15`、`layout.spec.ts:56`），把这三个文件隔离复跑 **21 passed**、`composer:28` 单跑实测 25.5 秒逼近 30 秒上限 → 判定为**并行负载下的超时抖动、不是回归**。后端测试**DSH 没有复跑**（`pytest` 需要数据库，而 Codex 在 7.1 声明占用数据库），Codex 报的语音专项 15 项、完整 235 项按其 7.2 报告采信。

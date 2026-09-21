@@ -31,8 +31,8 @@
 
 | 对象 | 本次实际状态 |
 | --- | --- |
-| 迁移 | 2026-09-16 核对时 `alembic current` = `20260916_0013`；**2026-09-20 未重跑 `alembic current`**，按迁移文件序号 head 为 `20260920_0015`（审计表 `audit_logs`，Codex 提交 `902c308`）；此前为 `20260919_0014`（用户模型凭据表，Codex 提交 `e18fdd9`）。此前两个迁移：`20260916_0012`（病理卡片消息元数据：`answer_format`、`is_medical_content`、`source_message_id`）与 `20260916_0013`（健康记录两张表）。 |
-| 自动化测试 | **2026-09-20 最新**：后端完整套件 **217 项通过**（Codex 报告，提交 `e75bc82`，DSH 未复跑）；前端单测 **116 项通过 / 15 个文件**；前端**浏览器文字断言**（Playwright 驱动本机 Edge/Chrome，接口用 `page.route` 拦截、不依赖后端）**35 项通过**，命令 `npm run e2e`；`npm run build`（含 `vue-tsc -b`，全量类型检查）退出码 0；`ruff check app tests migrations` 无问题。含数据库的测试在本机 PostgreSQL 可用时全部执行。 |
+| 迁移 | 2026-09-16 核对时 `alembic current` = `20260916_0013`；**2026-09-20 未重跑 `alembic current`**，按迁移文件序号 head 为 `20260920_0015`（审计表 `audit_logs`，Codex 提交 `902c308`）；此前为 `20260919_0014`（用户模型凭据表，Codex 提交 `e18fdd9`）。此前两个迁移：`20260916_0012`（病理卡片消息元数据：`answer_format`、`is_medical_content`、`source_message_id`）与 `20260916_0013`（健康记录两张表）。**2026-09-21 更新**：按同一方法（迁移文件序号）head 现为 `20260921_0016`（病历文档附件表，Codex 提交 `c4392b3`）；仍**未重跑** `alembic current`。 |
+| 自动化测试 | **2026-09-21 最新**：前端单测 **128 项通过 / 15 个文件**；前端**浏览器文字断言**（Playwright 驱动本机 Edge/Chrome，接口用 `page.route` 拦截、不依赖后端）**39 项通过**，命令 `npm run e2e`；`npm run build`（含 `vue-tsc -b`，全量类型检查）退出码 0；以上均由 DSH 实跑（提交 `dedde9b`）。后端完整套件 **254 项通过**（Codex 报告，提交 `c4392b3`，**DSH 未复跑**）；`ruff check app tests migrations` 无问题。含数据库的测试在本机 PostgreSQL 可用时全部执行。上一次记录（2026-09-20）：后端 217、前端 116/15、E2E 35。 |
 | DSH 会话权限 | **本机已把新会话默认权限预设改为 `danger-full-access`**（沙箱不受限 + 审批 `never`），写在 `C:\Users\Lenovo\.dsh\settings.yaml` 的 `permission.defaultPreset`。因此之后的会话**没有沙箱约束**，可以读写工作区之外的文件；改写它的那一次会话仍是 `workspace-write` + `ask`。 |
 | Git | 已有版本控制：首个提交 `b7c4e88`（203 个文件 / 24001 行），其后按功能小步提交，`master` 工作树当前干净。切勿提交或粘贴 `.env`、密钥。`.dsh-backup/` 是接线时留下的改动前副本与 diff，**不是项目内容、不影响构建与测试**；2026-09-17 确认暂时保留，请勿删除，也不要提交进版本库。根 `.gitignore` 已建立（补齐 `.dsh-backup/`、`report-work/`、`*.docx`），`backend/.gitignore` 与 `frontend/.gitignore` 原本就已排除 `.env`、`.venv`、`data/`、`node_modules`、`dist`。**两个 AI 共用一个工作目录，禁止 `git add .`，只显式暂存自己的文件**（细则见 `COORDINATION.md` 第 1 节）。 |
 | 本轮未复核 | Docker 容器状态、原型语料与知识库的文档／文本块／向量数量未在本轮重新统计。 |
@@ -265,6 +265,20 @@ Git、日志、截图、文档或聊天记录中。
   加密是 Fernet 整串加解密不适合大文件、前端无图片/富文本渲染管线、上传校验与 e2e 桩缺失；图片与病历
   还会绕过现有**只针对文本**的脱敏与红旗预检——报告照片上的姓名、身份证号、住院号无法被现有脱敏覆盖。
 - 多模态**不在任何路线图或进度文档中**（`REPOSITORY_AUDIT.md` 里的「多模态」是另一个历史原型，与本项目无关）。
+
+**2026-09-21 更新（②文件上传已落地）：**后端由 Codex 提交 `c4392b3`（迁移 `20260921_0016`）：会话级
+`POST/GET /consultations/{id}/attachments` 与 `DELETE /attachments/{id}`；发消息时 `POST /consultations/{id}/messages`
+新增 `attachmentIds`（≤3 个、去重），助手消息也带 `attachments`；只保存解析出的**加密文字分块**，**原件不保存**；
+上限 10 MB / 30 页 / 50 万字；上传必须带 `noticeAccepted=true` + `noticeVersion=document-upload-v1`，否则 422
+`DOCUMENT_NOTICE_REQUIRED`；解析错误（扫描件/加密/超页数/伪装宏等）都有独立错误码与中文文案；审计 `consent` +
+`upload`/`delete`，`resource_type=medical_document`。前端由 DSH 提交 `dedde9b`：回形针按钮（附件 | 麦克风 | 发送）、
+拖拽上传、首次上传的说明确认、**无会话时先静默创建会话再上传**、文件卡片与移除、解析期间禁止发送、发送带附件 id、
+消息附件条与「（已删除）」墓碑、回答上方「本次回答参考了：」。
+③图片上传**仍未开工**（含报告照片 OCR 与片子/身体照片只做分流、不做判读的分流策略）。
+**「开工前必须先补两件」中已补一件**：账号/数据删除路径已具备（后端 `DELETE /users/me` 校验当前密码，前端设置页
+「删除账号」入口，本提交）；**上传滥用限流仍是进程内实现**（`app/services/upload_limits.py`），多 worker 会各算一份，
+登录/注册限流也仍未做。语音路线 B 的真实转写与附件的真实解析质量、真实联调都还没有人眼验收，见
+`frontend/BROWSER_ACCEPTANCE.md` 第 3、9 行。
 
 后续工作按风险和依赖继续推进：
 
