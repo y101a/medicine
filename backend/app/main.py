@@ -76,6 +76,13 @@ app.add_middleware(
     max_file_bytes=settings.attachment_max_bytes,
     path_pattern=rf"{settings.api_v1_prefix}/consultations/[^/]+/attachments",
 )
+app.add_middleware(
+    AttachmentUploadBodyLimitMiddleware,
+    max_file_bytes=settings.image_max_bytes,
+    path_pattern=rf"{settings.api_v1_prefix}/consultations/[^/]+/images",
+    error_code="IMAGE_TOO_LARGE",
+    resource_label="图片",
+)
 app.include_router(api_router, prefix=settings.api_v1_prefix)
 if mcp_enabled:
     app.mount("/mcp", mcp_slot, name="mcp")

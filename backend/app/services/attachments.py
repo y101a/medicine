@@ -1,19 +1,44 @@
 from collections import defaultdict
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.errors import AppError
 from app.core.security import decrypt_sensitive, encrypt_sensitive
 from app.models import Attachment, AttachmentChunk, Consultation, MessageAttachment
 from app.schemas.attachments import AttachmentList, AttachmentOut, MessageAttachmentOut
 from app.services.document_extract import ExtractedDocument
+from app.services.image_analysis import ImageAnalysis
+from app.services.image_validation import NormalizedImage
+from app.services.medical_image_storage import StoredImage
+
+
+@dataclass(frozen=True)
+class DeletedAttachment:
+    kind: str
+    storage_key: str | None
 
 
 def _preview(value: str) -> str:
     clean = " ".join(value.split())
     return clean[:200] + ("…" if len(clean) > 200 else "")
+
+
+def _image_available(row: Attachment, now: datetime | None = None) -> bool | None:
+    if row.kind != "image":
+        return None
+    current = now or datetime.now(UTC)
+    return bool(
+        row.image_storage_key
+        and row.image_key_ciphertext
+        and row.image_deleted_at is None
+        and row.image_expires_at
+        and row.image_expires_at > current
+    )
 
 
 def _attachment_out(row: Attachment, preview: str) -> AttachmentOut:
@@ -27,6 +52,25 @@ def _attachment_out(row: Attachment, preview: str) -> AttachmentOut:
         preview=preview,
         status="ready",
         created_at=row.created_at,
+        image_category=row.image_category,
+        mime_type=row.mime_type,
+        image_width=row.image_width,
+        image_height=row.image_height,
+        image_available=_image_available(row),
+        image_expires_at=row.image_expires_at,
+    )
+
+
+def _message_out(row: Attachment) -> MessageAttachmentOut:
+    return MessageAttachmentOut(
+        id=row.id,
+        display_name=decrypt_sensitive(row.display_name_ciphertext),
+        kind=row.kind,
+        status="ready",
+        image_category=row.image_category,
+        mime_type=row.mime_type,
+        image_available=_image_available(row),
+        image_expires_at=row.image_expires_at,
     )
 
 
@@ -80,6 +124,60 @@ async def create_attachment(
     return _attachment_out(row, document.preview)
 
 
+async def create_image_attachment(
+    db: AsyncSession,
+    *,
+    user_id: UUID,
+    consultation_id: UUID,
+    category: str,
+    image: NormalizedImage,
+    analysis: ImageAnalysis,
+    stored: StoredImage,
+) -> AttachmentOut:
+    await ensure_owned_consultation(db, user_id, consultation_id)
+    settings = get_settings()
+    row = Attachment(
+        user_id=user_id,
+        consultation_id=consultation_id,
+        display_name_ciphertext=encrypt_sensitive(image.display_name),
+        kind="image",
+        byte_size=image.byte_size,
+        page_count=None,
+        char_count=len(analysis.text),
+        status="ready",
+        image_category=category,
+        mime_type=image.mime_type,
+        image_width=image.width,
+        image_height=image.height,
+        image_storage_key=stored.storage_key,
+        image_key_ciphertext=stored.key_ciphertext,
+        image_expires_at=datetime.now(UTC) + timedelta(days=settings.image_retention_days),
+        analysis_model=analysis.model,
+        analysis_version=analysis.version,
+    )
+    db.add(row)
+    await db.flush()
+    chunk_size = min(settings.attachment_chunk_chars, 4000)
+    chunks = [
+        analysis.text[index : index + chunk_size]
+        for index in range(0, len(analysis.text), chunk_size)
+    ]
+    db.add_all(
+        [
+            AttachmentChunk(
+                attachment_id=row.id,
+                position=position,
+                locator=f"图片识别结果 {position + 1}",
+                content_ciphertext=encrypt_sensitive(text),
+                char_count=len(text),
+            )
+            for position, text in enumerate(chunks)
+        ]
+    )
+    await db.flush()
+    return _attachment_out(row, analysis.preview)
+
+
 async def list_attachments(
     db: AsyncSession,
     user_id: UUID,
@@ -119,7 +217,7 @@ async def delete_attachment(
     db: AsyncSession,
     user_id: UUID,
     attachment_id: UUID,
-) -> bool:
+) -> DeletedAttachment:
     row = await db.scalar(
         select(Attachment).where(
             Attachment.id == attachment_id,
@@ -128,9 +226,29 @@ async def delete_attachment(
     )
     if row is None:
         raise AppError(404, "ATTACHMENT_NOT_FOUND", "附件不存在或无权访问")
+    result = DeletedAttachment(kind=row.kind, storage_key=row.image_storage_key)
     await db.delete(row)
     await db.flush()
-    return True
+    return result
+
+
+async def get_image_attachment(
+    db: AsyncSession,
+    user_id: UUID,
+    attachment_id: UUID,
+) -> Attachment:
+    row = await db.scalar(
+        select(Attachment).where(
+            Attachment.id == attachment_id,
+            Attachment.user_id == user_id,
+            Attachment.kind == "image",
+        )
+    )
+    if row is None:
+        raise AppError(404, "ATTACHMENT_NOT_FOUND", "图片不存在或无权访问")
+    if not _image_available(row):
+        raise AppError(410, "IMAGE_EXPIRED", "图片已过期或已被删除")
+    return row
 
 
 async def bind_message_attachments(
@@ -158,6 +276,8 @@ async def bind_message_attachments(
     by_id = {row.id: row for row in rows}
     if set(by_id) != set(attachment_ids):
         raise AppError(404, "ATTACHMENT_NOT_FOUND", "附件不存在或不属于当前会话")
+    if sum(row.kind == "image" for row in rows) > 3:
+        raise AppError(422, "ATTACHMENT_SELECTION_INVALID", "每条消息最多选择 3 张图片")
     db.add_all(
         [
             MessageAttachment(
@@ -169,15 +289,7 @@ async def bind_message_attachments(
         ]
     )
     await db.flush()
-    return [
-        MessageAttachmentOut(
-            id=attachment_id,
-            display_name=decrypt_sensitive(by_id[attachment_id].display_name_ciphertext),
-            kind=by_id[attachment_id].kind,
-            status="ready",
-        )
-        for attachment_id in attachment_ids
-    ]
+    return [_message_out(by_id[attachment_id]) for attachment_id in attachment_ids]
 
 
 async def copy_message_attachments(
@@ -230,12 +342,7 @@ async def message_attachment_refs(
                 status="deleted",
             )
         else:
-            item = MessageAttachmentOut(
-                id=attachment.id,
-                display_name=decrypt_sensitive(attachment.display_name_ciphertext),
-                kind=attachment.kind,
-                status="ready",
-            )
+            item = _message_out(attachment)
         result[link.message_id].append(item)
     return dict(result)
 
@@ -249,6 +356,33 @@ async def attachment_ids_for_message(db: AsyncSession, message_id: UUID) -> list
                 MessageAttachment.attachment_id.is_not(None),
             )
             .order_by(MessageAttachment.position)
+        )
+    )
+
+
+async def image_storage_keys_for_consultation(
+    db: AsyncSession, user_id: UUID, consultation_id: UUID
+) -> list[str]:
+    return list(
+        await db.scalars(
+            select(Attachment.image_storage_key).where(
+                Attachment.user_id == user_id,
+                Attachment.consultation_id == consultation_id,
+                Attachment.kind == "image",
+                Attachment.image_storage_key.is_not(None),
+            )
+        )
+    )
+
+
+async def image_storage_keys_for_user(db: AsyncSession, user_id: UUID) -> list[str]:
+    return list(
+        await db.scalars(
+            select(Attachment.image_storage_key).where(
+                Attachment.user_id == user_id,
+                Attachment.kind == "image",
+                Attachment.image_storage_key.is_not(None),
+            )
         )
     )
 

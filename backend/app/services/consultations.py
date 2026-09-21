@@ -24,6 +24,7 @@ from app.schemas.consultations import (
     TriageResult,
 )
 from app.services import attachments as attachment_service
+from app.services.medical_image_storage import remove_image
 
 
 def summary(row: Consultation) -> ConsultationOut:
@@ -388,6 +389,9 @@ async def append_assistant_message(
 
 async def remove(db: AsyncSession, user_id: UUID, cid: UUID):
     await owned(db, user_id, cid, lock=True)
+    image_keys = await attachment_service.image_storage_keys_for_consultation(
+        db, user_id, cid
+    )
     await db.execute(
         delete(Consultation).where(
             Consultation.id == cid,
@@ -395,3 +399,5 @@ async def remove(db: AsyncSession, user_id: UUID, cid: UUID):
         )
     )
     await db.commit()
+    for storage_key in image_keys:
+        await remove_image(storage_key)

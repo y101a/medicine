@@ -7,12 +7,14 @@ from sqlalchemy.orm import selectinload
 from app.core.errors import AppError
 from app.core.security import verify_password
 from app.models import User
+from app.services import attachments as attachment_service
 from app.services.audit_logs import (
     AUDIT_OUTCOME_REJECTED,
     AUDIT_OUTCOME_SUCCESS,
     add_audit_log,
 )
 from app.services.avatars import delete_avatar
+from app.services.medical_image_storage import remove_image
 
 
 async def delete_account(
@@ -40,6 +42,8 @@ async def delete_account(
         await db.commit()
         raise AppError(422, "ACCOUNT_PASSWORD_INVALID", "当前密码不正确")
 
+    # Capture encrypted blob keys before the database cascade removes attachment rows.
+    image_keys = await attachment_service.image_storage_keys_for_user(db, user_id)
     # Filesystem data cannot participate in the database transaction. Remove the
     # avatar first so a successful account deletion never leaves that personal file behind.
     delete_avatar(user_id)
@@ -52,3 +56,5 @@ async def delete_account(
     )
     await db.delete(user)
     await db.commit()
+    for storage_key in image_keys:
+        await remove_image(storage_key)

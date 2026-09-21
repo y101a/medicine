@@ -1,0 +1,377 @@
+import json
+from datetime import UTC, datetime, timedelta
+from io import BytesIO
+from uuid import UUID, uuid4
+
+import httpx
+import pytest
+from fastapi import UploadFile
+from PIL import Image, PngImagePlugin
+from pydantic import SecretStr
+from sqlalchemy import select
+
+from app.api.routes import images as image_routes
+from app.core.config import get_settings
+from app.core.errors import AppError
+from app.core.security import create_access_token, decrypt_sensitive
+from app.models import Attachment, AttachmentChunk, AuditLog
+from app.services.auth import ACCESS_COOKIE
+from app.services.image_analysis import (
+    ImageAnalysis,
+    VisionPayload,
+    analyze_image,
+)
+from app.services.image_analysis import (
+    _render as render_analysis,
+)
+from app.services.image_validation import normalize_image
+from app.services.medical_image_cleanup import cleanup_medical_images
+
+
+def image_bytes(
+    *,
+    size: tuple[int, int] = (320, 240),
+    color: str = "red",
+    metadata: bool = False,
+) -> bytes:
+    output = BytesIO()
+    pnginfo = PngImagePlugin.PngInfo()
+    if metadata:
+        pnginfo.add_text("PatientName", "Sensitive Person")
+    Image.new("RGB", size, color).save(output, format="PNG", pnginfo=pnginfo)
+    return output.getvalue()
+
+
+async def create_consultation(client, user_id):
+    client.cookies.set(ACCESS_COOKIE, create_access_token(user_id))
+    response = await client.post(
+        "/api/v1/consultations",
+        json={"clientRequestId": str(uuid4())},
+    )
+    assert response.status_code == 201
+    return response.json()["id"]
+
+
+async def fake_analysis(image, category):
+    if category == "report":
+        text = "报告图片文字提取（仅转录，不代表诊断）：\n白细胞 6.2"
+    elif category == "medical_imaging":
+        text = "影像模态：CT\n身体部位：胸部\n限制：未判读病灶、异常或诊断。"
+    else:
+        text = "身体照片可见事实（非诊断）：\n- 局部呈红色"
+    return ImageAnalysis(
+        text=text,
+        preview=" ".join(text.split())[:200],
+        model="qwen3.8-flash",
+    )
+
+
+async def test_normalize_image_removes_metadata_and_enforces_geometry():
+    upload = UploadFile(
+        file=BytesIO(image_bytes(metadata=True)),
+        filename="../../patient.png",
+    )
+    result = await normalize_image(
+        upload,
+        max_bytes=5 * 1024 * 1024,
+        max_pixels=20_000_000,
+        max_dimension=2400,
+    )
+    assert result.display_name == "patient.png"
+    assert result.mime_type == "image/webp"
+    with Image.open(BytesIO(result.content)) as image:
+        assert image.format == "WEBP"
+        assert image.size == (320, 240)
+        assert not image.getexif()
+        assert "PatientName" not in image.info
+
+    with pytest.raises(AppError) as raised:
+        await normalize_image(
+            UploadFile(file=BytesIO(image_bytes(size=(1000, 40))), filename="wide.png"),
+            max_bytes=5 * 1024 * 1024,
+            max_pixels=20_000_000,
+            max_dimension=2400,
+        )
+    assert raised.value.code == "IMAGE_INVALID"
+
+    with pytest.raises(AppError) as raised:
+        await normalize_image(
+            UploadFile(file=BytesIO(b"not an image"), filename="fake.png"),
+            max_bytes=5 * 1024 * 1024,
+            max_pixels=20_000_000,
+            max_dimension=2400,
+        )
+    assert raised.value.code == "IMAGE_INVALID"
+
+
+async def test_image_upload_encryption_access_binding_and_delete(
+    profile_context, tmp_path, monkeypatch
+):
+    client, db, (first, second) = profile_context
+    settings = get_settings()
+    monkeypatch.setattr(settings, "image_storage_dir", str(tmp_path))
+    monkeypatch.setattr(image_routes, "analyze_image", fake_analysis)
+    cid = await create_consultation(client, first.id)
+
+    uploaded = await client.post(
+        f"/api/v1/consultations/{cid}/images",
+        data={
+            "imageCategory": "report",
+            "noticeAccepted": "true",
+            "noticeVersion": "medical-image-upload-v1",
+        },
+        files={"file": ("报告.png", image_bytes(metadata=True), "image/png")},
+    )
+    assert uploaded.status_code == 201, uploaded.text
+    payload = uploaded.json()
+    assert payload["kind"] == "image"
+    assert payload["imageCategory"] == "report"
+    assert payload["mimeType"] == "image/webp"
+    assert payload["width"] == 320
+    assert payload["height"] == 240
+    assert "imageWidth" not in payload
+    assert payload["imageAvailable"] is True
+    attachment_id = UUID(payload["id"])
+
+    row = await db.get(Attachment, attachment_id)
+    assert row is not None
+    assert row.analysis_model == "qwen3.8-flash"
+    assert row.image_storage_key is not None
+    encrypted_path = tmp_path / row.image_storage_key
+    encrypted = encrypted_path.read_bytes()
+    assert not encrypted.startswith(b"RIFF")
+    assert b"Sensitive Person" not in encrypted
+    assert row.image_key_ciphertext and len(row.image_key_ciphertext) > 40
+
+    chunk = await db.scalar(
+        select(AttachmentChunk).where(AttachmentChunk.attachment_id == attachment_id)
+    )
+    assert chunk is not None
+    assert "白细胞 6.2" not in chunk.content_ciphertext
+    assert "白细胞 6.2" in decrypt_sensitive(chunk.content_ciphertext)
+
+    restored = await client.get(f"/api/v1/attachments/{attachment_id}/content")
+    assert restored.status_code == 200
+    assert restored.headers["content-type"] == "image/webp"
+    assert restored.headers["cache-control"] == "no-store, private"
+    with Image.open(BytesIO(restored.content)) as image:
+        assert image.format == "WEBP"
+        assert "PatientName" not in image.info
+
+    message = await client.post(
+        f"/api/v1/consultations/{cid}/messages",
+        json={
+            "clientRequestId": str(uuid4()),
+            "content": "请解释报告中的白细胞指标",
+            "attachmentIds": [str(attachment_id)],
+        },
+    )
+    assert message.status_code == 201, message.text
+    assert message.json()["attachments"][0]["imageCategory"] == "report"
+    assert message.json()["attachments"][0]["imageExpiresAt"] is not None
+
+    client.cookies.set(ACCESS_COOKIE, create_access_token(second.id))
+    assert (
+        await client.get(f"/api/v1/attachments/{attachment_id}/content")
+    ).status_code == 404
+
+    client.cookies.set(ACCESS_COOKIE, create_access_token(first.id))
+    deleted = await client.delete(f"/api/v1/attachments/{attachment_id}")
+    assert deleted.status_code == 204
+    assert not encrypted_path.exists()
+    events = (
+        await db.scalars(
+            select(AuditLog).where(
+                AuditLog.actor_user_id == first.id,
+                AuditLog.resource_type == "medical_image",
+            )
+        )
+    ).all()
+    assert {event.action for event in events} >= {"consent", "upload", "analyze", "delete"}
+
+
+async def test_image_notice_limit_and_three_image_message_limit(
+    profile_context, tmp_path, monkeypatch
+):
+    client, _, (user, _) = profile_context
+    monkeypatch.setattr(get_settings(), "image_storage_dir", str(tmp_path))
+    monkeypatch.setattr(image_routes, "analyze_image", fake_analysis)
+    cid = await create_consultation(client, user.id)
+    endpoint = f"/api/v1/consultations/{cid}/images"
+
+    missing = await client.post(
+        endpoint,
+        data={"imageCategory": "body_photo"},
+        files={"file": ("photo.png", image_bytes(), "image/png")},
+    )
+    assert missing.status_code == 422
+    assert missing.json()["code"] == "IMAGE_NOTICE_REQUIRED"
+
+    invalid_category = await client.post(
+        endpoint,
+        data={
+            "imageCategory": "diagnosis",
+            "noticeAccepted": "true",
+            "noticeVersion": "medical-image-upload-v1",
+        },
+        files={"file": ("photo.png", image_bytes(), "image/png")},
+    )
+    assert invalid_category.status_code == 422
+    assert invalid_category.json()["code"] == "IMAGE_CATEGORY_INVALID"
+
+    ids = []
+    for index in range(4):
+        uploaded = await client.post(
+            endpoint,
+            data={
+                "imageCategory": "body_photo",
+                "noticeAccepted": "true",
+                "noticeVersion": "medical-image-upload-v1",
+            },
+            files={"file": (f"photo-{index}.png", image_bytes(color="blue"), "image/png")},
+        )
+        assert uploaded.status_code == 201, uploaded.text
+        ids.append(uploaded.json()["id"])
+
+    rejected = await client.post(
+        f"/api/v1/consultations/{cid}/messages",
+        json={
+            "clientRequestId": str(uuid4()),
+            "content": "请整理这些图片",
+            "attachmentIds": ids,
+        },
+    )
+    assert rejected.status_code == 422
+    assert rejected.json()["code"] == "ATTACHMENT_SELECTION_INVALID"
+
+
+async def test_expired_image_content_is_removed_but_analysis_is_retained(
+    profile_context, tmp_path, monkeypatch
+):
+    client, db, (user, _) = profile_context
+    monkeypatch.setattr(get_settings(), "image_storage_dir", str(tmp_path))
+    monkeypatch.setattr(image_routes, "analyze_image", fake_analysis)
+    cid = await create_consultation(client, user.id)
+    uploaded = await client.post(
+        f"/api/v1/consultations/{cid}/images",
+        data={
+            "imageCategory": "medical_imaging",
+            "noticeAccepted": "true",
+            "noticeVersion": "medical-image-upload-v1",
+        },
+        files={"file": ("ct.png", image_bytes(), "image/png")},
+    )
+    assert uploaded.status_code == 201
+    attachment_id = UUID(uploaded.json()["id"])
+    row = await db.get(Attachment, attachment_id)
+    assert row is not None and row.image_storage_key
+    encrypted_path = tmp_path / row.image_storage_key
+    row.image_expires_at = datetime.now(UTC) - timedelta(seconds=1)
+    await db.flush()
+
+    expired = await client.get(f"/api/v1/attachments/{attachment_id}/content")
+    assert expired.status_code == 410
+    assert expired.json()["code"] == "IMAGE_EXPIRED"
+
+    stats = await cleanup_medical_images(db, now=datetime.now(UTC))
+    assert stats.lock_acquired is True
+    assert stats.expired == 1
+    assert not encrypted_path.exists()
+    await db.refresh(row)
+    assert row.image_storage_key is None
+    assert row.image_key_ciphertext is None
+    assert row.image_deleted_at is not None
+    chunk = await db.scalar(
+        select(AttachmentChunk).where(AttachmentChunk.attachment_id == attachment_id)
+    )
+    assert chunk is not None
+
+async def test_image_analysis_uses_server_key_fixed_model_and_sanitizes(monkeypatch):
+    settings = get_settings()
+    monkeypatch.setattr(settings, "image_analysis_api_key", SecretStr(""))
+    monkeypatch.setattr(settings, "qwen_api_key", SecretStr("server-qwen-key"))
+    captured = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        captured["authorization"] = request.headers["authorization"]
+        captured["payload"] = json.loads(request.content)
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "actual_category": "body_photo",
+                                    "ocr_text": "",
+                                    "modality": "",
+                                    "body_region": "",
+                                    "visible_labels": [],
+                                    "visible_facts": [
+                                        "局部呈红色，范围约一厘米",
+                                        "很可能是皮炎，概率 90%",
+                                    ],
+                                    "quality_warnings": [],
+                                },
+                                ensure_ascii=False,
+                            )
+                        }
+                    }
+                ]
+            },
+        )
+
+    normalized = await normalize_image(
+        UploadFile(file=BytesIO(image_bytes()), filename="photo.png"),
+        max_bytes=5 * 1024 * 1024,
+        max_pixels=20_000_000,
+        max_dimension=2400,
+    )
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(handler),
+        base_url="https://dashscope.aliyuncs.com",
+    ) as client:
+        result = await analyze_image(normalized, "body_photo", client=client)
+
+    assert captured["authorization"] == "Bearer server-qwen-key"
+    assert captured["payload"]["model"] == "qwen3.8-flash"
+    assert "局部呈红色" in result.text
+    assert "皮炎" not in result.text
+    assert "90%" not in result.text
+
+
+def test_image_analysis_rejects_category_mismatch():
+    payload = VisionPayload(
+        actual_category="medical_imaging",
+        ocr_text="白细胞 6.2",
+    )
+    with pytest.raises(AppError) as raised:
+        render_analysis(payload, "report", "qwen3.8-flash")
+    assert raised.value.code == "IMAGE_UNSUITABLE"
+
+async def test_deleting_consultation_removes_encrypted_image(
+    profile_context, tmp_path, monkeypatch
+):
+    client, db, (user, _) = profile_context
+    monkeypatch.setattr(get_settings(), "image_storage_dir", str(tmp_path))
+    monkeypatch.setattr(image_routes, "analyze_image", fake_analysis)
+    cid = await create_consultation(client, user.id)
+    uploaded = await client.post(
+        f"/api/v1/consultations/{cid}/images",
+        data={
+            "imageCategory": "report",
+            "noticeAccepted": "true",
+            "noticeVersion": "medical-image-upload-v1",
+        },
+        files={"file": ("report.png", image_bytes(), "image/png")},
+    )
+    assert uploaded.status_code == 201
+    row = await db.get(Attachment, UUID(uploaded.json()["id"]))
+    assert row is not None and row.image_storage_key
+    encrypted_path = tmp_path / row.image_storage_key
+    assert encrypted_path.exists()
+
+    deleted = await client.delete(f"/api/v1/consultations/{cid}")
+    assert deleted.status_code == 204
+    assert not encrypted_path.exists()

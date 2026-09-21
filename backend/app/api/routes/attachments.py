@@ -16,6 +16,7 @@ from app.services.audit_logs import (
     add_audit_log,
 )
 from app.services.document_extract import extract_document
+from app.services.medical_image_storage import remove_image
 from app.services.upload_limits import enforce_upload_rate_limit
 
 router = APIRouter(tags=["病历附件"])
@@ -139,14 +140,18 @@ async def remove_attachment(
     current_user: CurrentUser,
     db: DbSession,
 ) -> Response:
-    await attachment_service.delete_attachment(db, current_user.id, attachment_id)
+    deleted = await attachment_service.delete_attachment(
+        db, current_user.id, attachment_id
+    )
     await add_audit_log(
         db,
         actor_user_id=current_user.id,
         action="delete",
-        resource_type="medical_document",
+        resource_type="medical_image" if deleted.kind == "image" else "medical_document",
         resource_id=attachment_id,
         outcome=AUDIT_OUTCOME_SUCCESS,
     )
     await db.commit()
+    if deleted.storage_key:
+        await remove_image(deleted.storage_key)
     return Response(status_code=204)

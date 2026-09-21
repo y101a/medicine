@@ -11,6 +11,7 @@ UPLOAD_LIMIT = 10
 RESOURCE_UPLOAD_LIMITS = {
     "account_delete": 5,
     "medical_document": 20,
+    "medical_image": 10,
     "voice_audio": 6,
 }
 

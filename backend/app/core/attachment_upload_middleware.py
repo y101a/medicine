@@ -13,19 +13,29 @@ class AttachmentBodyTooLarge(Exception):
 class AttachmentUploadBodyLimitMiddleware:
     """Reject oversized document bodies before Starlette can spool multipart data."""
 
-    def __init__(self, app: ASGIApp, *, max_file_bytes: int, path_pattern: str) -> None:
+    def __init__(
+        self,
+        app: ASGIApp,
+        *,
+        max_file_bytes: int,
+        path_pattern: str,
+        error_code: str = "FILE_TOO_LARGE",
+        resource_label: str = "文档",
+    ) -> None:
         self.app = app
         self.path_pattern = re.compile(path_pattern)
         self.max_file_bytes = max_file_bytes
         self.max_body_bytes = max_file_bytes + MULTIPART_OVERHEAD_BYTES
+        self.error_code = error_code
+        self.resource_label = resource_label
 
     async def _reject(self, scope: Scope, receive: Receive, send: Send) -> None:
         limit_mb = self.max_file_bytes / (1024 * 1024)
         response = JSONResponse(
             status_code=413,
             content={
-                "code": "FILE_TOO_LARGE",
-                "message": f"单个文档不能超过 {limit_mb:g} MB",
+                "code": self.error_code,
+                "message": f"单个{self.resource_label}不能超过 {limit_mb:g} MB",
                 "details": None,
             },
         )

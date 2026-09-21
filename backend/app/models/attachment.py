@@ -12,6 +12,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -25,6 +26,7 @@ class AttachmentKind(StrEnum):
     PPTX = "pptx"
     TXT = "txt"
     MARKDOWN = "md"
+    IMAGE = "image"
 
 
 class Attachment(Base):
@@ -43,13 +45,28 @@ class Attachment(Base):
     page_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     char_count: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="ready")
+    image_category: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    mime_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    image_width: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    image_height: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    image_storage_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    image_key_ciphertext: Mapped[str | None] = mapped_column(Text, nullable=True)
+    image_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    image_deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    analysis_model: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    analysis_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
     __table_args__ = (
         CheckConstraint(
-            "kind IN ('pdf', 'docx', 'pptx', 'txt', 'md')", name="kind_supported"
+            "kind IN ('pdf', 'docx', 'pptx', 'txt', 'md', 'image')",
+            name="kind_supported",
         ),
         CheckConstraint(
             "byte_size BETWEEN 1 AND 31457280", name="byte_size_supported"
@@ -60,6 +77,36 @@ class Attachment(Base):
         ),
         CheckConstraint("char_count BETWEEN 1 AND 500000", name="char_count_supported"),
         CheckConstraint("status = 'ready'", name="status_supported"),
+        CheckConstraint(
+            "image_category IS NULL OR image_category IN "
+            "('report', 'medical_imaging', 'body_photo')",
+            name="image_category_supported",
+        ),
+        CheckConstraint(
+            "(image_width IS NULL AND image_height IS NULL) OR "
+            "(image_width BETWEEN 32 AND 2400 AND image_height BETWEEN 32 AND 2400)",
+            name="image_dimensions_supported",
+        ),
+        CheckConstraint(
+            "kind <> 'image' OR (image_category IS NOT NULL AND mime_type = 'image/webp' "
+            "AND image_width IS NOT NULL AND image_height IS NOT NULL "
+            "AND image_expires_at IS NOT NULL AND analysis_model IS NOT NULL "
+            "AND analysis_version IS NOT NULL)",
+            name="image_metadata_required",
+        ),
+        CheckConstraint(
+            "kind <> 'image' OR "
+            "((image_storage_key IS NOT NULL AND image_key_ciphertext IS NOT NULL "
+            "AND image_deleted_at IS NULL) OR "
+            "(image_storage_key IS NULL AND image_key_ciphertext IS NULL "
+            "AND image_deleted_at IS NOT NULL))",
+            name="image_storage_state_supported",
+        ),
+        Index(
+            "ix_attachments_image_expiry",
+            "image_expires_at",
+            postgresql_where=text("kind = 'image' AND image_deleted_at IS NULL"),
+        ),
         Index(
             "ix_attachments_user_consultation_created",
             "user_id",
