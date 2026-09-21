@@ -60,6 +60,37 @@ Cookie 和刷新 Cookie，并返回 `{ "user": AuthUser }`。
 但不会记录原始文件名、文件内容、磁盘路径、IP 或患者文本。为避免攻击者利用被限流请求
 持续写数据库，命中 429 的每次重试不单独写审计行。
 
+## 应用内语音转写
+
+`POST /voice/transcribe`，需要登录，使用 `multipart/form-data` 字段 `audio` 上传一段录音。
+成功返回待用户核对的文字和后端从实际音频帧计算的时长：
+
+~~~json
+{
+  "text": "最近三天咳嗽",
+  "durationMs": 3200
+}
+~~~
+
+第一版仅接收真实内容为 WebM 容器、Opus 编码的单声道或多声道纯音频；不信任请求声明的
+MIME、文件名或前端上报时长。单次上限 2 MB、60 秒，按账户 10 分钟最多 6 次。响应设置
+`Cache-Control: no-store`。Safari 等无法产生 WebM/Opus 的浏览器会收到 415
+`VOICE_TYPE_NOT_ALLOWED`，可继续使用设备输入法的语音输入。
+
+后端使用服务端 `ASR_API_KEY`；未单独配置时回落到服务端 `QWEN_API_KEY`，不会使用用户在
+设置页保存的模型密钥。`ASR_BASE_URL` 只允许阿里云百炼 HTTPS 兼容接口域名，模型固定为
+`qwen3-asr-flash`。音频以 Base64 Data URL 在单次同步请求中发送，处理期间只存在于内存，
+不落盘、不写日志、不写数据库；审计表只记录 `transcribe`、`voice_audio`、结果与受控错误码。
+
+转写接口不会创建咨询、保存消息或自动调用医疗 AI。前端必须先把文字放入输入框供用户核对，
+用户主动发送后才进入既有红旗预检、RAG、引用核验和流式回答链路。
+
+错误码包括：413 `VOICE_TOO_LARGE`；415 `VOICE_TYPE_NOT_ALLOWED`；422
+`VOICE_INVALID_AUDIO`、`VOICE_TOO_LONG`、`VOICE_NO_SPEECH`；429
+`UPLOAD_RATE_LIMITED`；503 `VOICE_NOT_CONFIGURED`；502
+`VOICE_PROVIDER_FAILED`、`VOICE_PROVIDER_INVALID_RESPONSE`；504
+`VOICE_PROVIDER_TIMEOUT`。
+
 ## 用户自带模型 API Key
 
 设置页只允许配置模型注册表中的四个服务商：`deepseek`、`qwen`、`kimi`、

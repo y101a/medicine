@@ -1,6 +1,6 @@
 from functools import lru_cache
 from typing import Annotated
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlparse
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -55,6 +55,15 @@ class Settings(BaseSettings):
     # in a multi-input response. Keep one input per request to preserve mapping.
     embedding_batch_size: int = 1
 
+    # Server-controlled speech recognition. User-provided model credentials are
+    # intentionally never used for audio uploads.
+    asr_api_key: SecretStr | None = None
+    asr_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    asr_model: str = "qwen3-asr-flash"
+    asr_timeout_seconds: float = Field(default=45, ge=5, le=60)
+    asr_max_bytes: int = Field(default=2 * 1024 * 1024, ge=64 * 1024, le=2 * 1024 * 1024)
+    asr_max_seconds: float = Field(default=60, ge=1, le=60)
+
     kimi_api_key: SecretStr | None = None
     kimi_base_url: str = "https://api.moonshot.cn/v1"
 
@@ -99,6 +108,36 @@ class Settings(BaseSettings):
         if value < 1 or value > 20:
             raise ValueError("阿里云同步向量接口每批必须为 1-20 条")
         return value
+
+    @field_validator("asr_base_url")
+    @classmethod
+    def validate_asr_base_url(cls, value: str) -> str:
+        normalized = value.strip().rstrip("/")
+        parsed = urlparse(normalized)
+        hostname = (parsed.hostname or "").lower()
+        allowed_host = hostname in {
+            "dashscope.aliyuncs.com",
+            "dashscope-intl.aliyuncs.com",
+        } or hostname.endswith(".maas.aliyuncs.com")
+        if (
+            parsed.scheme != "https"
+            or not allowed_host
+            or parsed.username
+            or parsed.password
+            or parsed.port not in {None, 443}
+            or parsed.query
+            or parsed.fragment
+            or parsed.path != "/compatible-mode/v1"
+        ):
+            raise ValueError("ASR_BASE_URL 必须是阿里云百炼 HTTPS 兼容接口地址")
+        return normalized
+
+    @field_validator("asr_model")
+    @classmethod
+    def validate_asr_model(cls, value: str) -> str:
+        if value.strip() != "qwen3-asr-flash":
+            raise ValueError("当前只允许 qwen3-asr-flash 语音识别模型")
+        return value.strip()
 
     @field_validator("external_tool_timeout_seconds")
     @classmethod

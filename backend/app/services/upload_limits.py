@@ -8,6 +8,7 @@ from app.core.errors import AppError
 
 UPLOAD_WINDOW_SECONDS = 600
 UPLOAD_LIMIT = 10
+RESOURCE_UPLOAD_LIMITS = {"voice_audio": 6}
 
 _upload_lock = Lock()
 _upload_calls: dict[tuple[str, str], deque[float]] = {}
@@ -27,7 +28,8 @@ def enforce_upload_rate_limit(user_id: UUID, resource_type: str) -> None:
     with _upload_lock:
         _discard_expired(now)
         calls = _upload_calls.setdefault(key, deque())
-        if len(calls) >= UPLOAD_LIMIT:
+        limit = RESOURCE_UPLOAD_LIMITS.get(resource_type, UPLOAD_LIMIT)
+        if len(calls) >= limit:
             retry_after = max(1, ceil(UPLOAD_WINDOW_SECONDS - (now - calls[0])))
             raise AppError(
                 429,
