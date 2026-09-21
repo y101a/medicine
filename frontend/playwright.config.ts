@@ -27,7 +27,9 @@ function resolveBrowserPath(): string {
 
 export default defineConfig({
   testDir: './e2e',
-  timeout: 30_000,
+  // 每个用例都要经 Vite dev server 加载 2-4 次整页，满负载并行时单例实测 20-25 秒，
+  // 30 秒上限会随机超时（已实测抖动，非断言失败），因此留出余量。
+  timeout: 45_000,
   expect: { timeout: 5_000 },
   fullyParallel: true,
   forbidOnly: true,
