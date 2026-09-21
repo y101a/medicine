@@ -1,40 +1,72 @@
 /**
- * 报告/检查单照片的本地预处理：压缩、摆正、重新编码。
+ * 医学图片的本地预处理：压缩、摆正、重新编码。
+ *
+ * 契约见 `backend/docs/MEDICAL_IMAGES.md`（2026-09-21 冻结）。本地这层只改善体验，
+ * **后端才是权威**：它会重新解码、嗅探真实类型、移除元数据并统一转成 WebP，
+ * 所以这里不做任何「相信前端」的判断，也不判断图片内容与病情。
  *
  * 三件事，全部在浏览器里完成：
- * 1. 长边压到 `IMAGE_MAX_EDGE`，避免手机原图（上万像素、十几 MB）直接上传；
+ * 1. 长边压到 `IMAGE_MAX_EDGE`，并在必要时继续降长边，直到压进 `IMAGE_MAX_BYTES`；
  * 2. 用 canvas 重新编码，**顺带丢掉 EXIF**——手机照片通常带 GPS、拍摄设备与时间；
  * 3. 按拍摄方向摆正（`imageOrientation: 'from-image'`），否则竖着拍的报告 OCR 会读成横的。
- *
- * 这里**不判断图片内容**，也不做任何病情判别：是不是「报告/检查单」由用户在界面上点选；
- * 片子和身体照片按已确认边界**不上传**，只给固定的分流提示（`FILM_NOTICE`）。
  */
 
-/** 长边上限（像素）。A4 报告照片压到 2400 像素约 170–200 dpi，够 OCR 认字，又不会传十几 MB。 */
+/** 长边上限（像素），与后端规范化目标一致。A4 报告照片约 170–200 dpi，够识别文字。 */
 export const IMAGE_MAX_EDGE = 2400
-/** 压完仍超过 `IMAGE_TARGET_BYTES` 时依次降质重编；都不达标就接受最后一次，只要没超过后端上限。 */
-export const IMAGE_QUALITY_STEPS = [0.85, 0.7, 0.55]
-/** 压缩目标体积。压到它就停，OCR 认字够用且上传快。 */
-export const IMAGE_TARGET_BYTES = 8 * 1024 * 1024
-/** 与后端 `attachment_max_bytes` 一致（2026-09-21 为 30 MB）；真正判定仍以服务端为准。 */
-export const IMAGE_MAX_BYTES = 30 * 1024 * 1024
+/** 压缩目标 = 上传上限：与后端 `image_max_bytes`（5 MiB）一致，超过必然被服务端拒绝。 */
+export const IMAGE_MAX_BYTES = 5 * 1024 * 1024
 const IMAGE_MAX_MB = IMAGE_MAX_BYTES / (1024 * 1024)
-const IMAGE_MAX_LABEL = `${Number.isInteger(IMAGE_MAX_MB) ? IMAGE_MAX_MB : IMAGE_MAX_MB.toFixed(1)} MB`
+/** 文案从常量派生，避免上限调整后提示还写着旧数字。 */
+const IMAGE_MAX_LABEL = `${Number.isInteger(IMAGE_MAX_MB) ? IMAGE_MAX_MB : IMAGE_MAX_MB.toFixed(1)} MiB`
+/** 本地拒绝的输入上限，只为保护浏览器内存；超过它的原图先让用户自己裁剪。 */
+export const IMAGE_INPUT_MAX_BYTES = 40 * 1024 * 1024
+/** 压不进上限时依次降质重编；仍不达标就再降一档长边重来。 */
+export const IMAGE_QUALITY_STEPS = [0.85, 0.7, 0.55, 0.45]
+/** 降长边的最大轮数（配合上面的质量序列，实测足以把手机原图压进 5 MiB）。 */
+export const IMAGE_MAX_ROUNDS = 3
+/** 后端要求：宽高均至少 32 px、宽高比不超过 20:1——本地先拦，能给出更具体的提示。 */
+export const IMAGE_MIN_EDGE = 32
+export const IMAGE_MAX_ASPECT_RATIO = 20
 
-/** 浏览器能可靠解码、且后端会收的图片类型。统一转成 JPEG 上传，所以后端只需认 JPEG。 */
+/** 浏览器能可靠解码、且后端会收的类型（后端再统一转 WebP）。 */
 export const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp']
 /** iPhone 默认存 HEIC/HEIF，浏览器解不开；要单独给说法，否则用户只看到「格式不支持」。 */
 const UNDECODABLE_EXTENSIONS = ['heic', 'heif']
 
-/** 用户点选「片子/身体照片」时显示的固定文案：不做判读，只分流。 */
-export const FILM_NOTICE =
-  '本产品不判读 X 光、CT、MRI 片子，也不评价身体照片。请携带原片到相应科室就诊；有明显不适或急症表现请及时就医。'
+export type ImageCategory = 'report' | 'medical_imaging' | 'body_photo'
+
+/** 类别选择器上的名字。 */
+export const IMAGE_CATEGORY_LABELS: Record<ImageCategory, string> = {
+  report: '报告 / 检查单',
+  medical_imaging: 'X 光 / CT / MRI 片子',
+  body_photo: '患处或身体照片',
+}
+
+/**
+ * 三类图片各不相同的能力边界文案（契约要求分别显示）。
+ * 都只描述「会做什么、不会做什么」，不给任何疾病判断。
+ */
+export const IMAGE_CATEGORY_NOTICES: Record<ImageCategory, string> = {
+  report: '会读取照片上的文字并整理成要点；识别可能出错，请以纸质报告为准。',
+  medical_imaging:
+    '只识别影像类型、部位与片子上可见的文字，不判断病灶、阴影、骨折等情况；请携带正式影像报告咨询医生。',
+  body_photo:
+    '只整理肉眼可见、非诊断性的事实（如颜色、范围、是否有明显出血），不判断是什么病；急症请立即就医或拨 120。',
+}
+
+/** 首次上传图片的一次性说明：敏感信息 + 第三方外发 + 保留期限（契约第 7 节）。 */
+export const IMAGE_CONSENT_NOTICE =
+  '照片属于医疗健康敏感信息：会先在本地压缩、去掉拍摄位置等元数据，再发送给服务端固定的阿里云视觉模型识别；' +
+  '画面上的姓名、住院号、条码无法自动去除，建议先遮挡。规范化图片加密保存 90 天，识别文字随会话保留，' +
+  '可随时删除附件、会话或账号。请勿上传他人资料。'
 
 export type ImagePrepReason =
   | 'not_image'
   | 'undecodable'
   | 'too_large'
+  | 'too_small'
+  | 'bad_ratio'
   | 'decode_failed'
   | 'output_failed'
 
@@ -76,7 +108,7 @@ export function scaledImageSize(
   }
 }
 
-/** 与后端文件名规则（≤120 字符）留出余量，并统一改成 `.jpg`。 */
+/** 与后端文件名规则（≤120 字符）留出余量，并统一改成 `.jpg`（后端会再转 WebP）。 */
 const MAX_NAME_LENGTH = 100
 
 export function preparedImageName(originalName: string, extension = 'jpg'): string {
@@ -98,8 +130,8 @@ function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number):
 }
 
 /**
- * 把用户选的图片处理成可直接上传的文件。失败一律抛 `ImagePrepError`，
- * 消息是给用户看的中文短句（调用方直接透传即可）。
+ * 把用户选的图片处理成可直接上传的文件（保证 ≤ `IMAGE_MAX_BYTES`）。
+ * 失败一律抛 `ImagePrepError`，消息是给用户看的中文短句，调用方直接透传。
  */
 export async function prepareImageForUpload(file: File): Promise<File> {
   if (isUndecodableImage(file)) {
@@ -109,11 +141,13 @@ export async function prepareImageForUpload(file: File): Promise<File> {
     )
   }
   if (!isAcceptedImageType(file)) {
-    throw new ImagePrepError('not_image', '图片只支持 JPG、PNG、WebP；报告也可以直接传 PDF')
+    throw new ImagePrepError(
+      'not_image',
+      '图片只支持 JPG、PNG、WebP；动图与截图外的其它格式请转成 JPG，报告也可以直接传 PDF',
+    )
   }
-  if (file.size > IMAGE_MAX_BYTES) {
-    // 文案从常量派生，避免上限调整后提示还写着旧数字。
-    throw new ImagePrepError('too_large', `单张图片不能超过 ${IMAGE_MAX_LABEL}`)
+  if (file.size > IMAGE_INPUT_MAX_BYTES) {
+    throw new ImagePrepError('too_large', '图片太大，请先在相册里裁剪后再上传')
   }
 
   let bitmap: ImageBitmap
@@ -124,31 +158,50 @@ export async function prepareImageForUpload(file: File): Promise<File> {
   }
 
   try {
-    const { width, height } = scaledImageSize(bitmap.width, bitmap.height)
-    if (!width || !height) {
+    const shortest = Math.min(bitmap.width, bitmap.height)
+    const longest = Math.max(bitmap.width, bitmap.height)
+    if (!shortest || !longest) {
       throw new ImagePrepError('decode_failed', '图片尺寸异常，请换一张或改用 PDF 上传')
     }
+    if (shortest < IMAGE_MIN_EDGE) {
+      throw new ImagePrepError('too_small', '图片太小（最短边不足 32 像素），请重新拍摄或改用 PDF')
+    }
+    if (longest / shortest > IMAGE_MAX_ASPECT_RATIO) {
+      throw new ImagePrepError('bad_ratio', '图片长宽比异常（超过 20:1），请裁剪后重试')
+    }
+
     const canvas = document.createElement('canvas')
-    canvas.width = width
-    canvas.height = height
     const context = canvas.getContext('2d')
     if (!context) {
       throw new ImagePrepError('output_failed', '当前浏览器无法处理图片，请改用 PDF 上传')
     }
-    context.drawImage(bitmap, 0, 0, width, height)
 
-    let latest: Blob | null = null
-    for (const quality of IMAGE_QUALITY_STEPS) {
-      latest = await canvasToBlob(canvas, 'image/jpeg', quality)
-      if (latest.size <= IMAGE_TARGET_BYTES) break
+    let edge = IMAGE_MAX_EDGE
+    for (let round = 0; round < IMAGE_MAX_ROUNDS; round += 1) {
+      const { width, height } = scaledImageSize(bitmap.width, bitmap.height, edge)
+      if (!width || !height) {
+        throw new ImagePrepError('decode_failed', '图片尺寸异常，请换一张或改用 PDF 上传')
+      }
+      canvas.width = width
+      canvas.height = height
+      context.drawImage(bitmap, 0, 0, width, height)
+
+      for (const quality of IMAGE_QUALITY_STEPS) {
+        const blob = await canvasToBlob(canvas, 'image/jpeg', quality)
+        if (blob.size <= IMAGE_MAX_BYTES) {
+          return new File([blob], preparedImageName(file.name), {
+            type: 'image/jpeg',
+            lastModified: Date.now(),
+          })
+        }
+      }
+      // 降到最低质量仍超上限：缩小长边再重来一轮。
+      edge = Math.round(edge * 0.75)
     }
-    if (!latest) {
-      throw new ImagePrepError('output_failed', '图片转换失败，请换一张或改用 PDF 上传')
-    }
-    return new File([latest], preparedImageName(file.name), {
-      type: 'image/jpeg',
-      lastModified: Date.now(),
-    })
+    throw new ImagePrepError(
+      'too_large',
+      `压缩后仍超过 ${IMAGE_MAX_LABEL}，请裁剪图片后重试或改用 PDF 上传`,
+    )
   } finally {
     bitmap.close()
   }
