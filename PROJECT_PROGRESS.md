@@ -31,8 +31,8 @@
 
 | 对象 | 本次实际状态 |
 | --- | --- |
-| 迁移 | 2026-09-16 核对时 `alembic current` = `20260916_0013`；**2026-09-20 未重跑 `alembic current`**，按迁移文件序号 head 为 `20260920_0015`（审计表 `audit_logs`，Codex 提交 `902c308`）；此前为 `20260919_0014`（用户模型凭据表，Codex 提交 `e18fdd9`）。此前两个迁移：`20260916_0012`（病理卡片消息元数据：`answer_format`、`is_medical_content`、`source_message_id`）与 `20260916_0013`（健康记录两张表）。**2026-09-21 更新**：按同一方法（迁移文件序号）head 现为 `20260921_0016`（病历文档附件表，Codex 提交 `c4392b3`）；仍**未重跑** `alembic current`。 |
-| 自动化测试 | **2026-09-21 最新**：前端单测 **128 项通过 / 15 个文件**；前端**浏览器文字断言**（Playwright 驱动本机 Edge/Chrome，接口用 `page.route` 拦截、不依赖后端）**39 项通过**，命令 `npm run e2e`；`npm run build`（含 `vue-tsc -b`，全量类型检查）退出码 0；以上均由 DSH 实跑（提交 `dedde9b`）。后端完整套件 **254 项通过**（Codex 报告，提交 `c4392b3`，**DSH 未复跑**）；`ruff check app tests migrations` 无问题。含数据库的测试在本机 PostgreSQL 可用时全部执行。上一次记录（2026-09-20）：后端 217、前端 116/15、E2E 35。 |
+| 迁移 | 2026-09-16 核对时 `alembic current` = `20260916_0013`；**2026-09-20 未重跑 `alembic current`**，按迁移文件序号 head 为 `20260920_0015`（审计表 `audit_logs`，Codex 提交 `902c308`）；此前为 `20260919_0014`（用户模型凭据表，Codex 提交 `e18fdd9`）。此前两个迁移：`20260916_0012`（病理卡片消息元数据：`answer_format`、`is_medical_content`、`source_message_id`）与 `20260916_0013`（健康记录两张表）。**2026-09-21 实跑（DSH）**：`alembic current` = `20260921_0017 (head)` —— `20260921_0016`（病历文档附件表，Codex 提交 `c4392b3`）与 `20260921_0017`（放宽附件三个 CHECK 约束，DSH 提交 `88a0b62`）都已应用。 |
+| 自动化测试 | **2026-09-21 最新**：后端完整套件 **254 项通过**（**DSH 实跑**，含数据库，提交 `88a0b62`）；`ruff check app tests migrations` 无问题。前端单测 **128 项通过 / 15 个文件**、**浏览器文字断言** **39 项**、`npm run build`（含 `vue-tsc -b`）退出码 0，均为 DSH 实跑（提交 `dedde9b`）；最近一次全量 e2e 为 38 passed + `layout.spec.ts:56` 抖动（隔离复跑该文件 13 passed，判定为并行负载抖动）。**工作区另有 Codex 尚未提交的 2 项语音用例（130 项），未计入 128。** 上一次记录（2026-09-20）：后端 217、前端 116/15、E2E 35。 |
 | DSH 会话权限 | **本机已把新会话默认权限预设改为 `danger-full-access`**（沙箱不受限 + 审批 `never`），写在 `C:\Users\Lenovo\.dsh\settings.yaml` 的 `permission.defaultPreset`。因此之后的会话**没有沙箱约束**，可以读写工作区之外的文件；改写它的那一次会话仍是 `workspace-write` + `ask`。 |
 | Git | 已有版本控制：首个提交 `b7c4e88`（203 个文件 / 24001 行），其后按功能小步提交，`master` 工作树当前干净。切勿提交或粘贴 `.env`、密钥。`.dsh-backup/` 是接线时留下的改动前副本与 diff，**不是项目内容、不影响构建与测试**；2026-09-17 确认暂时保留，请勿删除，也不要提交进版本库。根 `.gitignore` 已建立（补齐 `.dsh-backup/`、`report-work/`、`*.docx`），`backend/.gitignore` 与 `frontend/.gitignore` 原本就已排除 `.env`、`.venv`、`data/`、`node_modules`、`dist`。**两个 AI 共用一个工作目录，禁止 `git add .`，只显式暂存自己的文件**（细则见 `COORDINATION.md` 第 1 节）。 |
 | 本轮未复核 | Docker 容器状态、原型语料与知识库的文档／文本块／向量数量未在本轮重新统计。 |
@@ -268,8 +268,15 @@ Git、日志、截图、文档或聊天记录中。
 
 **2026-09-21 更新（②文件上传已落地）：**后端由 Codex 提交 `c4392b3`（迁移 `20260921_0016`）：会话级
 `POST/GET /consultations/{id}/attachments` 与 `DELETE /attachments/{id}`；发消息时 `POST /consultations/{id}/messages`
-新增 `attachmentIds`（≤3 个、去重），助手消息也带 `attachments`；只保存解析出的**加密文字分块**，**原件不保存**；
-上限 10 MB / 30 页 / 50 万字；上传必须带 `noticeAccepted=true` + `noticeVersion=document-upload-v1`，否则 422
+新增 `attachmentIds`（≤5 个、去重，原为 3 个），助手消息也带 `attachments`；只保存解析出的**加密文字分块**，**原件不保存**；
+**2026-09-21 用户要求放宽上限（后端已提交 `88a0b62` + 迁移 `20260921_0017`）**：单文件 10→**30 MB**、
+PDF/PPTX 30→**100 页**、解析 30→**60 秒**、每 10 分钟 5→**20 次**、每条消息附件 3→**5 份**；提取文字上限仍
+50 万字，**模型侧仍只取 12000 字符的相关片段**，所以放宽只改「收得下」、不改「用得上」。**踩坑记录（供后续参考）**：
+这三个上限同时写在数据库 CHECK 约束里（`ck_attachments_byte_size_supported`、
+`ck_attachments_page_count_supported`、`ck_message_attachments_position_supported`），只改 Pydantic 与 ORM
+声明会先通过应用校验、再被数据库直接拒绝（实测 position=3 触发违反），**必须带迁移**。前端上限同步由 DSH 完成但
+暂未提交（Codex 正在并发编辑同一测试文件，见 `COORDINATION.md` 第 6 节）；**工作区已生效**。
+上传必须带 `noticeAccepted=true` + `noticeVersion=document-upload-v1`，否则 422
 `DOCUMENT_NOTICE_REQUIRED`；解析错误（扫描件/加密/超页数/伪装宏等）都有独立错误码与中文文案；审计 `consent` +
 `upload`/`delete`，`resource_type=medical_document`。前端由 DSH 提交 `dedde9b`：回形针按钮（附件 | 麦克风 | 发送）、
 拖拽上传、首次上传的说明确认、**无会话时先静默创建会话再上传**、文件卡片与移除、解析期间禁止发送、发送带附件 id、
