@@ -101,7 +101,7 @@ class CreateConsultation(BaseModel):
 
 class CreateMessage(CreateConsultation):
     content: str = Field(min_length=1, max_length=2000)
-    attachment_ids: list[UUID] = Field(default_factory=list, alias="attachmentIds", max_length=3)
+    attachment_ids: list[UUID] = Field(default_factory=list, alias="attachmentIds", max_length=5)
 
     @field_validator("content", mode="before")
     @classmethod

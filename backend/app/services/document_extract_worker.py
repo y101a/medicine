@@ -233,7 +233,7 @@ def main() -> None:
         if not content:
             fail("FILE_PARSE_FAILED", "文档内容为空")
         if len(content) > args.max_bytes:
-            fail("FILE_TOO_LARGE", "单个文档不能超过 10 MB")
+            fail("FILE_TOO_LARGE", f"单个文档不能超过 {args.max_bytes / (1024 * 1024):g} MB")
         result = parse(content, args.extension.lower(), args.max_pages, args.max_chars)
     except ParseFailure as exc:
         result = {"ok": False, "code": exc.code, "message": exc.message}

@@ -10,7 +10,7 @@ UPLOAD_WINDOW_SECONDS = 600
 UPLOAD_LIMIT = 10
 RESOURCE_UPLOAD_LIMITS = {
     "account_delete": 5,
-    "medical_document": 5,
+    "medical_document": 20,
     "voice_audio": 6,
 }
 

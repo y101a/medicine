@@ -372,7 +372,8 @@ async def test_attachment_selection_limits_and_idempotency(profile_context):
     client, _, (user, _) = profile_context
     cid = await create_consultation(client, user.id)
     attachment_ids = []
-    for index in range(4):
+    # 上限是 5：多传一份才越界，同时保证「正好 5 个」确实被接受（2026-09-21 由 3 放宽到 5）。
+    for index in range(6):
         uploaded = await upload_txt(client, cid, f"检查记录 {index}", f"记录{index}.txt")
         assert uploaded.status_code == 201
         attachment_ids.append(uploaded.json()["id"])
@@ -398,6 +399,17 @@ async def test_attachment_selection_limits_and_idempotency(profile_context):
     )
     assert too_many.status_code == 422
     assert too_many.json()["code"] == "VALIDATION_ERROR"
+
+    at_limit = await client.post(
+        f"/api/v1/consultations/{cid}/messages",
+        json={
+            "clientRequestId": str(uuid4()),
+            "content": "解释附件",
+            "attachmentIds": attachment_ids[:5],
+        },
+    )
+    assert at_limit.status_code == 201
+    assert len(at_limit.json()["attachments"]) == 5
 
     request_id = str(uuid4())
     created = await client.post(

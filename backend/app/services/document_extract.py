@@ -163,7 +163,8 @@ async def extract_document(
     display_name, extension = _safe_display_name(upload.filename)
     if bool(getattr(upload.file, "_rolled", False)):
         await upload.close()
-        raise AppError(413, "FILE_TOO_LARGE", "单个文档不能超过 10 MB")
+        limit_mb = max_bytes / (1024 * 1024)
+        raise AppError(413, "FILE_TOO_LARGE", f"单个文档不能超过 {limit_mb:g} MB")
     try:
         content = await upload.read(max_bytes + 1)
     finally:

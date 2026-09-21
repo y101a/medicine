@@ -142,8 +142,8 @@ async def bind_message_attachments(
 ) -> list[MessageAttachmentOut]:
     if not attachment_ids:
         return []
-    if len(attachment_ids) > 3 or len(set(attachment_ids)) != len(attachment_ids):
-        raise AppError(422, "ATTACHMENT_SELECTION_INVALID", "每条消息最多选择 3 个不同附件")
+    if len(attachment_ids) > 5 or len(set(attachment_ids)) != len(attachment_ids):
+        raise AppError(422, "ATTACHMENT_SELECTION_INVALID", "每条消息最多选择 5 个不同附件")
     rows = (
         await db.scalars(
             select(Attachment)

@@ -52,10 +52,10 @@ class Attachment(Base):
             "kind IN ('pdf', 'docx', 'pptx', 'txt', 'md')", name="kind_supported"
         ),
         CheckConstraint(
-            "byte_size BETWEEN 1 AND 10485760", name="byte_size_supported"
+            "byte_size BETWEEN 1 AND 31457280", name="byte_size_supported"
         ),
         CheckConstraint(
-            "page_count IS NULL OR page_count BETWEEN 1 AND 30",
+            "page_count IS NULL OR page_count BETWEEN 1 AND 100",
             name="page_count_supported",
         ),
         CheckConstraint("char_count BETWEEN 1 AND 500000", name="char_count_supported"),
@@ -105,7 +105,7 @@ class MessageAttachment(Base):
     __table_args__ = (
         UniqueConstraint("message_id", "position", name="uq_message_attachments_position"),
         UniqueConstraint("message_id", "attachment_id", name="uq_message_attachments_attachment"),
-        CheckConstraint("position BETWEEN 0 AND 2", name="position_supported"),
+        CheckConstraint("position BETWEEN 0 AND 4", name="position_supported"),
         Index("ix_message_attachments_message", "message_id", "position"),
         Index("ix_message_attachments_attachment", "attachment_id"),
     )

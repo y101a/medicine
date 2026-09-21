@@ -251,12 +251,18 @@ status 可能为 completed、empty、failed 或 skipped。事件不会返回证�
 `byteSize`、`pageCount`、`charCount`、`preview`、`status=ready`、`createdAt`。
 PDF/PPTX 返回页数或幻灯片数；DOCX/TXT/MD 的 `pageCount` 为 `null`。
 
-第一版只支持带文本层 PDF、DOCX、PPTX、UTF-8 TXT/MD：单文件最大 10 MB，
-PDF/PPTX 最多 30 页，提取文字最多 500000 字符，解析最长 30 秒；每个用户每
-10 分钟最多上传 5 个。扫描件、加密 PDF、图片、Excel、旧版 DOC/PPT、宏文档、
+只支持带文本层 PDF、DOCX、PPTX、UTF-8 TXT/MD：单文件最大 30 MB，
+PDF/PPTX 最多 100 页，提取文字最多 500000 字符，解析最长 60 秒；每个用户每
+10 分钟最多上传 20 个。扫描件、加密 PDF、图片、Excel、旧版 DOC/PPT、宏文档、
 压缩包和一次多文件均拒绝。原件不落盘、不保存；提取文字自动按约 2000 字分块并加密。
 
-发送用户消息时可增加 `attachmentIds`（最多 3 个不同 UUID）。同一附件可在同一咨询的
+**2026-09-21 按用户要求放宽（方案 B）**：体积 10→30 MB、PDF/PPTX 30→100 页、解析
+30→60 秒、每 10 分钟 5→20 个、每条消息所选附件 3→5 个。**模型侧预算未变**：每轮仍只把
+最多 12000 字符的相关片段放进上下文（`ATTACHMENT_CONTEXT_MAX_CHARS`），所以放宽只影响
+「能不能收下」，不等于「回答用得上更多内容」。代价是资源占用上升——请求体与解析子进程
+都是整份进内存，30 MB 并发上传会显著抬高常驻内存；跨进程限流仍未实现。
+
+发送用户消息时可增加 `attachmentIds`（最多 5 个不同 UUID）。同一附件可在同一咨询的
 多条消息复用；不能跨咨询或跨用户引用。`MessageOut.attachments` 与流式 `start` 事件的
 `attachmentsUsed` 返回 `{id, displayName, kind, status}`。删除后历史消息保留
 `{id:null, displayName:"附件已删除", kind:null, status:"deleted"}` 墓碑，不再有正文。
