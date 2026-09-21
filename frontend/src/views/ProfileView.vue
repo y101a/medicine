@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import { onBeforeRouteLeave } from 'vue-router'
+import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { User } from '@element-plus/icons-vue'
 import { useAuthStore } from '../stores/auth'
@@ -8,8 +8,10 @@ import { getApiErrorMessage } from '../api/http'
 import type { Gender, UpdateProfileRequest } from '../types/auth'
 
 const store = useAuthStore()
+const router = useRouter()
 const formRef = ref<FormInstance>()
 const saving = ref(false)
+const deleting = ref(false)
 const uploadingAvatar = ref(false)
 const avatarFailed = ref(false)
 const avatarInput = ref<HTMLInputElement>()
@@ -105,6 +107,42 @@ async function save() {
   }
 }
 
+/**
+ * 删除账号不可逆：先把后果讲清楚，再要求输入当前密码（后端 422 ACCOUNT_PASSWORD_INVALID 兜底）。
+ */
+async function removeAccount() {
+  if (deleting.value) return
+  let currentPassword = ''
+  try {
+    const result = await ElMessageBox.prompt(
+      '账号、咨询记录、健康记录与上传的文档都会被永久删除，无法恢复。',
+      '删除账号',
+      {
+        confirmButtonText: '永久删除',
+        cancelButtonText: '取消',
+        inputType: 'password',
+        inputPlaceholder: '请输入当前密码',
+        inputValidator: (value: string) => (value && value.length >= 6
+          ? true
+          : '请输入至少 6 位的当前密码'),
+        type: 'warning',
+      },
+    )
+    currentPassword = result.value
+  } catch { return }
+  deleting.value = true
+  errorMessage.value = ''
+  try {
+    await store.deleteAccount(currentPassword)
+    ElMessage.success('账号已删除')
+    await router.push({ name: 'login' })
+  } catch (error) {
+    errorMessage.value = getApiErrorMessage(error)
+  } finally {
+    deleting.value = false
+  }
+}
+
 onBeforeRouteLeave(async () => {
   if (!store.isAuthenticated) return true
   if (saving.value) return false
@@ -175,6 +213,12 @@ onBeforeRouteLeave(async () => {
           </el-button>
         </div>
       </el-form>
+
+      <section class="danger-zone" aria-label="删除账号">
+        <h2>删除账号</h2>
+        <p>账号、咨询记录、健康记录与上传的病历文档会被永久删除，无法恢复。删除前需要验证当前密码。</p>
+        <el-button type="danger" plain :loading="deleting" @click="removeAccount">删除账号</el-button>
+      </section>
     </section>
   </main>
 </template>
@@ -207,5 +251,8 @@ dd { color: var(--text-main); font-size: 15px; margin: 0; overflow-wrap: anywher
   margin-top: 8px; padding-top: 24px; }
 .save-hint { margin-right: auto; color: var(--text-secondary); font-size: 13px; }
 .save-error { margin: 4px 0 18px; }
+.danger-zone { margin-top: 32px; padding-top: 24px; border-top: 1px solid #f0e2e0; }
+.danger-zone h2 { margin: 0 0 8px; color: #b4442c; font-size: 16px; }
+.danger-zone p { margin: 0 0 14px; color: var(--text-secondary); font-size: 13px; line-height: 1.7; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 </style>

@@ -11,14 +11,19 @@ import { useConsultationsStore } from '../stores/consultations'
 import { consultationsApi } from '../api/consultations'
 import { modelsApi } from '../api/models'
 import { voiceApi } from '../api/voice'
+import { attachmentsApi } from '../api/attachments'
 import { ApiError } from '../api/http'
-import { VOICE_TIP_STORAGE_KEY } from '../stores/composerHints'
+import { VOICE_TIP_STORAGE_KEY, DOCUMENT_NOTICE_STORAGE_KEY } from '../stores/composerHints'
+import type { Attachment } from '../types/consultations'
 
 vi.mock('../api/consultations', () => ({ consultationsApi: {
   create: vi.fn(), send: vi.fn(), stream: vi.fn(), get: vi.fn(), messages: vi.fn(), list: vi.fn(), remove: vi.fn(),
 } }))
 vi.mock('../api/models', () => ({ modelsApi: { list: vi.fn() } }))
 vi.mock('../api/voice', () => ({ voiceApi: { transcribe: vi.fn() } }))
+vi.mock('../api/attachments', () => ({ attachmentsApi: {
+  upload: vi.fn(), list: vi.fn(), remove: vi.fn(),
+} }))
 /** 录音状态机的替身：让视图测试能直接驱动「待录 / 录音中 / 识别中」三种状态。 */
 const voiceHarness = vi.hoisted(() => ({
   supported: true,
@@ -55,6 +60,7 @@ vi.mock('../composables/useVoiceRecorder', async () => {
 const conversation = { id: 'c1', title: '头痛', messageCount: 1, createdAt: '2026-09-06', updatedAt: '2026-09-06' }
 const message = { id: 'm1', role: 'user' as const, content: '头痛', sequence: 1, createdAt: '2026-09-06' }
 const answer = { id: 'm2', role: 'assistant' as const, content: '请先说明疼痛位置。', sequence: 2, provider: 'zhipuai', modelId: 'glm-4.7-flash', modelName: '智谱 GLM-4.7 Flash', generationStatus: 'completed' as const, answerFormat: 'plain' as const, medicalContent: true, sourceMessageId: null, createdAt: '2026-09-06' }
+const attachment = { id: 'a1', displayName: '血常规报告.pdf', kind: 'pdf' as const, byteSize: 20480, pageCount: 2, charCount: 860, preview: '白细胞计数 6.2', status: 'ready' as const, createdAt: '2026-09-21' }
 const aiModels = [
   { id: 'glm-4.7-flash', name: '智谱 GLM-4.7 Flash', provider: 'zhipuai', providerName: '智谱 AI', description: '免费轻量模型', isDefault: true, keySource: 'server' as const },
   { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', provider: 'deepseek', providerName: 'DeepSeek', description: '低价模型', isDefault: false, keySource: 'server' as const },
@@ -94,6 +100,9 @@ beforeEach(() => {
   vi.mocked(consultationsApi.list).mockResolvedValue({ items: [conversation], hasMore: false })
   vi.mocked(consultationsApi.stream).mockResolvedValue(answer)
   vi.mocked(modelsApi.list).mockResolvedValue(aiModels)
+  vi.mocked(attachmentsApi.list).mockResolvedValue([])
+  vi.mocked(attachmentsApi.upload).mockResolvedValue(attachment)
+  vi.mocked(attachmentsApi.remove).mockResolvedValue(undefined)
   HTMLElement.prototype.scrollTo = vi.fn()
 })
 
@@ -644,6 +653,155 @@ describe('应用内语音输入', () => {
     await flushPromises()
     expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toHaveLength(2000)
     expect(wrapper.text()).toContain('已截断')
+    wrapper.unmount()
+  })
+})
+
+describe('病历文档附件', () => {
+  type Wrapper = Awaited<ReturnType<typeof setup>>['wrapper']
+
+  async function pickFiles(wrapper: Wrapper, files: File[]) {
+    const input = wrapper.get('input[type="file"]')
+    Object.defineProperty(input.element, 'files', { value: files, configurable: true })
+    await input.trigger('change')
+    await flushPromises()
+  }
+
+  function docxFile(name = '检查报告.docx', bytes = 2048) {
+    return new File([new Uint8Array(bytes)], name)
+  }
+
+  /** 说明确认弹窗只弹一次，之后靠本机标记跳过。 */
+  function acceptNotice() {
+    return vi.spyOn(ElMessageBox, 'confirm').mockResolvedValueOnce(
+      'confirm' as Awaited<ReturnType<typeof ElMessageBox.confirm>>,
+    )
+  }
+
+  it('回形针按钮位于麦克风左侧，并带无障碍标签', async () => {
+    const { wrapper } = await setup()
+    const labels = wrapper.findAll('.send-area > button')
+      .map(button => button.attributes('aria-label'))
+    expect(labels).toContain('添加病历文档')
+    expect(labels[labels.indexOf('语音输入') - 1]).toBe('添加病历文档')
+    wrapper.unmount()
+  })
+
+  it('首次上传必须先确认说明，取消则不上传也不建会话', async () => {
+    const { wrapper } = await setup()
+    const confirm = vi.spyOn(ElMessageBox, 'confirm').mockRejectedValueOnce('cancel')
+    await pickFiles(wrapper, [docxFile()])
+    expect(confirm).toHaveBeenCalled()
+    expect(String(confirm.mock.calls[0][0])).toContain('随问题一起交给模型')
+    expect(String(confirm.mock.calls[0][0])).toContain('他人的病历')
+    expect(attachmentsApi.upload).not.toHaveBeenCalled()
+    expect(consultationsApi.create).not.toHaveBeenCalled()
+    expect(localStorage.getItem(DOCUMENT_NOTICE_STORAGE_KEY)).toBeNull()
+    wrapper.unmount()
+  })
+
+  it('确认后先静默建会话再上传，且绝不自动发送', async () => {
+    const { wrapper } = await setup()
+    acceptNotice()
+    await pickFiles(wrapper, [docxFile()])
+    expect(consultationsApi.create).toHaveBeenCalledTimes(1)
+    expect(attachmentsApi.upload).toHaveBeenCalledWith('c1', expect.any(File))
+    expect(wrapper.text()).toContain('血常规报告.pdf')
+    expect(localStorage.getItem(DOCUMENT_NOTICE_STORAGE_KEY)).toBe('true')
+    // 关键：解析完只挂在草稿区，消息必须由用户自己点发送。
+    expect(consultationsApi.send).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('发送时带上 attachmentIds，发送成功后草稿区清空', async () => {
+    const { wrapper } = await setup()
+    acceptNotice()
+    await pickFiles(wrapper, [docxFile()])
+    await wrapper.get('textarea').setValue('帮我解释这份报告')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(consultationsApi.send).toHaveBeenCalledWith(
+      'c1', '帮我解释这份报告', expect.any(String), ['a1'],
+    )
+    expect(wrapper.text()).not.toContain('血常规报告.pdf')
+    wrapper.unmount()
+  })
+
+  it('扩展名、体积与数量都在本地拦下，不打上传接口', async () => {
+    const { wrapper } = await setup()
+    acceptNotice()
+    await pickFiles(wrapper, [new File(['x'], '片子.xlsx')])
+    expect(wrapper.text()).toContain('只支持 PDF、Word（.docx）、PPT（.pptx）、txt、md 文件')
+    await pickFiles(wrapper, [new File([new Uint8Array(10 * 1024 * 1024 + 1)], '大文件.pdf')])
+    expect(wrapper.text()).toContain('单个文档不能超过 10 MB')
+    expect(attachmentsApi.upload).not.toHaveBeenCalled()
+    await pickFiles(wrapper, [
+      docxFile('a.docx'), docxFile('b.docx'), docxFile('c.docx'), docxFile('d.docx'),
+    ])
+    expect(wrapper.text()).toContain('多余的已忽略')
+    expect(attachmentsApi.upload).toHaveBeenCalledTimes(3)
+    wrapper.unmount()
+  })
+
+  it('解析失败显示服务端中文文案，不留下卡片', async () => {
+    vi.mocked(attachmentsApi.upload).mockRejectedValue(
+      new ApiError('文档像是扫描件或没有可读取文字，暂时无法解析', 'FILE_NO_TEXT', 422),
+    )
+    const { wrapper } = await setup()
+    acceptNotice()
+    await pickFiles(wrapper, [docxFile()])
+    expect(wrapper.text()).toContain('文档像是扫描件或没有可读取文字')
+    expect(wrapper.find('.attachment-item').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('解析期间禁止发送', async () => {
+    let resolveUpload: ((value: Attachment) => void) | undefined
+    vi.mocked(attachmentsApi.upload).mockImplementation(() => new Promise<Attachment>((resolve) => {
+      resolveUpload = resolve
+    }))
+    const { wrapper } = await setup()
+    acceptNotice()
+    await pickFiles(wrapper, [docxFile()])
+    expect(wrapper.text()).toContain('正在解析')
+    expect(wrapper.get('button[aria-label="发送消息"]').attributes('disabled')).toBeDefined()
+    await wrapper.get('textarea').setValue('先发送试试')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(consultationsApi.send).not.toHaveBeenCalled()
+    resolveUpload?.(attachment)
+    await flushPromises()
+    wrapper.unmount()
+  })
+
+  it('移除附件调用删除接口并清掉卡片', async () => {
+    const { wrapper } = await setup()
+    acceptNotice()
+    await pickFiles(wrapper, [docxFile()])
+    await wrapper.get('button[aria-label="移除 血常规报告.pdf"]').trigger('click')
+    await flushPromises()
+    expect(attachmentsApi.remove).toHaveBeenCalledWith('a1')
+    expect(wrapper.find('.attachment-item').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('历史消息渲染附件：被删除的显示墓碑，回答标明参考了哪份文档', async () => {
+    vi.mocked(consultationsApi.messages).mockResolvedValue({
+      items: [
+        {
+          ...message,
+          attachments: [{ id: null, displayName: '血常规报告.pdf', kind: null, status: 'deleted' as const }],
+        },
+        {
+          ...answer,
+          attachments: [{ id: 'a1', displayName: '血常规报告.pdf', kind: 'pdf' as const, status: 'ready' as const }],
+        },
+      ],
+      hasMore: false,
+    })
+    const { wrapper } = await setup('/app/consultations/c1')
+    expect(wrapper.text()).toContain('血常规报告.pdf（已删除）')
+    expect(wrapper.text()).toContain('本次回答参考了：')
     wrapper.unmount()
   })
 })

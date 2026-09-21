@@ -9,19 +9,22 @@ import { useAuthStore } from '../stores/auth'
 import { useHealthRecordsStore } from '../stores/healthRecords'
 import { ApiError, getApiErrorMessage } from '../api/http'
 import type { AiModel, AnswerFormat, FollowUpAnswers, FollowUpCard, Message } from '../types/consultations'
-import { Top, ChatDotRound, Compass, Document, CloseBold, Microphone } from '@element-plus/icons-vue'
+import { Top, ChatDotRound, Compass, Document, CloseBold, Microphone, Paperclip } from '@element-plus/icons-vue'
 import medicalAiAvatar from '../assets/medical-ai-avatar.png'
 import AssistantAnswerCard from '../components/AssistantAnswerCard.vue'
 import StructuredFollowUpCard from '../components/StructuredFollowUpCard.vue'
 import EmergencyTriageCard from '../components/EmergencyTriageCard.vue'
 import ReferenceSources from '../components/ReferenceSources.vue'
+import MessageAttachments from '../components/MessageAttachments.vue'
 import HospitalNavigator from '../components/HospitalNavigator.vue'
 import PathologyCardOffer from '../components/PathologyCardOffer.vue'
 import { readRetrievalNotice, rememberRetrievalNotice } from '../stores/retrievalNotices'
 import {
   readVoiceTipSeen, rememberVoiceTipSeen, readVoiceConsentSeen, rememberVoiceConsentSeen,
+  readDocumentNoticeSeen, rememberDocumentNoticeSeen,
 } from '../stores/composerHints'
 import { useVoiceRecorder } from '../composables/useVoiceRecorder'
+import { useAttachments, formatAttachmentSize, ATTACHMENT_LIMIT } from '../composables/useAttachments'
 import { voiceApi } from '../api/voice'
 
 const route = useRoute()
@@ -143,6 +146,68 @@ const voiceTitle = computed(() => {
   if (voiceState.value === 'recording') return '停止录音并转写'
   return '语音输入：录一段语音转成文字'
 })
+
+const documentNoticeSeen = ref(readDocumentNoticeSeen())
+const fileInput = ref<HTMLInputElement>()
+const dragging = ref(false)
+const {
+  items: attachments,
+  pendingName: attachmentPendingName,
+  uploading: attachmentUploading,
+  error: attachmentError,
+  addFiles: addAttachments,
+  load: loadAttachments,
+  remove: removeAttachment,
+  reset: resetAttachments,
+} = useAttachments()
+
+const attachTitle = computed(() => attachments.value.length >= ATTACHMENT_LIMIT
+  ? `一次最多带上 ${ATTACHMENT_LIMIT} 份文档`
+  : '添加病历文档：解析成文字后随问题一起交给模型')
+
+function chooseFiles() {
+  if (!attachmentUploading.value) fileInput.value?.click()
+}
+
+/**
+ * 附件上传挂在会话下（`POST /consultations/{id}/attachments`），而首页在发出第一条消息前
+ * 还没有会话。按已确认的做法：选中文档时**先静默创建会话**——不产生任何消息，也不进入问答链路。
+ */
+async function ensureConsultation(): Promise<string> {
+  if (cid) return cid
+  cid = (await consultationsApi.create(createRequestId)).id
+  return cid
+}
+
+async function handleFiles(files: File[]) {
+  if (!files.length) return
+  if (!documentNoticeSeen.value) {
+    try {
+      await ElMessageBox.confirm(
+        '文档会在本站解析成文字并加密保存，原件不保存；点发送时，解析出的文字会随问题一起交给模型。请勿上传他人的病历。',
+        '上传病历文档',
+        { confirmButtonText: '我知道了，继续上传', cancelButtonText: '取消', type: 'info' },
+      )
+    } catch {
+      return
+    }
+    documentNoticeSeen.value = true
+    rememberDocumentNoticeSeen()
+  }
+  await addAttachments(files, ensureConsultation)
+}
+
+function onFilePicked(event: Event) {
+  const target = event.target as HTMLInputElement
+  const files = Array.from(target.files || [])
+  target.value = ''
+  void handleFiles(files)
+}
+
+function onDrop(event: DragEvent) {
+  dragging.value = false
+  void handleFiles(Array.from(event.dataTransfer?.files || []))
+}
 function modelName(message: Message) {
   if (message.modelName) return message.modelName
   if (!message.modelId) return ''
@@ -213,6 +278,7 @@ async function load(older = false) {
     if (auth.user?.id !== userId) return
     if (!older) retrievalNotice.value = readRetrievalNotice(auth.user?.id, cid)
     title.value = conversation.title
+    if (!older) void loadAttachments(cid)
     messages.value = older ? [...page.items, ...messages.value] : page.items
     hasOlder.value = page.hasMore
     ready.value = true
@@ -363,8 +429,8 @@ function formatFollowUpAnswers(card: FollowUpCard, answers: FollowUpAnswers) {
   return `补充信息：\n${lines.join('\n')}`
 }
 async function sendContent(content: string, clearDraft = false) {
-  // 录音与转写期间不接受发送：转写文字必须先让用户核对，避免识别错误被直接送进咨询链路。
-  if (voiceState.value !== 'idle') return
+  // 录音、转写与文档上传期间都不接受发送：转写文字和文档解析结果都必须先让用户核对。
+  if (voiceState.value !== 'idle' || attachmentUploading.value) return
   if (!content || content.length > 2000 || saving.value || generating.value || loading.value || !ready.value) return
   if (!pending || pending.content !== content) pending = { content, id: crypto.randomUUID() }
   const userId = auth.user?.id
@@ -372,10 +438,16 @@ async function sendContent(content: string, clearDraft = false) {
   error.value = ''
   try {
     if (!cid) cid = (await consultationsApi.create(createRequestId)).id
-    const message = await consultationsApi.send(cid, pending.content, pending.id)
+    // 附件只在主发送时带上：追问与卡片生成不重复引用同一份文档。
+    const attachmentIds = clearDraft ? attachments.value.map(item => item.id) : []
+    const message = await consultationsApi.send(cid, pending.content, pending.id, attachmentIds)
     if (auth.user?.id !== userId) return
     if (!messages.value.some(item => item.id === message.id)) messages.value.push(message)
-    if (clearDraft) draft.value = ''
+    if (clearDraft) {
+      draft.value = ''
+      // 文档已经挂在消息上，草稿区不再重复显示，避免下次发送误带旧文档。
+      resetAttachments()
+    }
     pending = null
     void recent.load()
     saving.value = false
@@ -497,6 +569,14 @@ async function canLeave() {
       return true
     } catch { return false }
   }
+  if (attachmentUploading.value) {
+    try {
+      await ElMessageBox.confirm('文档正在上传解析，离开会中断本次上传。确定离开吗？', '中断上传', {
+        confirmButtonText: '中断并离开', cancelButtonText: '继续等待',
+      })
+      return true
+    } catch { return false }
+  }
   if (saving.value) return false
   if (!draft.value.trim()) return true
   try {
@@ -534,12 +614,16 @@ onBeforeRouteUpdate(canLeave)
         <div v-for="message in messages" :key="message.id" class="message-pair">
           <template v-if="message.role === 'user'">
             <div class="user-message">{{ message.content }}</div>
+            <div v-if="message.attachments?.length" class="user-attachments">
+              <MessageAttachments :items="message.attachments" />
+            </div>
             <EmergencyTriageCard v-if="message.triage" :triage="message.triage" />
           </template>
           <div v-else class="assistant-message">
             <img class="assistant-avatar" :src="medicalAiAvatar" alt="医疗 AI 助手" />
             <div class="assistant-body">
               <strong>科普助手<span v-if="modelName(message)" class="answer-model">{{ modelName(message) }}</span></strong>
+              <MessageAttachments :items="message.attachments || []" label="本次回答参考了：" />
               <StructuredFollowUpCard v-if="message.followUp" :card="message.followUp"
                 :disabled="saving || generating" :answered="followUpAnswered(message)"
                 @submit="submitFollowUp(message, $event)" />
@@ -563,13 +647,25 @@ onBeforeRouteUpdate(canLeave)
       </section>
     </div>
     <div class="composer-area">
-      <form class="composer" @submit.prevent="send">
+      <form class="composer" :class="{ dragging }" @submit.prevent="send"
+        @dragover.prevent="dragging = true" @dragleave="dragging = false" @drop.prevent="onDrop">
         <el-alert v-if="modelsError" class="model-error" :title="modelsError" type="warning" :closable="false" />
         <el-alert v-if="!voiceTipSeen" class="voice-tip" type="info" show-icon
           title="可用输入法上的麦克风语音输入（如豆包输入法），也可以点发送键左侧的麦克风按钮直接录音。语音识别可能出错，发送前请核对文字；请不要在对话中提供姓名、身份证号、住院号或手机号。"
           @close="dismissVoiceTip" />
         <el-alert v-if="voiceNotice || voiceError" class="voice-notice" type="warning" show-icon
           :title="voiceNotice || voiceError" :closable="false" />
+        <el-alert v-if="attachmentError" class="attachment-notice" type="warning" show-icon
+          :title="attachmentError" :closable="false" />
+        <div v-if="attachments.length || attachmentUploading" class="attachment-tray">
+          <span v-for="item in attachments" :key="item.id" class="attachment-item">
+            <span class="attachment-name">{{ item.displayName }}</span>
+            <span class="attachment-meta">{{ formatAttachmentSize(item.byteSize) }} · {{ item.charCount }} 字<template v-if="item.pageCount"> · {{ item.pageCount }} 页</template></span>
+            <button type="button" class="attachment-remove" :aria-label="`移除 ${item.displayName}`" title="移除" @click="removeAttachment(item.id)">移除</button>
+          </span>
+          <span v-if="attachmentUploading" class="attachment-item pending">正在解析 {{ attachmentPendingName }}…</span>
+        </div>
+        <input ref="fileInput" class="sr-only" type="file" multiple accept=".pdf,.docx,.pptx,.txt,.md" @change="onFilePicked" />
         <label class="sr-only" for="symptom-input">症状或健康问题</label>
         <textarea id="symptom-input" ref="input" v-model="draft" :maxlength="DRAFT_LIMIT" rows="3" :disabled="saving || generating || !ready"
           placeholder="描述您的症状或健康疑问，例如：什么时候开始、持续多久……" @keydown="keydown"></textarea>
@@ -600,6 +696,14 @@ onBeforeRouteUpdate(canLeave)
             <span v-else-if="voiceState === 'transcribing'" class="voice-status">正在识别…</span>
             <button v-if="voiceState === 'recording'" class="voice-cancel" type="button" @click="cancelRecording">取消</button>
             <button
+              class="attach-button"
+              type="button"
+              :disabled="attachmentUploading || saving || generating || !ready || attachments.length >= ATTACHMENT_LIMIT"
+              aria-label="添加病历文档"
+              :title="attachTitle"
+              @click="chooseFiles"
+            ><el-icon :size="18"><Paperclip /></el-icon></button>
+            <button
               class="voice-button"
               :class="{ recording: voiceState === 'recording' }"
               type="button"
@@ -610,11 +714,11 @@ onBeforeRouteUpdate(canLeave)
               @click="toggleRecording"
             ><el-icon :size="18"><Microphone /></el-icon></button>
             <button v-if="generating" class="stop-button" type="button" aria-label="停止生成" title="停止生成" @click="stopGeneration"><el-icon :size="15"><CloseBold /></el-icon></button>
-            <button v-else class="send-button" type="submit" :disabled="!draft.trim() || saving || loading || modelsLoading || !ready || voiceState !== 'idle'" aria-label="发送消息" title="发送消息"><el-icon :size="20"><Top /></el-icon></button>
+            <button v-else class="send-button" type="submit" :disabled="!draft.trim() || saving || loading || modelsLoading || !ready || voiceState !== 'idle' || attachmentUploading" aria-label="发送消息" title="发送消息"><el-icon :size="20"><Top /></el-icon></button>
           </div>
         </div>
       </form>
-      <div class="composer-meta"><span>仅提供健康科普与就医分流，不作确诊，不替代医生。</span><span>可用输入法语音输入（如豆包输入法） · 也可点麦克风录音 · Enter 发送 · Shift + Enter 换行</span></div>
+      <div class="composer-meta"><span>仅提供健康科普与就医分流，不作确诊，不替代医生；上传的文档不会被用来下诊断。</span><span>可用输入法语音输入（如豆包输入法） · 也可点麦克风录音 · 回形针上传病历文档 · Enter 发送 · Shift + Enter 换行</span></div>
     </div>
   </main>
 </template>
@@ -653,6 +757,19 @@ textarea::placeholder { color: #99a5b0; }
 .voice-button.recording { border-color: #e2b1ab; background: #fdf1f0; color: #c0492f; }
 .voice-cancel { border: none; padding: 0; background: transparent; color: #8798a8; font-size: 11px; cursor: pointer; }
 .voice-cancel:hover { color: #52697d; }
+.attach-button { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid #d7e3ee; border-radius: 10px; background: #fff; color: #4b7ea6; cursor: pointer; }
+.attach-button:hover:not(:disabled) { border-color: #9cc3e0; background: #f4faff; }
+.attach-button:disabled { border-color: #e6ecf2; background: #f3f6f9; color: #b3c1cd; cursor: default; }
+.attachment-notice { margin-bottom: 12px; }
+.attachment-tray { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.attachment-item { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid #dbe7f1; border-radius: 10px; background: #f7fbff; color: #4b6480; font-size: 11px; }
+.attachment-item.pending { border-style: dashed; color: #bf7a15; }
+.attachment-name { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attachment-meta { color: #90a0ae; }
+.attachment-remove { border: none; padding: 0; background: transparent; color: #8798a8; font-size: 11px; cursor: pointer; }
+.attachment-remove:hover { color: #c0492f; }
+.composer.dragging { border-color: #8cb9de; background: #f7fbff; }
+.user-attachments { display: flex; justify-content: flex-end; }
 .send-button { display: grid; place-items: center; width: 34px; height: 34px; border: none; border-radius: 10px; background: #237ac2; color: white; cursor: pointer; }
 .send-button:disabled { background: #e8eef4; color: #a2b3c3; cursor: default; }
 .composer-meta { display: flex; justify-content: space-between; gap: 12px; margin-top: 12px; color: #9ba7b3; font-size: 10px; line-height: 1.7; }

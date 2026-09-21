@@ -20,7 +20,35 @@ export interface Message {
   followUp?: FollowUpCard | null
   triage?: TriageResult | null
   citations?: MessageCitation[]
+  attachments?: MessageAttachment[]
   createdAt: string
+}
+
+/** 后端只接受这五种病历文档；判定以文件名扩展名为准。 */
+export type AttachmentKind = 'pdf' | 'docx' | 'pptx' | 'txt' | 'md'
+
+/** 上传并解析成功的文档（原件不保存，只留加密文字）。 */
+export interface Attachment {
+  id: string
+  displayName: string
+  kind: AttachmentKind
+  byteSize: number
+  pageCount?: number | null
+  charCount: number
+  preview: string
+  status: 'ready'
+  createdAt: string
+}
+
+/**
+ * 挂在消息上的附件引用。文档被删除后后端保留一条墓碑（`id` 置空、`status: 'deleted'`），
+ * 历史消息里要显示「已删除」，而不是让附件凭空消失。
+ */
+export interface MessageAttachment {
+  id?: string | null
+  displayName: string
+  kind?: AttachmentKind | null
+  status: 'ready' | 'deleted'
 }
 
 export interface MessageCitation {

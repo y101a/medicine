@@ -73,6 +73,12 @@ export const useAuthStore = defineStore('auth', () => {
     avatarVersion.value = Math.max(Date.now(), avatarVersion.value + 1)
   }
 
+  /** 删除账号与全部个人数据；成功后本地会话立即作废（后端要求验证当前密码）。 */
+  async function deleteAccount(currentPassword: string) {
+    await usersApi.deleteAccount(currentPassword)
+    clearSession()
+  }
+
   return {
     user,
     initialized,
@@ -86,5 +92,6 @@ export const useAuthStore = defineStore('auth', () => {
     clearSession,
     updateProfile,
     uploadAvatar,
+    deleteAccount,
   }
 })

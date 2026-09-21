@@ -124,8 +124,14 @@ export const consultationsApi = {
   async messages(id: string, before?: number) {
     return (await http.get<Page<Message>>(`/consultations/${id}/messages`, { params: { before, limit: 50 } })).data
   },
-  async send(id: string, content: string, clientRequestId: string) {
-    return (await http.post<Message>(`/consultations/${id}/messages`, { content, clientRequestId })).data
+  async send(id: string, content: string, clientRequestId: string, attachmentIds: string[] = []) {
+    const payload: { content: string; clientRequestId: string; attachmentIds?: string[] } = {
+      content,
+      clientRequestId,
+    }
+    // 没有附件就不带这个字段：既不改变既有请求体，也符合后端「默认无附件」的语义。
+    if (attachmentIds.length) payload.attachmentIds = attachmentIds
+    return (await http.post<Message>(`/consultations/${id}/messages`, payload)).data
   },
   stream: streamAnswer,
   async remove(id: string) { await http.delete(`/consultations/${id}`) },

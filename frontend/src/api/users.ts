@@ -15,4 +15,8 @@ export const usersApi = {
   avatarUrl(version: number) {
     return `${apiBaseUrl}/users/me/avatar?v=${version}`
   },
+  /** 删除账号与全部个人数据；后端要求验证当前密码（错的会返回 422 ACCOUNT_PASSWORD_INVALID）。 */
+  async deleteAccount(currentPassword: string) {
+    await http.delete('/users/me', { data: { currentPassword } })
+  },
 }

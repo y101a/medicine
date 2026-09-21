@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import ElementPlus from 'element-plus'
+import ElementPlus, { ElMessageBox } from 'element-plus'
 import ProfileView from './ProfileView.vue'
 import { useAuthStore } from '../stores/auth'
 import { usersApi } from '../api/users'
@@ -11,6 +11,7 @@ import { ApiError } from '../api/http'
 vi.mock('../api/users', () => ({ usersApi: {
   updateProfile: vi.fn(),
   uploadAvatar: vi.fn(),
+  deleteAccount: vi.fn(),
   avatarUrl: vi.fn((version: number) => `/api/v1/users/me/avatar?v=${version}`),
 } }))
 
@@ -25,7 +26,10 @@ async function setup() {
   }
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [{ path: '/app/profile', component: ProfileView }],
+    routes: [
+      { path: '/app/profile', component: ProfileView },
+      { path: '/login', name: 'login', component: { template: '<p>登录页</p>' } },
+    ],
   })
   await router.push('/app/profile')
   await router.isReady()
@@ -100,6 +104,53 @@ describe('个人资料编辑', () => {
     await input.trigger('change')
     expect(usersApi.uploadAvatar).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('不能超过 3 MB')
+    wrapper.unmount()
+  })
+})
+
+describe('删除账号', () => {
+  beforeEach(() => vi.clearAllMocks())
+  afterEach(() => document.body.replaceChildren())
+
+  function confirmPassword(password: string) {
+    return vi.spyOn(ElMessageBox, 'prompt').mockResolvedValueOnce(
+      { value: password, action: 'confirm' } as Awaited<ReturnType<typeof ElMessageBox.prompt>>,
+    )
+  }
+
+  it('先讲清后果再要密码，成功后清空会话并回到登录页', async () => {
+    const { wrapper, store } = await setup()
+    vi.mocked(usersApi.deleteAccount).mockResolvedValue(undefined)
+    const prompt = confirmPassword('secret123')
+    await wrapper.get('.danger-zone button').trigger('click')
+    await flushPromises()
+    expect(prompt).toHaveBeenCalled()
+    expect(String(prompt.mock.calls[0][0])).toContain('永久删除')
+    expect(usersApi.deleteAccount).toHaveBeenCalledWith('secret123')
+    expect(store.isAuthenticated).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('密码不正确时保留会话并显示服务端文案', async () => {
+    const { wrapper, store } = await setup()
+    vi.mocked(usersApi.deleteAccount).mockRejectedValue(
+      new ApiError('当前密码不正确', 'ACCOUNT_PASSWORD_INVALID', 422),
+    )
+    confirmPassword('wrong123')
+    await wrapper.get('.danger-zone button').trigger('click')
+    await flushPromises()
+    expect(store.isAuthenticated, '密码错误不能把本地会话清掉').toBe(true)
+    expect(wrapper.text()).toContain('当前密码不正确')
+    wrapper.unmount()
+  })
+
+  it('取消输入密码则不调用删除接口', async () => {
+    const { wrapper, store } = await setup()
+    vi.spyOn(ElMessageBox, 'prompt').mockRejectedValueOnce('cancel')
+    await wrapper.get('.danger-zone button').trigger('click')
+    await flushPromises()
+    expect(usersApi.deleteAccount).not.toHaveBeenCalled()
+    expect(store.isAuthenticated).toBe(true)
     wrapper.unmount()
   })
 })
