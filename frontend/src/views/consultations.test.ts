@@ -721,12 +721,13 @@ describe('病历文档附件', () => {
     )
   }
 
-  it('回形针按钮位于麦克风左侧，并带无障碍标签', async () => {
+  it('附件按钮位于麦克风左侧，并带无障碍标签', async () => {
     const { wrapper } = await setup()
-    const labels = wrapper.findAll('.send-area > button')
+    // 附件按钮现在包在 el-dropdown 的触发容器里，所以用后代选择器而不是直接子元素。
+    const labels = wrapper.findAll('.send-area button')
       .map(button => button.attributes('aria-label'))
-    expect(labels).toContain('添加病历文档')
-    expect(labels[labels.indexOf('语音输入') - 1]).toBe('添加病历文档')
+    expect(labels).toContain('添加附件')
+    expect(labels[labels.indexOf('语音输入') - 1]).toBe('添加附件')
     wrapper.unmount()
   })
 

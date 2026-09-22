@@ -58,7 +58,7 @@ test.describe('病历文档附件', () => {
     await installApiStubs(page, { extra: STUBS })
     await openComposer(page)
 
-    const attach = page.locator('button[aria-label="添加病历文档"]')
+    const attach = page.locator('button[aria-label="添加附件"]')
     const mic = page.locator('button[aria-label="语音输入"]')
     await expect(attach).toBeVisible()
     const attachBox = await attach.boundingBox()

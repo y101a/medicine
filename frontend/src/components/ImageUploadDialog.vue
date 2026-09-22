@@ -1,39 +1,26 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import {
-  IMAGE_CATEGORY_LABELS,
-  IMAGE_CATEGORY_NOTICES,
-  IMAGE_CONSENT_NOTICE,
-  type ImageCategory,
-} from '../composables/imagePrep'
+import { IMAGE_CONSENT_NOTICE } from '../composables/imagePrep'
 import { formatAttachmentSize } from '../composables/useAttachments'
 
 /**
- * 图片上传前的确认：选类别 + 首次的敏感信息与外发说明。
+ * 首次上传图片的一次性隐私确认（契约 `backend/docs/MEDICAL_IMAGES.md` 第 10 节）。
  *
- * 这里是产品边界的落点——三类图片都不做疾病判断，所以每选一类就把该类的能力边界与
- * 「该看什么」讲清楚；用户不勾选同意就不能上传（服务端也会校验 `noticeAccepted`）。
+ * 2026-09-22 起这里**不再选类别**：图片属于哪一类由服务端固定的视觉模型自动判断，前端只使用
+ * 响应里的 `imageCategory` 展示能力边界。组件保留下来的是用户已经确认过的那三件事——
+ * 敏感信息、90 天保留、阿里云外发；首次同意后本机记住，之后的图片直接上传，不再弹这个窗。
  */
 const props = defineProps<{
   modelValue: boolean
   files: File[]
-  /** 本机是否已经同意过这份说明；同意过就不再重复勾选。 */
-  consentSeen: boolean
   uploading?: boolean
 }>()
 
 const emit = defineEmits<{
   (event: 'update:modelValue', value: boolean): void
-  (event: 'confirm', category: ImageCategory): void
+  (event: 'confirm'): void
 }>()
 
-const CATEGORY_OPTIONS: { value: ImageCategory; label: string }[] = [
-  { value: 'report', label: IMAGE_CATEGORY_LABELS.report },
-  { value: 'medical_imaging', label: IMAGE_CATEGORY_LABELS.medical_imaging },
-  { value: 'body_photo', label: IMAGE_CATEGORY_LABELS.body_photo },
-]
-
-const category = ref<ImageCategory | ''>('')
 const agreed = ref(false)
 
 const visible = computed({
@@ -41,24 +28,19 @@ const visible = computed({
   set: (value: boolean) => emit('update:modelValue', value),
 })
 
-const notice = computed(() => (category.value ? IMAGE_CATEGORY_NOTICES[category.value] : ''))
-const canConfirm = computed(
-  () => Boolean(category.value) && agreed.value && props.files.length > 0,
-)
+const canConfirm = computed(() => agreed.value && props.files.length > 0)
 
-// 每次打开都重置选择；已经同意过的用户不必再勾一次，但仍要看到边界文案。
+// 每次打开都重置勾选：用户取消后再次选图，仍要重新确认一次。
 watch(
   () => props.modelValue,
   (opened) => {
-    if (!opened) return
-    category.value = ''
-    agreed.value = props.consentSeen
+    if (opened) agreed.value = false
   },
 )
 
 function onConfirm() {
-  if (!canConfirm.value || !category.value) return
-  emit('confirm', category.value)
+  if (!canConfirm.value) return
+  emit('confirm')
 }
 </script>
 
@@ -66,14 +48,14 @@ function onConfirm() {
   <el-dialog
     v-model="visible"
     class="image-upload"
-    title="上传图片"
+    title="上传图片前请确认"
     width="min(560px, 92vw)"
     append-to-body
     :close-on-click-modal="false"
   >
     <p class="image-upload__lead">
-      先确认这些图片属于哪一类——会做什么、不会做什么随之不同。本次选入的
-      {{ files.length }} 张图片按同一类处理，暂不上传原图。
+      本次将上传 {{ files.length }} 张图片。图片属于哪一类——报告 / 检查单、X 光与 CT/MRI 片子、
+      患处或身体照片——由服务端自动判断，你不需要选择；三类都不作疾病判断。
     </p>
 
     <ul class="image-upload__files">
@@ -83,26 +65,15 @@ function onConfirm() {
       </li>
     </ul>
 
-    <el-radio-group v-model="category" class="image-upload__category">
-      <el-radio-button v-for="option in CATEGORY_OPTIONS" :key="option.value" :value="option.value">
-        {{ option.label }}
-      </el-radio-button>
-    </el-radio-group>
-
-    <p v-if="notice" class="image-upload__notice">{{ notice }}</p>
-
-    <div v-if="!consentSeen" class="image-upload__consent">
+    <div class="image-upload__consent">
       <p class="image-upload__consent-text">{{ IMAGE_CONSENT_NOTICE }}</p>
       <el-checkbox v-model="agreed">我已阅读并同意上述说明</el-checkbox>
     </div>
-    <p v-else class="image-upload__consent-hint">
-      提醒：画面上的姓名、住院号、条码无法自动去除，建议先遮挡再上传。
-    </p>
 
     <template #footer>
       <el-button text @click="visible = false">取消</el-button>
       <el-button type="primary" :disabled="!canConfirm" :loading="uploading" @click="onConfirm">
-        上传并识别
+        同意并上传
       </el-button>
     </template>
   </el-dialog>
@@ -131,21 +102,6 @@ function onConfirm() {
   color: #90a0ae;
 }
 
-.image-upload__category {
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-
-.image-upload__notice {
-  margin: 0 0 12px;
-  padding: 9px 12px;
-  border-radius: 8px;
-  background: #f6faff;
-  color: #4b7ea6;
-  font-size: 12px;
-  line-height: 1.8;
-}
-
 .image-upload__consent {
   padding: 10px 12px;
   border: 1px solid #e6eef6;
@@ -158,12 +114,5 @@ function onConfirm() {
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.9;
-}
-
-.image-upload__consent-hint {
-  margin: 0;
-  color: #8798a8;
-  font-size: 12px;
-  line-height: 1.8;
 }
 </style>

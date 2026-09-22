@@ -1,5 +1,5 @@
 import http from './http'
-import type { Attachment, ImageCategory } from '../types/consultations'
+import type { Attachment } from '../types/consultations'
 
 /**
  * 后端要求每次上传都带上说明版本，不带就返回 422 `DOCUMENT_NOTICE_REQUIRED`。
@@ -32,12 +32,14 @@ export const attachmentsApi = {
   },
   /**
    * 上传图片走独立接口（契约 `POST /consultations/{id}/images`）。只传**一张**：
-   * 类别是每张图片自己的处理提示，混在一批里会张冠李戴。
+   * 逐张上传才能让「某一张被拒」不影响同批的其它图片。
+   *
+   * 2026-09-22 起 multipart 里**不再有 `imageCategory`**（契约第 10.2 节）：类别由服务端固定的
+   * 视觉模型自动判断，响应里的 `imageCategory` 才是事实，前端只负责如实展示。
    */
-  async uploadImage(consultationId: string, file: File, imageCategory: ImageCategory) {
+  async uploadImage(consultationId: string, file: File) {
     const data = new FormData()
     data.append('file', file)
-    data.append('imageCategory', imageCategory)
     data.append('noticeAccepted', 'true')
     data.append('noticeVersion', IMAGE_NOTICE_VERSION)
     return (await http.post<Attachment>(

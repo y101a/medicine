@@ -1,8 +1,8 @@
 import { computed, ref } from 'vue'
 import { attachmentsApi } from '../api/attachments'
-import { getApiErrorMessage } from '../api/http'
+import { ApiError, getApiErrorMessage } from '../api/http'
 import { ImagePrepError, prepareImageForUpload } from './imagePrep'
-import type { Attachment, AttachmentKind, ImageCategory } from '../types/consultations'
+import type { Attachment, AttachmentKind } from '../types/consultations'
 
 /** 与后端 `schemas/consultations.py` 的 `attachment_ids` max_length 一致（2026-09-21 由 3 放宽到 5）。 */
 export const ATTACHMENT_LIMIT = 5
@@ -40,6 +40,22 @@ export function isImageAttachment(item: Attachment): boolean {
 }
 
 /**
+ * 服务端自动分类判定「这张不算医疗健康图片」时的两种受控失败（契约第 10.2 节）。
+ *
+ * 这两种图片不入库、不落密文、不进入对话，所以文案只说「没有上传」，并给出下一步；
+ * 服务端 messages 也可能带中文说明，但错误码是契约固定的，这里以错误码为准。
+ */
+const IMAGE_CLASSIFY_MESSAGES: Record<string, string> = {
+  IMAGE_UNRELATED: '这张图片未识别为医疗健康相关，没有上传。如果确实与问题有关，请换一张更清楚的。',
+  IMAGE_CATEGORY_UNCLEAR: '这张图片看不清内容，没有上传。请重新拍摄，或改传报告文件（PDF / Word）。',
+}
+
+function imageUploadErrorMessage(cause: unknown): string {
+  const code = cause instanceof ApiError ? cause.code : ''
+  return IMAGE_CLASSIFY_MESSAGES[code] || getApiErrorMessage(cause)
+}
+
+/**
  * 本次待发送的文档与图片。上传成功只把附件挂上来，**绝不自动发送**：
  * 解析与识别都可能出错，由用户核对后再自己点发送，和语音输入保持同一套规矩。
  */
@@ -64,7 +80,7 @@ export function useAttachments() {
     const accepted: File[] = []
     for (const file of files.slice(0, room)) {
       if (!attachmentKindOf(file)) {
-        error.value = '只支持 PDF、Word（.docx）、PPT（.pptx）、txt、md 文件；图片请用左侧的图片按钮'
+        error.value = '只支持 PDF、Word（.docx）、PPT（.pptx）、txt、md 文件；图片请从附件菜单选「上传图片」'
         continue
       }
       if (file.size > ATTACHMENT_MAX_BYTES) {
@@ -93,14 +109,13 @@ export function useAttachments() {
   }
 
   /**
-   * 选入图片：先在本地压缩、摆正并剥掉 EXIF，再**逐张**上传（类别是每张图片自己的
-   * 处理提示，混在一批里会张冠李戴）。与文档一样：传完不自动发送。
+   * 选入图片：先在本地压缩、摆正并剥掉 EXIF，再**逐张**上传。
+   *
+   * 2026-09-22 起类别不再由前端提供（契约第 10 节）：类别由服务端固定的视觉模型自动判断，
+   * 前端只用响应里的 `imageCategory` 展示类别与能力边界。逐张的好处是——某一张被判为
+   * 「无关 / 不清晰」时，同批其它图片照常上传，失败的那张不进待发送列表。
    */
-  async function addImages(
-    files: File[],
-    imageCategory: ImageCategory,
-    ensureConsultation: () => Promise<string>,
-  ) {
+  async function addImages(files: File[], ensureConsultation: () => Promise<string>) {
     if (uploading.value || !files.length) return
     error.value = ''
     const imageRoom = IMAGE_LIMIT - imageCount.value
@@ -132,13 +147,20 @@ export function useAttachments() {
     uploading.value = true
     try {
       const consultationId = await ensureConsultation()
+      const failures = new Set<string>()
       for (const file of accepted) {
         pendingName.value = file.name
-        const uploaded = await attachmentsApi.uploadImage(consultationId, file, imageCategory)
-        items.value.push(uploaded)
-        // 预览用本地这张压缩后的字节：服务端存的是加密 WebP，要另走鉴权接口取。
-        if (uploaded.id) previews.value[uploaded.id] = URL.createObjectURL(file)
+        try {
+          const uploaded = await attachmentsApi.uploadImage(consultationId, file)
+          items.value.push(uploaded)
+          // 预览用本地这张压缩后的字节：服务端存的是加密 WebP，要另走鉴权接口取。
+          if (uploaded.id) previews.value[uploaded.id] = URL.createObjectURL(file)
+        } catch (cause) {
+          failures.add(imageUploadErrorMessage(cause))
+        }
       }
+      // 同一批里多张图片给出同样的原因时只说一遍。
+      if (failures.size) error.value = [...failures].join(' ')
     } catch (cause) {
       error.value = getApiErrorMessage(cause)
     } finally {

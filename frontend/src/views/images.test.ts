@@ -13,7 +13,7 @@ import { ApiError } from '../api/http'
 import { IMAGE_CONSENT_STORAGE_KEY } from '../stores/composerHints'
 import { ImagePrepError } from '../composables/imagePrep'
 import { IMAGE_LIMIT } from '../composables/useAttachments'
-import type { Attachment, MessageAttachment } from '../types/consultations'
+import type { Attachment, ImageCategory, Message, MessageAttachment } from '../types/consultations'
 
 vi.mock('../api/consultations', () => ({ consultationsApi: {
   create: vi.fn(), send: vi.fn(), stream: vi.fn(), get: vi.fn(), messages: vi.fn(), list: vi.fn(), remove: vi.fn(),
@@ -42,6 +42,7 @@ vi.mock('../composables/imagePrep', async (importOriginal) => {
 
 const conversation = { id: 'c1', title: '头痛', messageCount: 1, createdAt: '2026-09-06', updatedAt: '2026-09-06' }
 const userMessage = { id: 'm1', role: 'user' as const, content: '帮我看下', sequence: 1, createdAt: '2026-09-06' }
+const assistantMessage: Message = { id: 'a1', role: 'assistant', content: '建议先到内科就诊', sequence: 2, createdAt: '2026-09-06' }
 const imageAttachment: Attachment = {
   id: 'i1', displayName: '检查单.jpg', kind: 'image', byteSize: 234567, charCount: 860,
   preview: '白细胞计数 6.2', status: 'ready', createdAt: '2026-09-21',
@@ -76,22 +77,26 @@ async function setup(path = '/app/chat') {
   return { wrapper, router }
 }
 
+/** 让下一次上传返回服务端「自动分类」的结果——类别只能来自响应，前端不再自己选。 */
+function mockUploadedCategory(category: ImageCategory) {
+  vi.mocked(attachmentsApi.uploadImage).mockImplementation(async (_cid, file) => ({
+    ...imageAttachment, id: `i-${file.name}`, displayName: file.name, imageCategory: category,
+  }))
+}
+
 beforeEach(() => {
   vi.resetAllMocks()
   localStorage.clear()
   vi.mocked(consultationsApi.create).mockResolvedValue(conversation)
   vi.mocked(consultationsApi.send).mockResolvedValue(userMessage)
+  // stream 必须给一个真实消息：HomeView 会把它写回 messages[index]，返回 undefined 会在渲染时炸。
+  vi.mocked(consultationsApi.stream).mockResolvedValue(assistantMessage)
   vi.mocked(consultationsApi.get).mockResolvedValue(conversation)
   vi.mocked(consultationsApi.messages).mockResolvedValue({ items: [userMessage], hasMore: false })
   vi.mocked(consultationsApi.list).mockResolvedValue({ items: [conversation], hasMore: false })
   vi.mocked(modelsApi.list).mockResolvedValue(aiModels)
   vi.mocked(attachmentsApi.list).mockResolvedValue([])
-  vi.mocked(attachmentsApi.uploadImage).mockImplementation(async (_cid, file, category) => ({
-    ...imageAttachment,
-    id: `i-${file.name}`,
-    displayName: file.name,
-    imageCategory: category,
-  }))
+  mockUploadedCategory('report')
   vi.mocked(attachmentsApi.content).mockResolvedValue(new Blob(['webp'], { type: 'image/webp' }))
   vi.mocked(attachmentsApi.remove).mockResolvedValue(undefined)
   prep.prepare.mockImplementation(async (file: File) => new File(['x'], `${file.name}.jpg`, { type: 'image/jpeg' }))
@@ -116,61 +121,86 @@ function dialogButton(label: string) {
     .find(button => button.textContent?.includes(label))
 }
 
-async function chooseCategory(value: string) {
-  document.querySelector<HTMLInputElement>(`.image-upload input[type="radio"][value="${value}"]`)?.click()
-  await flushPromises()
-}
-
 async function agreeConsent() {
   document.querySelector<HTMLInputElement>('.image-upload input[type="checkbox"]')?.click()
   await flushPromises()
 }
 
-/** 走完「选图 → 选类别 →（必要时）同意 → 上传」这条主路径。 */
-async function uploadImage(
-  wrapper: VueWrapper,
-  files: File[] = [imageFile()],
-  category = 'report',
-  agree = true,
-) {
+function dropdownItems() {
+  return Array.from(document.querySelectorAll<HTMLElement>('.el-dropdown-menu__item'))
+}
+
+/** el-dialog 关闭后 overlay 仍留在 DOM 里、只是 display:none；jsdom 没有布局，只能看内联样式。 */
+function dialogVisible() {
+  const overlay = document.querySelector<HTMLElement>('.image-upload')?.closest<HTMLElement>('.el-overlay')
+  return Boolean(overlay) && overlay?.style.display !== 'none'
+}
+
+/** 走完「选图 →（首次）同意 → 上传」。没有类别选择这一步。 */
+async function uploadImage(wrapper: VueWrapper, files: File[] = [imageFile()], agree = true) {
   await pickImages(wrapper, files)
   await flushPromises()
-  await chooseCategory(category)
   if (agree) await agreeConsent()
-  dialogButton('上传并识别')?.click()
+  dialogButton('同意并上传')?.click()
+  await flushPromises()
+}
+
+/** 本机已同意过的用户：必须在 `setup()` **之前**写标记，组件初始化时才会读到。 */
+async function setupConsented(path = '/app/chat') {
+  localStorage.setItem(IMAGE_CONSENT_STORAGE_KEY, 'true')
+  return setup(path)
+}
+
+/** 已同意过的用户选图后直接上传，不经过任何弹窗。 */
+async function uploadImageDirect(wrapper: VueWrapper, files: File[] = [imageFile()]) {
+  await pickImages(wrapper, files)
   await flushPromises()
 }
 
 describe('图片上传与识别（前端）', () => {
-  it('图片按钮在回形针左侧，并带无障碍标签', async () => {
+  it('只有一个附件按钮，位于麦克风左侧，并带无障碍标签', async () => {
     const { wrapper } = await setup()
-    const labels = wrapper.findAll('.send-area > button').map(button => button.attributes('aria-label'))
-    expect(labels).toContain('添加图片')
-    expect(labels[labels.indexOf('添加病历文档') - 1]).toBe('添加图片')
+    const labels = wrapper.findAll('.send-area button').map(button => button.attributes('aria-label'))
+    expect(labels.filter(label => label === '添加附件')).toHaveLength(1)
+    expect(labels).not.toContain('添加图片')
+    expect(labels[labels.indexOf('语音输入') - 1]).toBe('添加附件')
     wrapper.unmount()
   })
 
-  it('选图后先确认类别；没选类别或没同意就传不出去', async () => {
+  it('点附件按钮弹出「上传文档 / 上传图片」两个入口，各走自己的文件选择器', async () => {
+    const { wrapper } = await setup()
+    const clickSpy = vi.spyOn(HTMLInputElement.prototype, 'click')
+    await wrapper.get('button[aria-label="添加附件"]').trigger('click')
+    await flushPromises()
+
+    expect(dropdownItems().map(item => item.textContent?.trim())).toEqual(['上传文档', '上传图片'])
+
+    dropdownItems()[1]?.click()
+    await flushPromises()
+    const clickedInput = clickSpy.mock.instances[0] as HTMLInputElement | undefined
+    expect(clickedInput?.getAttribute('accept')).toContain('image/jpeg')
+    wrapper.unmount()
+  })
+
+  it('首次上传必须先勾选隐私说明；未同意传不出去，且请求里没有类别字段', async () => {
     const { wrapper } = await setup()
     await pickImages(wrapper, [imageFile('血常规.jpg')])
     await flushPromises()
 
-    expect(document.body.textContent).toContain('上传图片')
     expect(document.body.textContent).toContain('血常规.jpg')
-    expect(dialogButton('上传并识别')?.disabled).toBe(true)
-
-    await chooseCategory('report')
-    // 未同意敏感信息与外发说明时仍不可上传
-    expect(dialogButton('上传并识别')?.disabled).toBe(true)
     expect(document.body.textContent).toContain('阿里云视觉模型')
     expect(document.body.textContent).toContain('建议先遮挡')
+    // 类别由服务端判断，弹窗里不该再出现任何类别选项。
+    expect(document.querySelector('.image-upload .el-radio-group')).toBeNull()
+    expect(dialogButton('同意并上传')?.disabled).toBe(true)
 
     await agreeConsent()
-    expect(dialogButton('上传并识别')?.disabled).toBe(false)
-    dialogButton('上传并识别')?.click()
+    expect(dialogButton('同意并上传')?.disabled).toBe(false)
+    dialogButton('同意并上传')?.click()
     await flushPromises()
 
-    expect(attachmentsApi.uploadImage).toHaveBeenCalledWith('c1', expect.any(File), 'report')
+    // 只传会话 id 与文件：契约第 10.2 节已删除 imageCategory。
+    expect(attachmentsApi.uploadImage).toHaveBeenCalledWith('c1', expect.any(File))
     expect(wrapper.text()).toContain('血常规.jpg')
     wrapper.unmount()
   })
@@ -179,7 +209,6 @@ describe('图片上传与识别（前端）', () => {
     const { wrapper } = await setup()
     await pickImages(wrapper, [imageFile()])
     await flushPromises()
-    await chooseCategory('report')
     await agreeConsent()
     dialogButton('取消')?.click()
     await flushPromises()
@@ -189,33 +218,65 @@ describe('图片上传与识别（前端）', () => {
     wrapper.unmount()
   })
 
-  it('三类各自显示不同的能力边界文案，都不给疾病判断', async () => {
-    const { wrapper } = await setup()
-    await pickImages(wrapper, [imageFile()])
-    await flushPromises()
+  it('已同意过的用户不再弹窗，选图后直接上传', async () => {
+    const { wrapper } = await setupConsented()
+    await uploadImageDirect(wrapper, [imageFile('报告.jpg')])
 
-    await chooseCategory('medical_imaging')
-    expect(document.body.textContent).toContain('不判断病灶')
-
-    await chooseCategory('body_photo')
-    expect(document.body.textContent).toContain('不判断是什么病')
-    expect(document.body.textContent).toContain('120')
-
-    await chooseCategory('report')
-    expect(document.body.textContent).toContain('以纸质报告为准')
+    expect(dialogVisible()).toBe(false)
+    expect(attachmentsApi.uploadImage).toHaveBeenCalledTimes(1)
+    expect(wrapper.text()).toContain('报告.jpg')
     wrapper.unmount()
   })
 
-  it('已同意过的用户不再勾选，但仍会看到提醒', async () => {
-    localStorage.setItem(IMAGE_CONSENT_STORAGE_KEY, 'true')
-    const { wrapper } = await setup()
-    await pickImages(wrapper, [imageFile()])
-    await flushPromises()
+  it('三类自动分类结果各自显示不同的能力边界文案，都不给疾病判断', async () => {
+    const cases: { category: ImageCategory; label: string; notice: string }[] = [
+      { category: 'report', label: '报告 / 检查单', notice: '以纸质报告为准' },
+      { category: 'medical_imaging', label: 'X 光 / CT / MRI 片子', notice: '不判断病灶' },
+      { category: 'body_photo', label: '患处或身体照片', notice: '不判断是什么病' },
+    ]
 
-    expect(document.querySelector('.image-upload input[type="checkbox"]')).toBeNull()
-    expect(document.body.textContent).toContain('建议先遮挡')
-    await chooseCategory('report')
-    expect(dialogButton('上传并识别')?.disabled).toBe(false)
+    for (const item of cases) {
+      mockUploadedCategory(item.category)
+      const { wrapper } = await setupConsented()
+      await uploadImageDirect(wrapper, [imageFile(`${item.category}.jpg`)])
+      expect(wrapper.text()).toContain(item.label)
+      expect(wrapper.text()).toContain(item.notice)
+      wrapper.unmount()
+    }
+  })
+
+  it('服务端判为无关或不清晰的图片不进待发送列表，只给一句短提示', async () => {
+    vi.mocked(attachmentsApi.uploadImage)
+      .mockRejectedValueOnce(new ApiError('未识别为医疗健康相关图片，请换一张', 'IMAGE_UNRELATED', 422))
+      .mockRejectedValueOnce(new ApiError('无法判断图片类别', 'IMAGE_CATEGORY_UNCLEAR', 422))
+
+    const unrelated = await setupConsented()
+    await uploadImageDirect(unrelated.wrapper, [imageFile('风景.jpg')])
+    expect(unrelated.wrapper.text()).toContain('未识别为医疗健康相关')
+    expect(unrelated.wrapper.findAll('.attachment-item')).toHaveLength(0)
+    expect(unrelated.wrapper.find('.attachment-notice .el-alert__close-btn').exists(), '提示要可关闭').toBe(true)
+    unrelated.wrapper.unmount()
+
+    const unclear = await setupConsented()
+    await uploadImageDirect(unclear.wrapper, [imageFile('糊了.jpg')])
+    expect(unclear.wrapper.text()).toContain('看不清内容')
+    expect(unclear.wrapper.findAll('.attachment-item')).toHaveLength(0)
+    unclear.wrapper.unmount()
+  })
+
+  it('同一批里被判无关的那张不影响其它图片上传', async () => {
+    vi.mocked(attachmentsApi.uploadImage)
+      .mockRejectedValueOnce(new ApiError('未识别为医疗健康相关图片', 'IMAGE_UNRELATED', 422))
+      .mockImplementation(async (_cid, file) => ({
+        ...imageAttachment, id: `i-${file.name}`, displayName: file.name,
+      }))
+    const { wrapper } = await setupConsented()
+    await uploadImageDirect(wrapper, [imageFile('风景.jpg'), imageFile('报告.jpg')])
+
+    expect(attachmentsApi.uploadImage).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).toContain('未识别为医疗健康相关')
+    expect(wrapper.text()).toContain('报告.jpg')
+    expect(wrapper.text()).not.toContain('风景.jpg')
     wrapper.unmount()
   })
 
@@ -263,13 +324,14 @@ describe('图片上传与识别（前端）', () => {
     wrapper.unmount()
   })
 
-  it('刷新已有会话时，服务端返回的图片附件照常出现在草稿区', async () => {
+  it('刷新已有会话时，服务端返回的图片附件与类别照常出现在草稿区', async () => {
     vi.mocked(attachmentsApi.list).mockResolvedValue([imageAttachment])
     const { wrapper } = await setup('/app/consultations/c1')
     await flushPromises()
 
     expect(wrapper.text()).toContain('检查单.jpg')
     expect(wrapper.text()).toContain('1600×1200')
+    expect(wrapper.text()).toContain('报告 / 检查单')
     wrapper.unmount()
   })
 })
