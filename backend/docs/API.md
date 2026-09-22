@@ -286,8 +286,8 @@ PDF/PPTX 最多 100 页，提取文字最多 500000 字符，解析最长 60 秒
 | `POST /consultations/{consultation_id}/images` | 规范化、受限识别并加密保存单张图片 |
 | `GET /attachments/{attachment_id}/content` | 解密读取仍在保留期内的规范化 WebP |
 
-上传为 `multipart/form-data`：`file`、`imageCategory=report|medical_imaging|body_photo`、
-`noticeAccepted=true`、`noticeVersion=medical-image-upload-v1`。只接收实际内容为
+上传为 `multipart/form-data`：`file`、`noticeAccepted=true`、`noticeVersion=medical-image-upload-v1`。
+旧客户端可继续发送 `imageCategory`，但后端会忽略并由固定视觉模型自动分类。只接收实际内容为
 JPEG/PNG/WebP 的静态图片；原始文件不保存。后端纠正方向、移除元数据、最长边缩至 2400 px 内并
 重编码为 `image/webp`。单张最多 5 MiB、2000 万像素、宽高至少 32 px、长宽比不超过 20:1；
 每用户每 10 分钟最多上传 10 张；每条消息最多选择 3 张图片，文档与图片合计仍最多 5 项。
@@ -300,7 +300,9 @@ JPEG/PNG/WebP 的静态图片；原始文件不保存。后端纠正方向、移
 
 图片使用固定的服务端阿里云 `qwen3.8-flash`，优先
 `IMAGE_ANALYSIS_API_KEY`，为空时回退服务端 `QWEN_API_KEY`，绝不读取用户自带模型 Key。
-报告图片只转录文字；医学影像只提取模态、部位、可见标签与质量，不判读病灶；身体照片只整理
+分类只允许 `report|medical_imaging|body_photo|unrelated|unclear`；前三类成功保存并在响应中返回服务端判定的
+`imageCategory`，后两类分别返回 422 `IMAGE_UNRELATED` / `IMAGE_CATEGORY_UNCLEAR`，且不会生成附件、
+密文文件或上下文片段。报告图片只转录文字；医学影像只提取模态、部位、可见标签与质量，不判读病灶；身体照片只整理
 非诊断性肉眼事实并过滤疾病名/概率。识别结果作为加密、不可信附件片段进入现有上下文；图片结果
 不参与确定性红旗预检，紧急症状仍必须由用户主动输入文字。
 
@@ -314,8 +316,8 @@ JPEG/PNG/WebP 的静态图片；原始文件不保存。后端纠正方向、移
 
 清理使用 PostgreSQL advisory lock，可安全避免多实例同时执行。用户删除附件、会话或账号也会
 清除相应图片密文。稳定错误码：`IMAGE_TOO_LARGE`、`IMAGE_TYPE_NOT_ALLOWED`、
-`IMAGE_NOTICE_REQUIRED`、`IMAGE_CATEGORY_INVALID`、`IMAGE_INVALID`、`IMAGE_NO_TEXT`、
-`IMAGE_UNSUITABLE`、`IMAGE_NOT_CONFIGURED`、`IMAGE_PROVIDER_FAILED`、
+`IMAGE_NOTICE_REQUIRED`、`IMAGE_UNRELATED`、`IMAGE_CATEGORY_UNCLEAR`、`IMAGE_INVALID`、
+`IMAGE_NO_TEXT`、`IMAGE_NOT_CONFIGURED`、`IMAGE_PROVIDER_FAILED`、
 `IMAGE_PROVIDER_TIMEOUT`、`IMAGE_EXPIRED`、`UPLOAD_RATE_LIMITED`。
 
 ## 删除账号

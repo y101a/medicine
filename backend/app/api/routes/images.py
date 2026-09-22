@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Annotated, Literal, cast
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, File, Form, Response, UploadFile
@@ -27,15 +27,14 @@ from app.services.upload_limits import enforce_upload_rate_limit
 router = APIRouter(tags=["医学图片"])
 logger = logging.getLogger(__name__)
 NOTICE_VERSION = "medical-image-upload-v1"
-ImageCategory = Literal["report", "medical_imaging", "body_photo"]
 
 
-async def _record_rejection(db: DbSession, user: CurrentUser, reason_code: str) -> None:
+async def _record_rejection(db: DbSession, user_id: UUID, reason_code: str) -> None:
     try:
         await db.rollback()
         await add_audit_log(
             db,
-            actor_user_id=user.id,
+            actor_user_id=user_id,
             action="upload",
             resource_type="medical_image",
             outcome=AUDIT_OUTCOME_REJECTED,
@@ -59,17 +58,18 @@ async def upload_medical_image(
     db: DbSession,
     response: Response,
     file: Annotated[UploadFile, File()],
-    category: Annotated[str, Form(alias="imageCategory")],
+    legacy_image_category: Annotated[str | None, Form(alias="imageCategory")] = None,
     notice_accepted: Annotated[bool, Form(alias="noticeAccepted")] = False,
     notice_version: Annotated[str, Form(alias="noticeVersion")] = "",
 ) -> AttachmentOut:
     settings = get_settings()
+    actor_user_id = current_user.id
     storage_key: str | None = None
     try:
         enforce_upload_rate_limit(current_user.id, "medical_image")
-        if category not in {"report", "medical_imaging", "body_photo"}:
-            raise AppError(422, "IMAGE_CATEGORY_INVALID", "请选择正确的图片类别")
-        category_value = cast(ImageCategory, category)
+        # Transitional compatibility only: old clients may still send imageCategory,
+        # but server-side vision classification is authoritative.
+        _ = legacy_image_category
         if not notice_accepted or notice_version != NOTICE_VERSION:
             raise AppError(
                 422,
@@ -85,14 +85,14 @@ async def upload_medical_image(
             max_pixels=settings.image_max_pixels,
             max_dimension=settings.image_max_dimension,
         )
-        analysis = await analyze_image(image, category_value)
+        analysis = await analyze_image(image)
         stored = await store_image(image.content)
         storage_key = stored.storage_key
         result = await attachment_service.create_image_attachment(
             db,
             user_id=current_user.id,
             consultation_id=consultation_id,
-            category=category_value,
+            category=analysis.category,
             image=image,
             analysis=analysis,
             stored=stored,
@@ -101,12 +101,12 @@ async def upload_medical_image(
         if storage_key:
             await remove_image(storage_key)
         if exc.code != "UPLOAD_RATE_LIMITED":
-            await _record_rejection(db, current_user, exc.code)
+            await _record_rejection(db, actor_user_id, exc.code)
         raise
     except SQLAlchemyError as exc:
         if storage_key:
             await remove_image(storage_key)
-        await _record_rejection(db, current_user, "IMAGE_SAVE_FAILED")
+        await _record_rejection(db, actor_user_id, "IMAGE_SAVE_FAILED")
         raise AppError(500, "IMAGE_SAVE_FAILED", "图片保存失败，请稍后重试") from exc
 
     try:

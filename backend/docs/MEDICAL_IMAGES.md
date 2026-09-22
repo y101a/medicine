@@ -1,12 +1,12 @@
 # 医学图片上传与受限识别设计
 
-> 状态：2026-09-22 后端已实现并通过自动化测试；前端已由 DeepSeek 接线，待真实阿里云与浏览器联调。
+> 状态：2026-09-22 后端自动分类已实现并通过自动化测试；DeepSeek 正在改造统一附件入口，待真实阿里云与浏览器联调。
 > 产品边界：健康科普与就医分流，不作确诊，不替代医生，不判读医学影像病灶。
 
 ## 1. 已确认决策
 
-- 支持三类图片：`report`（报告/检查单照片）、`medical_imaging`（X 光、CT、MRI 等片子照片）、
-  `body_photo`（患处或身体照片）。上传时由用户选择类别，后端把它当作处理提示而不是可信事实。
+- 服务端自动识别三类可保存图片：`report`（报告/检查单照片）、`medical_imaging`（X 光、CT、MRI 等片子照片）、
+  `body_photo`（患处或身体照片）；`unrelated` 与 `unclear` 会被拒绝且不落库、不落盘。
 - 报告照片允许 OCR；医学影像只识别影像类型、可见文字、部位与拍摄质量，不判断病灶；身体照片只整理
   肉眼可见且非诊断性的事实，并结合用户文字提供就医分流，不输出疾病识别结论。
 - 原始上传字节不保存。后端完成真实类型校验、方向纠正、缩放、元数据移除和 WebP 重编码后，保存规范化图片。
@@ -35,7 +35,7 @@
 `multipart/form-data`：
 
 - `file`: 单张图片。
-- `imageCategory`: `report | medical_imaging | body_photo`。
+- `imageCategory`（可选兼容字段）：旧客户端可以继续发送，但后端忽略该值并自动分类。
 - `noticeAccepted`: 必须为 `true`。
 - `noticeVersion`: 必须为 `medical-image-upload-v1`。
 
@@ -87,10 +87,10 @@
 | 413 | `IMAGE_TOO_LARGE` | 超过 5 MiB |
 | 415 | `IMAGE_TYPE_NOT_ALLOWED` | 非 JPEG/PNG/WebP 或真实类型不符 |
 | 422 | `IMAGE_NOTICE_REQUIRED` | 未确认图片处理与外发说明 |
-| 422 | `IMAGE_CATEGORY_INVALID` | 类别不在白名单 |
+| 422 | `IMAGE_UNRELATED` | 服务端判定为非医疗健康相关图片 |
+| 422 | `IMAGE_CATEGORY_UNCLEAR` | 画面不足以可靠判断图片类别 |
 | 422 | `IMAGE_INVALID` | 无法解码、动图、图片炸弹、尺寸或比例非法 |
 | 422 | `IMAGE_NO_TEXT` | `report` 类图片没有可读取文字 |
-| 422 | `IMAGE_UNSUITABLE` | 无法在产品安全边界内处理 |
 | 429 | `UPLOAD_RATE_LIMITED` | 图片上传限流 |
 | 502 | `IMAGE_PROVIDER_FAILED` | 视觉服务失败或返回不合约 |
 | 504 | `IMAGE_PROVIDER_TIMEOUT` | 视觉服务超时 |
@@ -165,11 +165,11 @@
 
 验收不包括疾病识别准确率或医学影像诊断能力；不得宣传“AI 看片”“识别病因”或“辅助确诊”。
 
-## 10. 2026-09-22 交互与分类契约变更（待实现）
+## 10. 2026-09-22 交互与分类契约变更
 
 用户取消“上传图片前必须手动选择图片类型”的设计，改为固定的服务端视觉模型自动分类；同时把
-“上传文档”和“上传图片”合并到同一个附件入口。当前运行代码仍要求 `imageCategory`，本节是下一版
-目标契约；前后端完成并联调前，不得把本节写成已上线功能。
+“上传文档”和“上传图片”合并到同一个附件入口。后端自动分类已完成：`imageCategory` 已变为可选兼容字段且被忽略；
+前端统一入口由 DeepSeek 实施中。完成真实联调前不得把整项功能写成已上线。
 
 ### 10.1 产品决定与安全边界
 
@@ -186,20 +186,20 @@
   隐私确认；确认中不出现类型选项。之后直接上传，前端继续随每次请求发送
   `noticeAccepted=true` 和 `noticeVersion=medical-image-upload-v1`，后端继续审计同意事件。
 
-### 10.2 目标 API 契约
+### 10.2 当前 API 契约
 
 - `POST /api/v1/consultations/{consultation_id}/images` 的 multipart 不再要求 `imageCategory`；字段只保留
   `file`、`noticeAccepted`、`noticeVersion`。为便于前后端分步部署，后端过渡期可以接受旧客户端仍发送
   `imageCategory`，但必须忽略它，不能把它作为分类事实。
 - 成功响应仍返回 `imageCategory`，但其值来自服务端自动分类，且成功附件只会是
-  `report | medical_imaging | body_photo`。现有数据库约束可以继续使用，因此本次预计不需要迁移。
+  `report | medical_imaging | body_photo`。现有数据库约束继续适用，因此本次无需迁移。
 - 分类为 `unrelated` 时返回 `422 IMAGE_UNRELATED`，中文文案说明“未识别为医疗健康相关图片，请换一张”；
   分类为 `unclear` 时返回 `422 IMAGE_CATEGORY_UNCLEAR`，提示重新拍摄或改传报告文件。两种失败都只写
   受控审计码，不记录图片、OCR、文件名、Base64 或模型原文。
 - 服务端应先规范化并在内存中分析，只有分类为前三类且结构化输出通过对应安全校验后，才加密落盘并
   创建 `attachments`/`attachment_chunks`。失败路径必须证明没有数据库附件和密文文件残留。
 
-### 10.3 Codex 后端任务
+### 10.3 Codex 后端实现（已完成）
 
 - `api/routes/images.py`：把 `imageCategory` 改为可选兼容字段并忽略；调用分析服务后使用其实际分类创建附件。
 - `services/image_analysis.py`：结构化枚举增加 `unrelated`、`unclear`；移除“实际类别必须等于用户选择”的
@@ -228,9 +228,7 @@
 
 ### 10.5 实施顺序
 
-1. DeepSeek 可先按本节修改前端并用接口桩测试，但必须在报告中注明真实上传暂时会被旧后端的必填
-   `imageCategory` 拒绝；不得伪称已联调。
-2. Codex 修改后端契约与安全测试；无数据库迁移，前后端文件可以并行，但双方仍须在 `COORDINATION.md` 7.1
-   登记各自占用。
-3. 后端释放后做真实联调，重点核对无关图片不留数据库行/密文文件，以及响应分类能在刷新后恢复。
+1. Codex 后端已完成自动分类契约、安全测试和拒绝审计修复；未新增数据库迁移。
+2. DeepSeek 完成统一附件入口与取消类别手选后，使用真实后端联调，重点核对响应分类能在刷新后恢复。
+3. 联调时再次确认无关/无法判断图片不留数据库行或密文文件；自动化已覆盖该失败路径。
 4. 最后运行后端完整 pytest/Ruff、前端 Vitest/build/Playwright，并用不含身份信息的五类测试图片人工验收。
