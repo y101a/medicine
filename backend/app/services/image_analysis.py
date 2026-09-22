@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
+import logging
 import re
 from dataclasses import dataclass
 from typing import Literal
@@ -16,6 +18,10 @@ from app.core.errors import AppError
 from app.services.image_validation import NormalizedImage
 
 ANALYSIS_VERSION = "medical-image-auto-category-v2"
+MAX_PROVIDER_ATTEMPTS = 2
+RETRY_DELAY_SECONDS = 0.25
+RETRYABLE_PROVIDER_STATUSES = {408, 425, 429, 500, 502, 503, 504}
+logger = logging.getLogger(__name__)
 AcceptedImageCategory = Literal["report", "medical_imaging", "body_photo"]
 DetectedImageCategory = Literal[
     "report",
@@ -84,6 +90,75 @@ def _parse_content(content: object) -> VisionPayload:
     if cleaned.startswith(fence):
         cleaned = re.sub(r"^.{3}(?:json)?\s*|\s*.{3}$", "", cleaned, flags=re.I)
     return VisionPayload.model_validate(json.loads(cleaned))
+
+
+def _safe_header(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()[:128]
+    if not cleaned or not re.fullmatch(r"[A-Za-z0-9._:-]+", cleaned):
+        return None
+    return cleaned
+
+
+def _provider_metadata(response: httpx.Response | None = None) -> dict[str, object]:
+    if response is None:
+        return {"provider_status": None, "provider_request_id": None}
+    request_id = next(
+        (
+            _safe_header(response.headers.get(name))
+            for name in ("x-request-id", "request-id", "x-dashscope-request-id")
+            if response.headers.get(name)
+        ),
+        None,
+    )
+    return {
+        "provider_status": response.status_code,
+        "provider_request_id": request_id,
+    }
+
+
+def _retry_after_seconds(response: httpx.Response) -> int | None:
+    value = response.headers.get("retry-after", "").strip()
+    if not value.isdigit():
+        return None
+    return min(max(int(value), 1), 3600)
+
+
+def _provider_status_error(response: httpx.Response) -> AppError:
+    status = response.status_code
+    if status == 408:
+        return AppError(
+            504,
+            "IMAGE_PROVIDER_TIMEOUT",
+            "图片识别连续超时，请稍后重试",
+        )
+    if status in {401, 403}:
+        return AppError(
+            503,
+            "IMAGE_PROVIDER_AUTH_FAILED",
+            "服务端图片识别凭据不可用，请联系管理员",
+        )
+    if status == 429:
+        retry_after = _retry_after_seconds(response)
+        details = {"retryAfterSeconds": retry_after} if retry_after else None
+        return AppError(
+            429,
+            "IMAGE_PROVIDER_RATE_LIMITED",
+            "图片识别服务繁忙，请稍后重试",
+            details,
+        )
+    if 400 <= status < 500:
+        return AppError(
+            502,
+            "IMAGE_PROVIDER_REJECTED",
+            "图片识别请求被服务拒绝，请换一张图片或稍后重试",
+        )
+    return AppError(
+        502,
+        "IMAGE_PROVIDER_UNAVAILABLE",
+        "图片识别服务暂时不可用，请稍后重试",
+    )
 
 
 def _render(payload: VisionPayload, model: str) -> ImageAnalysis:
@@ -179,21 +254,95 @@ async def analyze_image(
     if client is None:
         client = httpx.AsyncClient(timeout=settings.image_analysis_timeout_seconds)
     try:
-        response = await client.post(
-            f"{settings.image_analysis_base_url}/chat/completions",
-            headers={"Authorization": f"Bearer {secret.get_secret_value()}"},
-            json=payload,
-        )
-        response.raise_for_status()
-        body = response.json()
-        result = _parse_content(body["choices"][0]["message"]["content"])
-        return _render(result, settings.image_analysis_model)
-    except AppError:
-        raise
-    except httpx.TimeoutException as exc:
-        raise AppError(504, "IMAGE_PROVIDER_TIMEOUT", "图片识别超时，请稍后重试") from exc
-    except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError, ValidationError) as exc:
-        raise AppError(502, "IMAGE_PROVIDER_FAILED", "图片识别服务暂时不可用") from exc
+        for attempt in range(1, MAX_PROVIDER_ATTEMPTS + 1):
+            try:
+                response = await client.post(
+                    f"{settings.image_analysis_base_url}/chat/completions",
+                    headers={"Authorization": f"Bearer {secret.get_secret_value()}"},
+                    json=payload,
+                )
+            except httpx.TimeoutException as exc:
+                will_retry = attempt < MAX_PROVIDER_ATTEMPTS
+                logger.warning(
+                    "Medical image provider request timed out",
+                    extra={
+                        "provider_attempt": attempt,
+                        "provider_will_retry": will_retry,
+                        "provider_exception_type": type(exc).__name__,
+                        **_provider_metadata(),
+                    },
+                )
+                if will_retry:
+                    await asyncio.sleep(RETRY_DELAY_SECONDS)
+                    continue
+                raise AppError(
+                    504,
+                    "IMAGE_PROVIDER_TIMEOUT",
+                    "图片识别连续超时，请稍后重试",
+                ) from exc
+            except httpx.RequestError as exc:
+                will_retry = attempt < MAX_PROVIDER_ATTEMPTS
+                logger.warning(
+                    "Medical image provider connection failed",
+                    extra={
+                        "provider_attempt": attempt,
+                        "provider_will_retry": will_retry,
+                        "provider_exception_type": type(exc).__name__,
+                        **_provider_metadata(),
+                    },
+                )
+                if will_retry:
+                    await asyncio.sleep(RETRY_DELAY_SECONDS)
+                    continue
+                raise AppError(
+                    502,
+                    "IMAGE_PROVIDER_UNAVAILABLE",
+                    "无法连接图片识别服务，请稍后重试",
+                ) from exc
+
+            if not response.is_success:
+                will_retry = (
+                    response.status_code in RETRYABLE_PROVIDER_STATUSES
+                    and attempt < MAX_PROVIDER_ATTEMPTS
+                )
+                logger.warning(
+                    "Medical image provider returned an error status",
+                    extra={
+                        "provider_attempt": attempt,
+                        "provider_will_retry": will_retry,
+                        "provider_exception_type": None,
+                        **_provider_metadata(response),
+                    },
+                )
+                if will_retry:
+                    await asyncio.sleep(RETRY_DELAY_SECONDS)
+                    continue
+                raise _provider_status_error(response)
+
+            try:
+                body = response.json()
+                result = _parse_content(body["choices"][0]["message"]["content"])
+            except (KeyError, IndexError, TypeError, ValueError, ValidationError) as exc:
+                will_retry = attempt < MAX_PROVIDER_ATTEMPTS
+                logger.warning(
+                    "Medical image provider returned an invalid response",
+                    extra={
+                        "provider_attempt": attempt,
+                        "provider_will_retry": will_retry,
+                        "provider_exception_type": type(exc).__name__,
+                        **_provider_metadata(response),
+                    },
+                )
+                if will_retry:
+                    await asyncio.sleep(RETRY_DELAY_SECONDS)
+                    continue
+                raise AppError(
+                    502,
+                    "IMAGE_PROVIDER_INVALID_RESPONSE",
+                    "图片识别服务返回异常，请稍后重试",
+                ) from exc
+            return _render(result, settings.image_analysis_model)
+        raise RuntimeError("unreachable image provider retry state")
     finally:
         if owns_client:
             await client.aclose()

@@ -15,6 +15,7 @@ from app.core.config import get_settings
 from app.core.errors import AppError
 from app.core.security import create_access_token, decrypt_sensitive
 from app.models import Attachment, AttachmentChunk, AuditLog
+from app.services import image_analysis as image_analysis_service
 from app.services.auth import ACCESS_COOKIE
 from app.services.image_analysis import (
     ImageAnalysis,
@@ -40,6 +41,15 @@ def image_bytes(
         pnginfo.add_text("PatientName", "Sensitive Person")
     Image.new("RGB", size, color).save(output, format="PNG", pnginfo=pnginfo)
     return output.getvalue()
+
+
+async def normalized_test_image():
+    return await normalize_image(
+        UploadFile(file=BytesIO(image_bytes()), filename="test.png"),
+        max_bytes=5 * 1024 * 1024,
+        max_pixels=20_000_000,
+        max_dimension=2400,
+    )
 
 
 async def create_consultation(client, user_id):
@@ -384,6 +394,179 @@ async def test_image_analysis_uses_server_key_fixed_model_and_sanitizes(monkeypa
     assert "局部呈红色" in result.text
     assert "皮炎" not in result.text
     assert "90%" not in result.text
+
+
+async def test_image_analysis_retries_retryable_status_and_logs_safe_metadata(
+    monkeypatch, caplog
+):
+    attempts = 0
+
+    async def no_wait(seconds):
+        return None
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            return httpx.Response(
+                503,
+                request=request,
+                headers={"x-request-id": "safe-request-123"},
+                json={"error": {"message": "sensitive upstream details"}},
+            )
+        return httpx.Response(
+            200,
+            request=request,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "actual_category": "report",
+                                    "ocr_text": "白细胞 6.2",
+                                    "modality": "",
+                                    "body_region": "",
+                                    "visible_labels": [],
+                                    "visible_facts": [],
+                                    "quality_warnings": [],
+                                },
+                                ensure_ascii=False,
+                            )
+                        }
+                    }
+                ]
+            },
+        )
+
+    monkeypatch.setattr(image_analysis_service.asyncio, "sleep", no_wait)
+    caplog.set_level("WARNING", logger="app.services.image_analysis")
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        result = await analyze_image(await normalized_test_image(), client=client)
+
+    assert attempts == 2
+    assert result.category == "report"
+    record = next(
+        item for item in caplog.records if item.provider_status == 503
+    )
+    assert record.provider_attempt == 1
+    assert record.provider_will_retry is True
+    assert record.provider_request_id == "safe-request-123"
+    assert "sensitive upstream details" not in caplog.text
+    assert "Bearer" not in caplog.text
+    assert "base64" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("provider_status", "expected_status", "expected_code", "attempts"),
+    [
+        (400, 502, "IMAGE_PROVIDER_REJECTED", 1),
+        (408, 504, "IMAGE_PROVIDER_TIMEOUT", 2),
+        (401, 503, "IMAGE_PROVIDER_AUTH_FAILED", 1),
+        (403, 503, "IMAGE_PROVIDER_AUTH_FAILED", 1),
+        (429, 429, "IMAGE_PROVIDER_RATE_LIMITED", 2),
+        (503, 502, "IMAGE_PROVIDER_UNAVAILABLE", 2),
+    ],
+)
+async def test_image_analysis_classifies_provider_statuses(
+    monkeypatch, provider_status, expected_status, expected_code, attempts
+):
+    calls = 0
+
+    async def no_wait(seconds):
+        return None
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(
+            provider_status,
+            request=request,
+            headers={"retry-after": "7"},
+            json={"error": {"message": "must not reach the user"}},
+        )
+
+    monkeypatch.setattr(image_analysis_service.asyncio, "sleep", no_wait)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(AppError) as raised:
+            await analyze_image(await normalized_test_image(), client=client)
+
+    assert calls == attempts
+    assert raised.value.status_code == expected_status
+    assert raised.value.code == expected_code
+    assert "must not reach" not in raised.value.message
+    if provider_status == 429:
+        assert raised.value.details == {"retryAfterSeconds": 7}
+
+
+@pytest.mark.parametrize(
+    ("provider_exception", "expected_status", "expected_code"),
+    [
+        (httpx.ReadTimeout, 504, "IMAGE_PROVIDER_TIMEOUT"),
+        (httpx.ConnectError, 502, "IMAGE_PROVIDER_UNAVAILABLE"),
+    ],
+)
+async def test_image_analysis_retries_transport_failures(
+    monkeypatch, provider_exception, expected_status, expected_code
+):
+    calls = 0
+
+    async def no_wait(seconds):
+        return None
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        raise provider_exception("private upstream detail", request=request)
+
+    monkeypatch.setattr(image_analysis_service.asyncio, "sleep", no_wait)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(AppError) as raised:
+            await analyze_image(await normalized_test_image(), client=client)
+
+    assert calls == 2
+    assert raised.value.status_code == expected_status
+    assert raised.value.code == expected_code
+    assert "private upstream detail" not in raised.value.message
+
+
+async def test_image_analysis_retries_invalid_response_without_logging_body(
+    monkeypatch, caplog
+):
+    calls = 0
+
+    async def no_wait(seconds):
+        return None
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(
+            200,
+            request=request,
+            headers={"x-request-id": "response-request-456"},
+            json={
+                "choices": [
+                    {"message": {"content": "patient-secret invalid-json"}}
+                ]
+            },
+        )
+
+    monkeypatch.setattr(image_analysis_service.asyncio, "sleep", no_wait)
+    caplog.set_level("WARNING", logger="app.services.image_analysis")
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(AppError) as raised:
+            await analyze_image(await normalized_test_image(), client=client)
+
+    assert calls == 2
+    assert raised.value.code == "IMAGE_PROVIDER_INVALID_RESPONSE"
+    assert "patient-secret" not in raised.value.message
+    assert "patient-secret" not in caplog.text
+    assert all(record.provider_status == 200 for record in caplog.records)
+    assert all(
+        record.provider_request_id == "response-request-456"
+        for record in caplog.records
+    )
 
 
 @pytest.mark.parametrize(
