@@ -6,8 +6,8 @@ import { installApiStubs, settle, waitForRendered, type StubTable } from './supp
  * 图片上传与识别的界面验收（契约 `backend/docs/MEDICAL_IMAGES.md` 第 10 节）。
  *
  * 2026-09-22 起输入区只有一个附件按钮，点开是「上传文档 / 上传图片」两项；图片不再由用户选类别，
- * 类别由服务端固定视觉模型自动判断。这里走的是**真实用户路径**：点菜单 → 文件选择器 → 本地压缩
- * → 上传，所以菜单路由本身也在验收范围内。
+ * 类别由服务端固定视觉模型自动判断。这里走的是**真实用户路径**：**单击附件按钮 → 系统文件选择器 → 本地压缩
+ * → 上传**（按类型自动分流，没有中间菜单），所以这条链路本身也在验收范围内。
  *
  * 图片用 `setInputFiles` 喂**真实可解码的字节**（仓库里现成的 PNG），本地压缩/摆正那一步会真的跑；
  * 识别结果与类别来自桩接口。
@@ -33,6 +33,18 @@ const IMAGE = {
   createdAt: '2026-09-21T02:00:00Z',
 }
 
+const DOCUMENT = {
+  id: 'doc-1',
+  displayName: '血常规报告.pdf',
+  kind: 'pdf',
+  byteSize: 20480,
+  pageCount: 2,
+  charCount: 860,
+  preview: '白细胞计数 6.2',
+  status: 'ready',
+  createdAt: '2026-09-21T02:00:00Z',
+}
+
 const CONSULTATION = {
   id: 'c-e2e',
   title: '当前咨询',
@@ -44,11 +56,15 @@ const CONSULTATION = {
 const STUBS: StubTable = {
   'POST /consultations': { status: 201, body: CONSULTATION },
   'POST /consultations/*/images': { status: 201, body: IMAGE },
+  // 同一个附件按钮也能传文档，所以这条链路也要有桩（图片满额时用它验收「不误伤文档入口」）。
+  'POST /consultations/*/attachments': { status: 201, body: DOCUMENT },
   'GET /consultations/*/attachments': { body: { items: [] } },
 }
 
 /** 仓库里现成的真实 PNG：必须能被浏览器解码，不然本地预处理会直接判 `decode_failed`。 */
 const PNG_BYTES = readFileSync(new URL('../src/assets/medical-ai-avatar.png', import.meta.url))
+// 文档路径只需要扩展名/MIME 走对分支，字节不必是真 PDF（服务端全部由桩接管）。
+const PDF_BYTES = Buffer.from('%PDF-1.4\n% e2e 用的最小结构，仅前端验收\n')
 
 async function openComposer(page: Page) {
   await page.goto('/app/chat')
@@ -62,28 +78,23 @@ function attachButton(page: Page) {
   return page.locator('button[aria-label="添加附件"]')
 }
 
-/** 关掉的 popper 仍留在 DOM 里，所以只认当前可见的那个菜单，否则会撞上 strict mode。 */
-function attachMenu(page: Page) {
-  return page.locator('.el-dropdown-menu:visible')
-}
-
-async function openAttachMenu(page: Page) {
-  await attachButton(page).click()
-  const menu = attachMenu(page)
-  await expect(menu, '点附件按钮应弹出两个上传入口').toBeVisible({ timeout: 10_000 })
-  return menu
-}
-
-/** 点菜单项并接住系统文件选择器——这是用户真实走的路径。 */
-async function pickVia(page: Page, label: '上传文档' | '上传图片', name: string, mimeType: string) {
+/** 单击附件按钮就直接弹系统文件选择器——不再有「上传文档 / 上传图片」菜单。 */
+async function pickFiles(page: Page, files: { name: string; mimeType: string; buffer: Buffer }[]) {
   const chooser = page.waitForEvent('filechooser')
-  const menu = await openAttachMenu(page)
-  await menu.getByText(label, { exact: true }).click()
-  await (await chooser).setFiles({ name, mimeType, buffer: PNG_BYTES })
+  await attachButton(page).click()
+  await (await chooser).setFiles(files)
 }
 
 function pickImage(page: Page, name = '血常规.jpg') {
-  return pickVia(page, '上传图片', name, 'image/png')
+  return pickFiles(page, [{ name, mimeType: 'image/png', buffer: PNG_BYTES }])
+}
+
+/** 图片满额后仍要能继续传文档：同一个按钮，先过首次的文档说明。 */
+async function pickPdf(page: Page, name = '血常规报告.pdf') {
+  await pickFiles(page, [{ name, mimeType: 'application/pdf', buffer: PDF_BYTES }])
+  const box = page.locator('.el-message-box')
+  await expect(box, '首次传文档必须先过一次性说明').toBeVisible({ timeout: 15_000 })
+  await box.getByRole('button', { name: '我知道了，继续上传' }).click()
 }
 
 function dialog(page: Page) {
@@ -98,7 +109,7 @@ async function confirmDialog(page: Page, agree = true) {
 }
 
 test.describe('图片上传与识别', () => {
-  test('附件按钮在麦克风左侧，点开后是「上传文档 / 上传图片」两个入口', async ({ page }) => {
+  test('附件按钮在麦克风左侧，单击直接打开本机文件选择器（没有菜单）', async ({ page }) => {
     await installApiStubs(page, { extra: STUBS })
     await openComposer(page)
 
@@ -116,9 +127,12 @@ test.describe('图片上传与识别', () => {
       `附件按钮右边界 ${Math.round(attachBox!.x + attachBox!.width)}px 应不晚于麦克风左边界 ${Math.round(micBox!.x)}px`,
     ).toBeLessThanOrEqual(micBox!.x)
 
-    const menu = await openAttachMenu(page)
-    await expect(menu.getByText('上传文档', { exact: true })).toBeVisible()
-    await expect(menu.getByText('上传图片', { exact: true })).toBeVisible()
+    // 单击即进系统文件选择器；中途不该冒出「上传文档 / 上传图片」菜单
+    const chooser = page.waitForEvent('filechooser')
+    await attach.click()
+    await expect(page.getByText('上传文档', { exact: true }), '不该再有上传菜单').toHaveCount(0)
+    await expect(page.getByText('上传图片', { exact: true }), '不该再有上传菜单').toHaveCount(0)
+    await (await chooser).setFiles([])
   })
 
   test('首次上传先确认隐私说明（无类别选项），取消则不上传也不建会话', async ({ page }) => {
@@ -191,7 +205,7 @@ test.describe('图片上传与识别', () => {
     expect(sent, '上传识别完成不得自动发送').toBe(0)
   })
 
-  test('图片满 3 张后只禁用「上传图片」，文档入口仍可用', async ({ page }) => {
+  test('图片满 3 张后仍能继续传文档；第 4 张图片被拦下并说明', async ({ page }) => {
     await installApiStubs(page, { extra: STUBS })
     await openComposer(page)
 
@@ -208,11 +222,14 @@ test.describe('图片上传与识别', () => {
     }
     await expect(dialog(page), '已同意过的用户不该再弹窗').toBeHidden()
 
-    const menu = await openAttachMenu(page)
-    await expect(menu.getByText('上传图片', { exact: true }), '图片已满时禁用图片入口')
-      .toHaveClass(/is-disabled/)
-    await expect(menu.getByText('上传文档', { exact: true }), '图片满了不能连带禁掉文档入口')
-      .not.toHaveClass(/is-disabled/)
+    // 第 4 张图片：菜单没了，不能再靠禁用入口，改为「拦下 + 说清楚」
+    await pickImage(page, 'd.jpg')
+    await expect(page.locator('.attachment-item'), '超出的图片不该进待发送列表').toHaveCount(3)
+    await expect(page.locator('.attachment-notice')).toContainText('一次最多带上 3 张图片')
+
+    // 图片满额不误伤文档入口：同一个按钮照样能传 PDF
+    await pickPdf(page)
+    await expect(page.locator('.attachment-item')).toHaveCount(4, { timeout: 20_000 })
   })
 
   test('被判为无关或看不清的图片不出现卡片，只给一句短提示', async ({ page }) => {

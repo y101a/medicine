@@ -24,7 +24,7 @@ import {
   readDocumentNoticeSeen, rememberDocumentNoticeSeen, readImageConsentSeen, rememberImageConsentSeen,
 } from '../stores/composerHints'
 import { useVoiceRecorder } from '../composables/useVoiceRecorder'
-import { useAttachments, formatAttachmentSize, ATTACHMENT_LIMIT, IMAGE_LIMIT } from '../composables/useAttachments'
+import { useAttachments, formatAttachmentSize, ATTACHMENT_LIMIT } from '../composables/useAttachments'
 import { IMAGE_CATEGORY_LABELS, IMAGE_CATEGORY_NOTICES, isUndecodableImage, type ImageCategory } from '../composables/imagePrep'
 import ImageUploadDialog from '../components/ImageUploadDialog.vue'
 import { voiceApi } from '../api/voice'
@@ -177,7 +177,6 @@ const voiceTitle = computed(() => {
 const documentNoticeSeen = ref(readDocumentNoticeSeen())
 const imageConsentSeen = ref(readImageConsentSeen())
 const fileInput = ref<HTMLInputElement>()
-const imageInput = ref<HTMLInputElement>()
 const dragging = ref(false)
 const imageDialogVisible = ref(false)
 /** 已选入、等待用户在弹窗里确认类别的图片（还没上传任何字节）。 */
@@ -185,7 +184,6 @@ const pendingImageFiles = ref<File[]>([])
 const {
   items: attachments,
   previews: attachmentPreviews,
-  imageCount,
   pendingName: attachmentPendingName,
   uploading: attachmentUploading,
   error: attachmentError,
@@ -200,11 +198,7 @@ const {
 
 const attachTitle = computed(() => attachments.value.length >= ATTACHMENT_LIMIT
   ? `一次最多带上 ${ATTACHMENT_LIMIT} 份附件`
-  : '添加附件：上传病历文档，或上传报告、片子、患处照片')
-const imageItemDisabled = computed(() => imageCount.value >= IMAGE_LIMIT)
-const imageAddTitle = computed(() => (imageItemDisabled.value
-  ? `一次最多带上 ${IMAGE_LIMIT} 张图片`
-  : '上传图片：报告单、片子或患处照片，类别由服务端自动判断'))
+  : '添加附件：可选病历文档（PDF / Word / PPT / txt / md）或图片（报告、片子、患处照片）')
 /**
  * 已上传图片的类别与能力边界。类别来自服务端自动分类的响应，前端只如实展示；
  * 被判为「无关 / 看不清」的图片根本不会进这个列表（契约第 10.2 节）。
@@ -224,18 +218,9 @@ const composerPlaceholder = computed(() => attachments.value.length
   : '描述您的症状或健康疑问，例如：什么时候开始、持续多久……')
 
 
-function chooseFiles() {
+/** 一个入口：直接打开本机文件选择器，不再先让用户选「文档还是图片」。 */
+function chooseAttachments() {
   if (!attachmentUploading.value) fileInput.value?.click()
-}
-
-function chooseImages() {
-  if (!attachmentUploading.value) imageInput.value?.click()
-}
-
-/** 一个附件入口、两个动作：文档与图片各走自己的隐藏选择器、预处理与后端接口。 */
-function onAttachCommand(command: string) {
-  if (command === 'document') chooseFiles()
-  else if (command === 'image') chooseImages()
 }
 
 /**
@@ -266,11 +251,26 @@ async function handleFiles(files: File[]) {
   await addAttachments(files, ensureConsultation)
 }
 
-function onFilePicked(event: Event) {
+async function onFilePicked(event: Event) {
   const target = event.target as HTMLInputElement
   const files = Array.from(target.files || [])
   target.value = ''
-  void handleFiles(files)
+  await handlePicked(files)
+}
+
+/**
+ * 点选与拖拽共用同一条分流逻辑：按类型拆开。
+ *
+ * 文档先走（它的首次说明是一个轻量确认框），图片随后走本地压缩 + 首次隐私确认；
+ * 两条路都遵守「上传完不自动发送」。顺序固定成先文档后图片，是为了避免两次上传同时进行
+ * （草稿区同一时刻只允许一个上传在跑）。
+ */
+async function handlePicked(files: File[]) {
+  if (!files.length) return
+  const images = files.filter(looksLikeImage)
+  const documents = files.filter(file => !looksLikeImage(file))
+  if (documents.length) await handleFiles(documents)
+  if (images.length) await openImageDialog(images)
 }
 
 /** 拖进来的可能是文档也可能是图片，也可能是 HEIC（浏览器解不开，要单独给说法）。 */
@@ -282,21 +282,14 @@ function looksLikeImage(file: File) {
  * 首次上传图片要先看一次隐私说明并勾选同意（服务端也会校验 `noticeAccepted`）；
  * 本机同意过就不再弹窗，之后的选图直接进入本地压缩与上传，**不再有类型选择**（契约第 10 节）。
  */
-function openImageDialog(files: File[]) {
+async function openImageDialog(files: File[]) {
   if (!files.length) return
   if (imageConsentSeen.value) {
-    void addImageAttachments(files, ensureConsultation)
+    await addImageAttachments(files, ensureConsultation)
     return
   }
   pendingImageFiles.value = files
   imageDialogVisible.value = true
-}
-
-function onImagePicked(event: Event) {
-  const target = event.target as HTMLInputElement
-  const files = Array.from(target.files || [])
-  target.value = ''
-  openImageDialog(files)
 }
 
 /** 首次确认后只上传、不发送——识别结果要用户自己核对后再点发送。 */
@@ -311,10 +304,7 @@ async function confirmImages() {
 
 function onDrop(event: DragEvent) {
   dragging.value = false
-  const files = Array.from(event.dataTransfer?.files || [])
-  const images = files.filter(looksLikeImage)
-  if (images.length) openImageDialog(images)
-  void handleFiles(files.filter(file => !looksLikeImage(file)))
+  void handlePicked(Array.from(event.dataTransfer?.files || []))
 }
 function modelName(message: Message) {
   if (message.modelName) return message.modelName
@@ -800,9 +790,8 @@ onBeforeRouteUpdate(canLeave)
             <strong>{{ boundary.label }}</strong>：{{ boundary.notice }}
           </li>
         </ul>
-        <input ref="fileInput" class="sr-only" type="file" multiple accept=".pdf,.docx,.pptx,.txt,.md" @change="onFilePicked" />
-        <input ref="imageInput" class="sr-only" type="file" multiple
-          accept="image/jpeg,image/png,image/webp" @change="onImagePicked" />
+        <input ref="fileInput" class="sr-only" type="file" multiple
+          accept=".pdf,.docx,.pptx,.txt,.md,image/jpeg,image/png,image/webp" @change="onFilePicked" />
         <label class="sr-only" for="symptom-input">症状或健康问题</label>
         <textarea id="symptom-input" ref="input" v-model="draft" :maxlength="DRAFT_LIMIT" rows="3" :disabled="saving || generating || !ready"
           :placeholder="composerPlaceholder" @keydown="keydown"></textarea>
@@ -832,28 +821,14 @@ onBeforeRouteUpdate(canLeave)
             <span v-else-if="voiceState === 'recording'" class="voice-status">录音中 {{ voiceSeconds }}s</span>
             <span v-else-if="voiceState === 'transcribing'" class="voice-status">正在识别…</span>
             <button v-if="voiceState === 'recording'" class="voice-cancel" type="button" @click="cancelRecording">取消</button>
-            <el-dropdown
-              trigger="click"
-              placement="top-start"
+            <button
+              class="attach-button"
+              type="button"
               :disabled="attachmentUploading || saving || generating || !ready || attachments.length >= ATTACHMENT_LIMIT"
-              @command="onAttachCommand"
-            >
-              <button
-                class="attach-button"
-                type="button"
-                :disabled="attachmentUploading || saving || generating || !ready || attachments.length >= ATTACHMENT_LIMIT"
-                aria-label="添加附件"
-                :title="attachTitle"
-              ><el-icon :size="18"><Paperclip /></el-icon></button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="document">上传文档</el-dropdown-item>
-                  <el-dropdown-item command="image" :disabled="imageItemDisabled" :title="imageAddTitle">
-                    上传图片
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
+              aria-label="添加附件"
+              :title="attachTitle"
+              @click="chooseAttachments"
+            ><el-icon :size="18"><Paperclip /></el-icon></button>
             <button
               class="voice-button"
               :class="{ recording: voiceState === 'recording' }"
@@ -869,7 +844,7 @@ onBeforeRouteUpdate(canLeave)
           </div>
         </div>
       </form>
-      <div class="composer-meta"><span>仅提供健康科普与就医分流，不作确诊，不替代医生；上传的文档不会被用来下诊断。</span><span>可用输入法语音输入（如豆包输入法） · 也可点麦克风录音 · 回形针可选择上传病历文档或图片（报告、片子、患处照片） · Enter 发送 · Shift + Enter 换行</span></div>
+      <div class="composer-meta"><span>仅提供健康科普与就医分流，不作确诊，不替代医生；上传的文档不会被用来下诊断。</span><span>可用输入法语音输入（如豆包输入法） · 也可点麦克风录音 · 回形针直接打开文件选择器，文档与图片按类型自动分流 · Enter 发送 · Shift + Enter 换行</span></div>
     </div>
     <ImageUploadDialog
       v-model="imageDialogVisible"

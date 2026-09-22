@@ -45,7 +45,7 @@ async function openComposer(page: Page) {
 }
 
 function pickFile(page: Page) {
-  // 输入区现在有两个文件入口（图片 / 文档），这里按 accept 精确定位文档那个。
+  // 输入区只有一个文件入口（文档与图片共用一个选择器），这里按 accept 里含 .pdf 定位它。
   return page.locator('input[type="file"][accept*=".pdf"]').setInputFiles({
     name: '血常规报告.pdf',
     mimeType: 'application/pdf',

@@ -80,7 +80,7 @@ export function useAttachments() {
     const accepted: File[] = []
     for (const file of files.slice(0, room)) {
       if (!attachmentKindOf(file)) {
-        error.value = '只支持 PDF、Word（.docx）、PPT（.pptx）、txt、md 文件；图片请从附件菜单选「上传图片」'
+        error.value = '只支持 PDF、Word（.docx）、PPT（.pptx）、txt、md 文件；报告单、片子、患处照片请传图片（jpg / png / webp），系统按类型自动分流'
         continue
       }
       if (file.size > ATTACHMENT_MAX_BYTES) {

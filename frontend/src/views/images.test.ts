@@ -10,7 +10,7 @@ import { consultationsApi } from '../api/consultations'
 import { modelsApi } from '../api/models'
 import { attachmentsApi } from '../api/attachments'
 import { ApiError } from '../api/http'
-import { IMAGE_CONSENT_STORAGE_KEY } from '../stores/composerHints'
+import { DOCUMENT_NOTICE_STORAGE_KEY, IMAGE_CONSENT_STORAGE_KEY } from '../stores/composerHints'
 import { ImagePrepError } from '../composables/imagePrep'
 import { IMAGE_LIMIT } from '../composables/useAttachments'
 import type { Attachment, ImageCategory, Message, MessageAttachment } from '../types/consultations'
@@ -49,12 +49,20 @@ const imageAttachment: Attachment = {
   imageCategory: 'report', mimeType: 'image/webp', width: 1600, height: 1200,
   imageAvailable: true, imageExpiresAt: '2026-12-20T10:00:00Z',
 }
+const documentAttachment: Attachment = {
+  id: 'd1', displayName: '血常规报告.pdf', kind: 'pdf', byteSize: 20480, pageCount: 2,
+  charCount: 860, preview: '白细胞计数 6.2', status: 'ready', createdAt: '2026-09-22',
+}
 const aiModels = [
   { id: 'glm-4.7-flash', name: '智谱 GLM-4.7 Flash', provider: 'zhipuai', providerName: '智谱 AI', description: '', isDefault: true, keySource: 'server' as const },
 ]
 
 function imageFile(name = 'IMG_1234.jpg', type = 'image/jpeg'): File {
   return new File([new Uint8Array(16)], name, { type })
+}
+
+function docxFile(name = '检查报告.docx', bytes = 2048): File {
+  return new File([new Uint8Array(bytes)], name)
 }
 
 async function setup(path = '/app/chat') {
@@ -96,6 +104,9 @@ beforeEach(() => {
   vi.mocked(consultationsApi.list).mockResolvedValue({ items: [conversation], hasMore: false })
   vi.mocked(modelsApi.list).mockResolvedValue(aiModels)
   vi.mocked(attachmentsApi.list).mockResolvedValue([])
+  vi.mocked(attachmentsApi.upload).mockImplementation(async (_cid, file) => ({
+    ...documentAttachment, id: `d-${file.name}`, displayName: file.name,
+  }))
   mockUploadedCategory('report')
   vi.mocked(attachmentsApi.content).mockResolvedValue(new Blob(['webp'], { type: 'image/webp' }))
   vi.mocked(attachmentsApi.remove).mockResolvedValue(undefined)
@@ -110,7 +121,7 @@ afterEach(() => {
   document.body.innerHTML = ''
 })
 
-function pickImages(wrapper: VueWrapper, files: File[]) {
+function pickFiles(wrapper: VueWrapper, files: File[]) {
   const input = wrapper.get('input[type="file"][accept*="image/jpeg"]')
   Object.defineProperty(input.element, 'files', { value: files, configurable: true })
   return input.trigger('change')
@@ -126,10 +137,6 @@ async function agreeConsent() {
   await flushPromises()
 }
 
-function dropdownItems() {
-  return Array.from(document.querySelectorAll<HTMLElement>('.el-dropdown-menu__item'))
-}
-
 /** el-dialog 关闭后 overlay 仍留在 DOM 里、只是 display:none；jsdom 没有布局，只能看内联样式。 */
 function dialogVisible() {
   const overlay = document.querySelector<HTMLElement>('.image-upload')?.closest<HTMLElement>('.el-overlay')
@@ -138,22 +145,23 @@ function dialogVisible() {
 
 /** 走完「选图 →（首次）同意 → 上传」。没有类别选择这一步。 */
 async function uploadImage(wrapper: VueWrapper, files: File[] = [imageFile()], agree = true) {
-  await pickImages(wrapper, files)
+  await pickFiles(wrapper, files)
   await flushPromises()
   if (agree) await agreeConsent()
   dialogButton('同意并上传')?.click()
   await flushPromises()
 }
 
-/** 本机已同意过的用户：必须在 `setup()` **之前**写标记，组件初始化时才会读到。 */
+/** 本机已同意过的用户：必须在 `setup()` **之前**写标记，组件初始化时才会读到。文档与图片都设上。 */
 async function setupConsented(path = '/app/chat') {
   localStorage.setItem(IMAGE_CONSENT_STORAGE_KEY, 'true')
+  localStorage.setItem(DOCUMENT_NOTICE_STORAGE_KEY, 'true')
   return setup(path)
 }
 
 /** 已同意过的用户选图后直接上传，不经过任何弹窗。 */
 async function uploadImageDirect(wrapper: VueWrapper, files: File[] = [imageFile()]) {
-  await pickImages(wrapper, files)
+  await pickFiles(wrapper, files)
   await flushPromises()
 }
 
@@ -167,24 +175,40 @@ describe('图片上传与识别（前端）', () => {
     wrapper.unmount()
   })
 
-  it('点附件按钮弹出「上传文档 / 上传图片」两个入口，各走自己的文件选择器', async () => {
+  it('点附件按钮直接打开本机文件选择器，一个选择器同时收文档与图片', async () => {
     const { wrapper } = await setup()
     const clickSpy = vi.spyOn(HTMLInputElement.prototype, 'click')
     await wrapper.get('button[aria-label="添加附件"]').trigger('click')
-    await flushPromises()
 
-    expect(dropdownItems().map(item => item.textContent?.trim())).toEqual(['上传文档', '上传图片'])
-
-    dropdownItems()[1]?.click()
-    await flushPromises()
     const clickedInput = clickSpy.mock.instances[0] as HTMLInputElement | undefined
-    expect(clickedInput?.getAttribute('accept')).toContain('image/jpeg')
+    expect(clickedInput, '按钮应直接触发本机文件选择器').toBeDefined()
+    const accept = clickedInput?.getAttribute('accept') || ''
+    expect(accept).toContain('.pdf')
+    expect(accept).toContain('.docx')
+    expect(accept).toContain('image/jpeg')
+    expect(accept).toContain('image/png')
+    // 只剩一个文件入口，因此也不该再有菜单
+    expect(wrapper.findAll('input[type="file"]')).toHaveLength(1)
+    expect(document.querySelector('.el-dropdown-menu')).toBeNull()
+    wrapper.unmount()
+  })
+
+  it('混合选中时按类型分流：文档先走 /attachments，图片再走 /images', async () => {
+    const { wrapper } = await setupConsented()
+    await pickFiles(wrapper, [docxFile(), imageFile('报告.jpg')])
+    await flushPromises()
+
+    expect(attachmentsApi.upload).toHaveBeenCalledWith('c1', expect.any(File))
+    expect(attachmentsApi.uploadImage).toHaveBeenCalledWith('c1', expect.any(File))
+    expect(vi.mocked(attachmentsApi.upload).mock.invocationCallOrder[0],
+      '两次上传不能同时跑，顺序固定为先文档后图片')
+      .toBeLessThan(vi.mocked(attachmentsApi.uploadImage).mock.invocationCallOrder[0])
     wrapper.unmount()
   })
 
   it('首次上传必须先勾选隐私说明；未同意传不出去，且请求里没有类别字段', async () => {
     const { wrapper } = await setup()
-    await pickImages(wrapper, [imageFile('血常规.jpg')])
+    await pickFiles(wrapper, [imageFile('血常规.jpg')])
     await flushPromises()
 
     expect(document.body.textContent).toContain('血常规.jpg')
@@ -207,7 +231,7 @@ describe('图片上传与识别（前端）', () => {
 
   it('取消弹窗不上传、也不建会话', async () => {
     const { wrapper } = await setup()
-    await pickImages(wrapper, [imageFile()])
+    await pickFiles(wrapper, [imageFile()])
     await flushPromises()
     await agreeConsent()
     dialogButton('取消')?.click()
