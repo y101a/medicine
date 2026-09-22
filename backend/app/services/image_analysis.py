@@ -264,7 +264,11 @@ async def analyze_image(
             except httpx.TimeoutException as exc:
                 will_retry = attempt < MAX_PROVIDER_ATTEMPTS
                 logger.warning(
-                    "Medical image provider request timed out",
+                    "Medical image provider request timed out: "
+                    "attempt=%s will_retry=%s exception_type=%s",
+                    attempt,
+                    will_retry,
+                    type(exc).__name__,
                     extra={
                         "provider_attempt": attempt,
                         "provider_will_retry": will_retry,
@@ -283,7 +287,11 @@ async def analyze_image(
             except httpx.RequestError as exc:
                 will_retry = attempt < MAX_PROVIDER_ATTEMPTS
                 logger.warning(
-                    "Medical image provider connection failed",
+                    "Medical image provider connection failed: "
+                    "attempt=%s will_retry=%s exception_type=%s",
+                    attempt,
+                    will_retry,
+                    type(exc).__name__,
                     extra={
                         "provider_attempt": attempt,
                         "provider_will_retry": will_retry,
@@ -306,7 +314,12 @@ async def analyze_image(
                     and attempt < MAX_PROVIDER_ATTEMPTS
                 )
                 logger.warning(
-                    "Medical image provider returned an error status",
+                    "Medical image provider returned an error status: "
+                    "attempt=%s will_retry=%s status=%s request_id=%s",
+                    attempt,
+                    will_retry,
+                    response.status_code,
+                    _provider_metadata(response)["provider_request_id"],
                     extra={
                         "provider_attempt": attempt,
                         "provider_will_retry": will_retry,
@@ -325,7 +338,14 @@ async def analyze_image(
             except (KeyError, IndexError, TypeError, ValueError, ValidationError) as exc:
                 will_retry = attempt < MAX_PROVIDER_ATTEMPTS
                 logger.warning(
-                    "Medical image provider returned an invalid response",
+                    "Medical image provider returned an invalid response: "
+                    "attempt=%s will_retry=%s status=%s request_id=%s "
+                    "exception_type=%s",
+                    attempt,
+                    will_retry,
+                    response.status_code,
+                    _provider_metadata(response)["provider_request_id"],
+                    type(exc).__name__,
                     extra={
                         "provider_attempt": attempt,
                         "provider_will_retry": will_retry,

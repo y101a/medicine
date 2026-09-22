@@ -452,6 +452,8 @@ async def test_image_analysis_retries_retryable_status_and_logs_safe_metadata(
     assert record.provider_attempt == 1
     assert record.provider_will_retry is True
     assert record.provider_request_id == "safe-request-123"
+    assert "status=503" in caplog.text
+    assert "request_id=safe-request-123" in caplog.text
     assert "sensitive upstream details" not in caplog.text
     assert "Bearer" not in caplog.text
     assert "base64" not in caplog.text
@@ -561,6 +563,8 @@ async def test_image_analysis_retries_invalid_response_without_logging_body(
     assert calls == 2
     assert raised.value.code == "IMAGE_PROVIDER_INVALID_RESPONSE"
     assert "patient-secret" not in raised.value.message
+    assert "request_id=response-request-456" in caplog.text
+    assert "exception_type=JSONDecodeError" in caplog.text
     assert "patient-secret" not in caplog.text
     assert all(record.provider_status == 200 for record in caplog.records)
     assert all(
