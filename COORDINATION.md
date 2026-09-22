@@ -62,12 +62,12 @@
 # DSH（前端）
 cd frontend
 npx vue-tsc --noEmit -p tsconfig.app.json                    # 期望退出码 0
-npx vitest run                                               # 期望 162 passed / 17 files
+npx vitest run                                               # 期望 163 passed / 17 files
 npm run build                                                # 期望退出码 0（含 vue-tsc -b，全量类型检查）
 
 # Codex（后端）
 cd backend
-.venv\Scripts\python.exe -m pytest -q                        # 期望 261 passed（Codex 2026-09-22 报告，见 7.2；DSH 上次实跑复核为 254）
+.venv\Scripts\python.exe -m pytest -q                        # 期望 267 passed（Codex 2026-09-22 报告，含 `0a20ec0` 图片自动分类；DSH 上次实跑复核为 254）
 .venv\Scripts\ruff.exe check app tests migrations            # 期望 All checks passed
 ```
 
@@ -97,6 +97,13 @@ Codex 新增 3 项（语音提示自动消失 ×2、允许仅附件发送 ×1）
 一个附件按钮 + 菜单、删除强制类别弹窗（保留首次敏感信息与阿里云外发确认），`uploadImage` 不再传 `imageCategory`、
 改用响应里的服务端自动分类展示类别与能力边界，并处理 `IMAGE_UNRELATED` / `IMAGE_CATEGORY_UNCLEAR`（失败图片不进
 待发送列表）。见 7.2。）
+（前端 162/17 → 163/17、E2E 47 → 47：**用户同一天又改了一次交互**——附件入口要「单击直接打开本机文件选择器」，
+不要先弹菜单。DSH 改为一个隐藏 input 用混合 `accept` + 按类型自动分流（与拖拽共用同一段逻辑），删除菜单与相关状态；
+上一条对菜单的描述因此作废。单测把 1 项菜单用例换成 2 项（单击直开选择器、混合分流的先后顺序），e2e 同步改写
+（不再有菜单；图片满额由「禁用入口」改为「拦下并说明」）。已按规则在第 6 节通报 Codex 更新契约第 10.1/10.4 节。见 7.2。）
+（后端 254 → 267：Codex 提交 `48cdabe`（加密图片工作流，迁移 `20260921_0018`）与 `0a20ec0`（第 10.3 节图片自动分类：
+上传不再要求 `imageCategory`、旧字段兼容并忽略、`unrelated`/`unclear` 返回受控 422 且不落库不落盘、无迁移）。
+按其 7.2 报告采信；**DSH 未复跑 `pytest`**（需要数据库，且属 Codex 所有权）。）
 
 **为什么 `npm run build` 是必须的**：Vitest 用 esbuild 剥离类型，**不做类型检查**，所以类型错误只在
 `npm run build`（`vue-tsc -b`）暴露。2026-09-17 实测：ECharts 选项类型不兼容时 Vitest 全绿、
@@ -157,6 +164,7 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 日期 | 提出方 | 目标文件 | 请求内容 | 状态 |
 | --- | --- | --- | --- | --- |
+| 2026-09-22 | DSH | `backend/docs/MEDICAL_IMAGES.md` 第 10.1/10.4 节（**契约文档属 Codex**）、`frontend/**` | **用户再次改变了刚冻结的交互：附件入口要「点一下直接打开本机文件选择器」，不要先弹菜单。** 用户先问「为什么上传文档和上传图片是分开选择的」，DSH 说明了菜单的由来（出自第 10.1 节，也是用户上次的决定）与两条路径的实质差别（接口、本地压缩/EXIF 剥离、留存：文档原件不留 vs 图片加密存 90 天、限额、同意版本），并给出技术选项；用户拍板选「改成单击直开混合文件选择器，按类型自动分流」。DSH 按此实施：一个隐藏 input 用混合 `accept`（`.pdf,.docx,.pptx,.txt,.md,image/jpeg,image/png,image/webp`），选中后按 `looksLikeImage` 分流——图片走本地压缩 + `/consultations/{id}/images`，文档走原路径，**与拖拽共用同一段逻辑**；`el-dropdown` 菜单、`imageItemDisabled`、`onAttachCommand` 一并删除。**请把第 10.1 节「点击后显示两个操作：上传文档和上传图片」与第 10.4 节第 1 条（菜单/Popover）改成「单一按钮直开混合选择器、按类型自动分流」。** 两点请确认或反驳：①原第 10.4 条要求「图片已满时只禁用图片入口、不误伤文档入口」，新交互下没有菜单项可禁用，DSH 改为「图片满 3 张后仍能继续上传文档，超出的图片给既有文案『一次最多带上 3 张图片，请先移除一张』」；②混选超过 5 项时 DSH 的顺序是**先满足文档、再按剩余名额处理图片**（沿用「多余的已忽略」文案），若你认为该反过来请说。 | 待 Codex 更新契约第 10.1/10.4 节；DSH 先按用户决定实施前端，并在 7.2 注明这是对契约的**有意偏离**（不是漏改） |
 | 2026-09-22 | Codex | `PROJECT_PROGRESS.md` | 请同步图片自动分类后端已由 `0a20ec0` 完成：上传不再要求 `imageCategory`，旧字段仅兼容且忽略；`unrelated/unclear` 返回受控 422 且不落库不落盘；无迁移；Ruff 全绿、后端完整测试 **267 passed**。前端统一入口已由 `533ff97` 完成，整项仍待无身份信息图片的真实阿里云/浏览器联调。 | 待 DSH 汇总 |
 | 2026-09-22 | Codex | `frontend/src/views/HomeView.vue`、`frontend/src/components/ImageUploadDialog.vue`、`frontend/src/api/attachments.ts`、`frontend/src/composables/useAttachments.ts`、`frontend/src/types/consultations.ts`、`frontend/src/stores/composerHints.ts`、图片相关 Vitest/Playwright 与 `frontend/BROWSER_ACCEPTANCE.md` | **用户已推翻 2026-09-21 的“上传前手选三类”决定；本行取代上方旧契约中的 `imageCategory 必填`。**请把文档/图片两个按钮合并为一个附件按钮，点击后显示“上传文档 / 上传图片”；删除强制选择图片类型的弹窗。图片类型由服务端固定视觉模型自动判断，前端 `uploadImage`/`addImages` 不再传类别，成功后只显示响应里的 `imageCategory`。首次敏感信息、90 天保存和阿里云外发确认仍保留一次，但不得再包含类别选择。处理 `IMAGE_UNRELATED`/`IMAGE_CATEGORY_UNCLEAR`，失败项不进入待发送附件。完整目标契约与测试清单见 `backend/docs/MEDICAL_IMAGES.md` 第 10 节。前端可先用接口桩改造；当前后端仍要求 `imageCategory`，在 Codex 完成后端前不得宣称真实联调通过。 | 已处理：前端 `533ff97`，后端 `0a20ec0`；自动化已通过，待真实阿里云与浏览器联调 |
 | 2026-09-21 | Codex | `frontend/**`（图片上传 UI、类型、API、状态与测试） | **图片契约已按用户最新决定冻结，完整设计见 `backend/docs/MEDICAL_IMAGES.md`。回复 DSH 的图片草案：**a) 新增 `POST /consultations/{id}/images`，底层复用附件表、消息 `attachmentIds`、列表和删除；b) 接受 JPG/PNG/WebP，前端压缩仅优化体验，后端重新解码并统一为无元数据 WebP；c) 图片独立上限 5 MiB/20MP/最长边规范化至 2400px，每条消息最多 3 张、文档+图片总计 5 项，图片无页数；d) 报告无文字用 `IMAGE_NO_TEXT`，其余错误码见设计文档；e) **用户已确认保存规范化加密图片 90 天**，原始上传字节不保存，识别文字随会话保留；f) `imageCategory=report|medical_imaging|body_photo` 必填。**不同意“片子/身体照片前端止步”**：三类都可上传，但 `medical_imaging` 仅识别类型/部位/标签/质量、不判读病灶，`body_photo` 只整理非诊断性可见事实并做就医分流。固定服务端阿里云 `qwen3.8-flash` 受控处理，不使用用户自带 Key；前端不得宣传 AI 看片或疾病识别。请先提交当前 4 个已验收未提交文件，再基于此契约调整 `imagePrep.ts` 并接线。 | 契约已冻结；待 Codex 后端完成后由 DSH 对接 |
@@ -185,11 +193,13 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 执行者 | 任务 | 正在改的文件 | 迁移编号 | 占用数据库 | 开始时间 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
+| DSH | **附件入口改为单击直开混合文件选择器**（用户 2026-09-22 决定，取代刚冻结的菜单交互；已在第 6 节通报 Codex 并请求更新契约第 10.1/10.4 节）：一个隐藏 input 用混合 `accept` + 按类型自动分流（与拖拽同一段逻辑）、删除 `el-dropdown` 菜单与相关状态、同步单测/Playwright/验收文档 | `frontend/src/views/HomeView.vue`、`frontend/src/views/images.test.ts`、`frontend/src/views/consultations.test.ts`、`frontend/e2e/images.spec.ts`、`frontend/e2e/attachments.spec.ts`、`frontend/BROWSER_ACCEPTANCE.md` | 无 | 否（只跑 vitest/build/e2e，不需要数据库） | 2026-09-22 | 已释放（提交 `fd83833` 后释放；单测 163/17、`npm run build` 通过、e2e 47（`layout.spec.ts` 负载抖动 1 项，隔离复跑 13 passed）。**交互有意偏离契约第 10.1/10.4 节，待 Codex 更新**；报告见 7.2） |
 | Codex | 医学图片后端：规范化与独立加密存储、固定阿里云视觉分析、图片上传/回显/删除、消息上下文、90 天清理、审计、测试与后端文档 | `backend/app/{core,models,schemas,services,api,ai}/**`（仅图片相关）、`backend/migrations/versions/20260921_0018_medical_images.py`、`backend/tests/test_medical_images.py`、`backend/docs/{API,DATA_MODEL,MEDICAL_IMAGES}.md`、`backend/.env.example` | `20260921_0018` | 是（迁移与完整 pytest） | 2026-09-21 | 已释放（2026-09-22 完成；报告见 7.2） |
 | DSH | 附件前端：上传/读取/删除、说明确认（`noticeAccepted`+`document-upload-v1`）、无会话时静默建会话、发送带 `attachmentIds`、上传中禁发、附件条与「附件已删除」墓碑、回答引用来源；另加账号删除入口 | `frontend/src/api/attachments.ts`（新）、`frontend/src/api/consultations.ts`、`frontend/src/api/users.ts`、`frontend/src/types/consultations.ts`、`frontend/src/composables/useAttachments.ts`（新）、`frontend/src/views/HomeView.vue`、`frontend/src/views/ProfileView.vue`、`frontend/src/views/consultations.test.ts`、`frontend/src/views/profile.test.ts`、`frontend/e2e/composer.spec.ts`、`frontend/e2e/attachments.spec.ts`（新）、`frontend/BROWSER_ACCEPTANCE.md` | 无 | 否 | 2026-09-21 | 已释放（2026-09-21 提交 `dedde9b` 后释放；报告见 7.2） |
 | DSH | **图片上传与识别前端**（用户 2026-09-21 要求；契约 `backend/docs/MEDICAL_IMAGES.md` 已由 Codex 冻结）：图片选入、客户端压缩与 EXIF/GPS 剥离、缩略图与预览、类别确认、能力边界与同意说明、单测与验收文档更新 | `frontend/src/composables/imagePrep.ts`（新）、`frontend/src/composables/imagePrep.test.ts`（新）、`frontend/src/components/ImageUploadDialog.vue`（新）、`frontend/src/components/MessageAttachments.vue`、`frontend/src/composables/useAttachments.ts`、`frontend/src/api/attachments.ts`、`frontend/src/types/consultations.ts`、`frontend/src/stores/composerHints.ts`、`frontend/src/views/HomeView.vue`、`frontend/src/views/consultations.test.ts`、`frontend/src/views/images.test.ts`（新）、`frontend/e2e/images.spec.ts`（新）、`frontend/e2e/attachments.spec.ts`、`frontend/BROWSER_ACCEPTANCE.md` | 无 | 否（只跑 vitest/e2e，不需要数据库） | 2026-09-21 | 已释放：`imagePrep.ts` 与 13 项单测已按契约改造（`33b5464`）；**UI 已接线并自测**——图片按钮在回形针左侧、`ImageUploadDialog` 选类别+首次同意（三类各自的边界文案）、`useAttachments.addImages` 逐张上传+Object URL 预览与释放、`MessageAttachments` 走鉴权接口取 Blob+到期墓碑、仅图片发送用图片版默认提问。**后端仍未落地**（`backend/docs/MEDICAL_IMAGES.md` 第 3 行仍写「尚未实现」），按契约第 9.4 条先用接口桩完成单测与 e2e。**已提交 `b3877c5` 并释放**；真实联调待 Codex 交付，届时要再动这些文件会重新登记 |
 | DSH | **临时接手后端 + 前端上限**（用户 2026-09-21 明确要求放宽上传限制，方案 B）：体积 10→30 MB、PDF/PPTX 页数 30→100、解析超时 30→60 秒、单条消息附件数 3→5、每 10 分钟上传次数 5→20；同步前端上限、文案与文档。**必须带迁移**：体积/页数/每条消息 position 三个 CHECK 约束写在 `20260921_0016` 建表时，只改 Pydantic 与 ORM 声明不生效（实测 position=3 被数据库直接拒绝）。所有权仍归 Codex，交付后释放 | `backend/app/core/config.py`、`backend/app/schemas/attachments.py`、`backend/app/schemas/consultations.py`、`backend/app/services/attachments.py`、`backend/app/services/document_extract.py`、`backend/app/services/document_extract_worker.py`、`backend/app/services/upload_limits.py`、`backend/app/models/attachment.py`、`backend/migrations/versions/20260921_0017_attachment_limits.py`（新）、`backend/tests/test_attachments.py`、`backend/docs/API.md`、`frontend/src/composables/useAttachments.ts`、`frontend/src/api/attachments.ts`、`frontend/src/views/consultations.test.ts` | `20260921_0017`（放宽三个 CHECK：体积 30 MB、页数 100、每条消息附件 position 0–4） | 是（跑 Alembic 迁移与 pytest 都需要本机 PostgreSQL；**只放宽 CHECK 约束，不加表、不加列**） | 2026-09-21 | 已释放（提交 `88a0b62`（后端）+`f81d515`（文档）+`f194c5c`（前端）后释放；迁移 `20260921_0017` 已应用；报告见 7.2） |
 | DSH | **统一附件入口 + 取消图片类型手选**（用户 2026-09-22 决定；契约 `backend/docs/MEDICAL_IMAGES.md` 第 10 节）：文档/图片合并为一个附件按钮 + 菜单、删除强制类别弹窗（保留首次隐私/90 天/阿里云外发确认）、`uploadImage` 与 `addImages` 不再传 `imageCategory`、用响应里的自动分类展示类别与能力边界、处理 `IMAGE_UNRELATED`/`IMAGE_CATEGORY_UNCLEAR`、同步单测/Playwright/验收文档 | `frontend/src/views/HomeView.vue`、`frontend/src/components/ImageUploadDialog.vue`、`frontend/src/api/attachments.ts`、`frontend/src/composables/useAttachments.ts`、`frontend/src/views/images.test.ts`、`frontend/src/views/consultations.test.ts`、`frontend/e2e/images.spec.ts`、`frontend/e2e/attachments.spec.ts`、`frontend/BROWSER_ACCEPTANCE.md` | 无 | 否（只跑 vitest/build/e2e，不需要数据库） | 2026-09-22 | 已释放（提交 `533ff97` 后释放；单测 159 → 162/17、`npm run build` 通过、e2e 44 → 47（全量跑时 `layout.spec.ts` 抖动 1 项，隔离复跑 13 passed）。**后端 §10.3 未落地，仍只做接口桩验证**；报告见 7.2） |
+| Codex | **图片识别错误诊断与重试**：区分鉴权/限流/网络/供应商拒绝/无效响应；对超时、连接、429、5xx 重试一次；安全日志与测试、后端文档 | `backend/app/services/image_analysis.py`、`backend/tests/test_medical_images.py`、`backend/docs/{API,MEDICAL_IMAGES}.md`、`COORDINATION.md` | 无 | 是（完整 pytest，不改结构） | 2026-09-22 | 进行中；不触碰 DSH 占用的 `frontend/**` |
 | — | — | — | — | — | — | — |
 
 （2026-09-18 01:40 说明：DSH 临时接手后端完成审查第 3 项后已释放；**分工表所有权归属未改**，
@@ -232,6 +242,11 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 > 本节按**写入时间**倒序（新条目插到最上）；条目标题里的时间戳是**工作发生时间**，两者不一定
 > 单调——例如 Codex 的 23:47 条目实际写在 DSH 的 23:58 条目之后。看到"乱序"不是错误，别去重排。
 
+### 2026-09-22 DSH 附件入口改为单击直开选择器 + 按类型分流（提交 `fd83833`；交互按用户当天第二次决定改写）
+- 改动（全部在 `frontend/`，均在 DSH 所有权内）：`HomeView.vue` 删除 `el-dropdown` 菜单与 `imageItemDisabled`/`imageAddTitle`/`onAttachCommand`/`chooseFiles`/`chooseImages`/`onImagePicked`，只留一个隐藏 input（混合 `accept`：`.pdf,.docx,.pptx,.txt,.md` + `image/jpeg,image/png,image/webp`）与一个按钮（仍在麦克风左侧、仍带 `aria-label="添加附件"`）；新增 `handlePicked(files)` 作为**点选与拖拽共用**的分流口（按 `looksLikeImage` 拆开、**先文档后图片**，代码注释写明顺序固定是为了避免两次上传同时进行）；`openImageDialog` 改 async 以便顺序等待；`useAttachments.ts` 的「不支持的类型」文案改为「系统按类型自动分流」；`BROWSER_ACCEPTANCE.md` 的 `images.spec.ts`/`attachments.spec.ts` 行与人工验收第 3 条同步。
+- 验证：`npx vitest run` = **163 passed / 17 files**（162 → 163：菜单用例换成「单击直开选择器」+「混合分流先后顺序」两项，后者用 `invocationCallOrder` 断言文档先于图片）；`npm run build`（含 `vue-tsc -b`）退出码 0；`npx playwright test` = **46 passed + 1 failed**，失败项仍是 `layout.spec.ts:65`「旧路径重定向到设置页的对应分栏」，**隔离复跑该文件 13 passed**，与本轮无交集，判定为并行负载抖动；全量里 8 项图片用例全部通过。首轮 3 项红都是 e2e 自身写错，已修：①`.el-dropdown-menu` 命中了页面上另一个（隐藏的）下拉，改为断言不存在「上传文档 / 上传图片」文案；②文档说明框用 `isVisible()` 抢跑，改成 `expect(...).toBeVisible()`；③`images.spec.ts` 桩表缺 `POST /consultations/*/attachments`，导致「图片满额仍能传文档」永远等不到第 4 张卡片。
+- 阻塞：无。**未验证**：与真实后端的联调（自动分类判对率、`unrelated`/`unclear` 的真实响应与「不落库不落盘」、刷新后分类恢复、90 天到期清理）。上一条报告写「后端 §10.3 未落地」，写完后 Codex 已以 `0a20ec0` 交付（其 7.2 报告称后端 267 passed、无迁移），**所以现在具备联调条件，但 DSH 本轮没做**；真实阿里云调用涉及费用与图片外发，须用户另行确认。
+- 下一步：用户确认后做真实联调（含不含身份信息的五类测试图片人工验收）；契约第 10.1/10.4 节目前仍写着「菜单」，已在第 6 节请求 Codex 更新——**它改完之前，本轮前端与契约文档是有意偏离，请不要按旧文档验收**。
 ### 2026-09-22 Codex 医学图片服务端自动分类（提交 `0a20ec0`）
 - 改动（全部在后端）：`POST /consultations/{id}/images` 不再要求 `imageCategory`；旧客户端字段继续接受但忽略。固定服务端 `qwen3.8-flash` 自动分类为 `report`、`medical_imaging`、`body_photo`、`unrelated`、`unclear`，前三类按原安全边界提取并保存，后两类在加密存储和数据库写入前返回 `IMAGE_UNRELATED` / `IMAGE_CATEGORY_UNCLEAR`。成功响应中的 `imageCategory` 只来自服务端分类。无数据库迁移。
 - 安全修复：图片文字继续按不可信数据处理，系统提示明确拒绝执行画面内指令；拒绝路径不保存附件、识别分块或密文文件。测试时额外发现并修复拒绝审计在 `rollback` 后访问过期用户对象导致 `MissingGreenlet` 的问题，现改为请求开始即保存用户 UUID。
@@ -244,6 +259,7 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 - 验证：`npx vitest run` = **162 passed / 17 files**（159 → 162）；`npm run build`（含 `vue-tsc -b`）退出码 0；`npx playwright test` = **46 passed + 1 failed**——失败项是 `layout.spec.ts`「旧路径重定向到设置页的对应分栏」（`toBeVisible` 找不到元素），**隔离复跑 `layout.spec.ts` 得 13 passed**，与图片改动无交集，判定为并行负载抖动；`e2e/images.spec.ts` 单跑 **8 passed**。图片用例走的是**真实用户路径**（点菜单 → 文件选择器 → 本地压缩 → 上传），并断言请求体**不含 `imageCategory`**、仍含 `noticeVersion`。顺带修掉单测里 `stream` 桩返回 `undefined` 被写回 `messages[index]` 造成的未捕获渲染错误。
 - 阻塞：无。**未验证**：真实 `POST /consultations/{id}/images`（不再传类别的版本）、真实自动分类的判对率、`IMAGE_UNRELATED`/`IMAGE_CATEGORY_UNCLEAR` 的真实响应与「不落库不落盘」。已提交的后端仍是**必填 `imageCategory`** 的版本，Codex 的 §10.3 改动此刻只在工作区（`M backend/app/api/routes/images.py`、`M backend/app/services/image_analysis.py` 等，DSH 一字未碰），所以**不得把本轮说成已联调**。
 - 下一步：等 Codex 释放 §10.3（后端把 `imageCategory` 改为可选兼容字段并忽略）后做真实联调，重点核对无关/看不清的图片不留数据库行与密文文件、响应里的分类能在刷新后恢复；再由用户用不含身份信息的五类测试图片人工验收（真实阿里云调用涉及费用与图片外发，须另行确认）。
+  **后记（2026-09-22 补记）**：本节写「已提交的后端仍是必填 `imageCategory` 的版本，Codex 的 §10.3 改动此刻只在工作区」——写完后 Codex 即以 `0a20ec0` 落地 §10.3，该表述已过期；此后端能力现可用于真实联调。
 ### 2026-09-22 Codex 合并上传入口与图片自动分类方案（纯文档）
 - 改动：更新 `backend/docs/MEDICAL_IMAGES.md` 第 10 节，明确单一附件按钮、文档/图片菜单、取消强制类别选择、服务端自动分类五值、无关/不清晰图片不落库，以及 Codex/DeepSeek 分工；在第 6 节新增给 DeepSeek 的前端交接行。未修改运行代码。
 - 验证：读回现有 `HomeView.vue`、`ImageUploadDialog.vue`、`useAttachments.ts`、`attachments.ts` 和后端图片接口后制定；本轮只做 Markdown 一致性检查，不运行代码测试。
