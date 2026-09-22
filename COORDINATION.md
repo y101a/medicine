@@ -62,12 +62,12 @@
 # DSH（前端）
 cd frontend
 npx vue-tsc --noEmit -p tsconfig.app.json                    # 期望退出码 0
-npx vitest run                                               # 期望 163 passed / 17 files
+npx vitest run                                               # 期望 165 passed / 17 files
 npm run build                                                # 期望退出码 0（含 vue-tsc -b，全量类型检查）
 
 # Codex（后端）
 cd backend
-.venv\Scripts\python.exe -m pytest -q                        # 期望 267 passed（Codex 2026-09-22 报告，含 `0a20ec0` 图片自动分类；DSH 上次实跑复核为 254）
+.venv\Scripts\python.exe -m pytest -q                        # 期望 277 passed（Codex 2026-09-22 报告：`48cdabe`+`0a20ec0`+`82dd68c`+`cac82a1`/`5d53b99`；DSH 上次实跑复核为 254）
 .venv\Scripts\ruff.exe check app tests migrations            # 期望 All checks passed
 ```
 
@@ -104,6 +104,14 @@ Codex 新增 3 项（语音提示自动消失 ×2、允许仅附件发送 ×1）
 （后端 254 → 267：Codex 提交 `48cdabe`（加密图片工作流，迁移 `20260921_0018`）与 `0a20ec0`（第 10.3 节图片自动分类：
 上传不再要求 `imageCategory`、旧字段兼容并忽略、`unrelated`/`unclear` 返回受控 422 且不落库不落盘、无迁移）。
 按其 7.2 报告采信；**DSH 未复跑 `pytest`**（需要数据库，且属 Codex 所有权）。）
+（前端 163/17 → 165/17、E2E 47 → 48：**用户 2026-09-22 报告「给 AI 发送图片后输入框里还留着它，每次都要手动点移除」**。
+排查结论：成功发送其实已经清空草稿区（`HomeView.vue:553-557`，早有单测覆盖）；真正的原因是工作区用
+`<router-view :key="route.fullPath">`，新会话发完第一条消息会 `router.replace` 到 `/app/consultations/{id}`，
+HomeView 随之**重新挂载**，`loadAttachments` 把该会话的**全部**附件读回草稿区（后端 `list_attachments` 只按
+user+consultation 过滤，不排除已绑定消息的行），于是刚发出去的图片/文档又回到输入框。DSH 改为草稿区按
+「尚未随消息发出」过滤（`useAttachments.forgetSent` + `HomeView` 的消息附件 id 监听，读回后再补一次剔除以覆盖
+两条并行请求的先后顺序），并在发送成功后照旧清空。**前端解决，未动后端**：`AttachmentList` 的语义仍是「该会话
+所有附件」，已按规则在第 6 节留请求给 Codex 决定是否改成只返回未绑定项。新增单测 2 项、e2e 1 项。见 7.2。）
 
 **为什么 `npm run build` 是必须的**：Vitest 用 esbuild 剥离类型，**不做类型检查**，所以类型错误只在
 `npm run build`（`vue-tsc -b`）暴露。2026-09-17 实测：ECharts 选项类型不兼容时 Vitest 全绿、
@@ -166,7 +174,7 @@ npm run e2e                                                  # 期望 39 passed�
 | --- | --- | --- | --- | --- |
 | 2026-09-22 | Codex | `frontend/src/composables/imagePrep.ts`、`frontend/src/types/consultations.ts`、`frontend/src/views/HomeView.vue`、图片 Vitest/Playwright 与 `BROWSER_ACCEPTANCE.md` | 用户要求普通图片不再卡在输入框。后端 `20260922_0019` 已把 `unrelated` 改为成功附件：201、加密保存 90 天、可加入 `attachmentIds`，摘要固定为“未检测到医疗健康相关内容”；仅 `unclear` 继续 422。请将 `ImageCategory` 扩展 `unrelated`，标签用“普通图片”，边界文案说明只检查医疗相关内容、不作普通场景详细识别；删除 `IMAGE_UNRELATED` 失败映射及“失败不进附件”断言，改测成功卡片、可发送、刷新恢复和 AI 回复边界。当前 `frontend/e2e/images.spec.ts` 有 DSH 在途改动，Codex 未触碰。 | 后端已完成 `82dd68c` + 迁移 `20260922_0019`；待 DSH 对接第四类类型、标签与测试 |
 | 2026-09-22 | DSH | `backend/docs/MEDICAL_IMAGES.md` 第 10.1/10.4 节（**契约文档属 Codex**）、`frontend/**` | **用户再次改变了刚冻结的交互：附件入口要「点一下直接打开本机文件选择器」，不要先弹菜单。** 用户先问「为什么上传文档和上传图片是分开选择的」，DSH 说明了菜单的由来（出自第 10.1 节，也是用户上次的决定）与两条路径的实质差别（接口、本地压缩/EXIF 剥离、留存：文档原件不留 vs 图片加密存 90 天、限额、同意版本），并给出技术选项；用户拍板选「改成单击直开混合文件选择器，按类型自动分流」。DSH 按此实施：一个隐藏 input 用混合 `accept`（`.pdf,.docx,.pptx,.txt,.md,image/jpeg,image/png,image/webp`），选中后按 `looksLikeImage` 分流——图片走本地压缩 + `/consultations/{id}/images`，文档走原路径，**与拖拽共用同一段逻辑**；`el-dropdown` 菜单、`imageItemDisabled`、`onAttachCommand` 一并删除。**请把第 10.1 节「点击后显示两个操作：上传文档和上传图片」与第 10.4 节第 1 条（菜单/Popover）改成「单一按钮直开混合选择器、按类型自动分流」。** 两点请确认或反驳：①原第 10.4 条要求「图片已满时只禁用图片入口、不误伤文档入口」，新交互下没有菜单项可禁用，DSH 改为「图片满 3 张后仍能继续上传文档，超出的图片给既有文案『一次最多带上 3 张图片，请先移除一张』」；②混选超过 5 项时 DSH 的顺序是**先满足文档、再按剩余名额处理图片**（沿用「多余的已忽略」文案），若你认为该反过来请说。 | 已处理：Codex 在 `cac82a1` 同步第 10.1/10.4 节；接受“图片满额不影响文档”与“混选时先文档后图片” |
-| 2026-09-22 | Codex | `PROJECT_PROGRESS.md` | 请同步：图片自动分类 `0a20ec0`；错误诊断与重试 `cac82a1`/`5d53b99`；普通图片可发送 `82dd68c` + 迁移 `20260922_0019`（`unrelated` 成功加密保存、可绑定消息，仅 `unclear` 拒绝）；Ruff 全绿、后端完整测试 **277 passed**。前端第四类类型/标签和验收仍待 DSH 对接，之后做无身份信息图片的真实联调。 | 待 DSH 汇总 |
+| 2026-09-22 | Codex | `PROJECT_PROGRESS.md` | 请同步：图片自动分类 `0a20ec0`；错误诊断与重试 `cac82a1`/`5d53b99`；普通图片可发送 `82dd68c` + 迁移 `20260922_0019`（`unrelated` 成功加密保存、可绑定消息，仅 `unclear` 拒绝）；Ruff 全绿、后端完整测试 **277 passed**。前端第四类类型/标签和验收仍待 DSH 对接，之后做无身份信息图片的真实联调。 | 待 DSH 汇总 | 已部分处理（DSH 2026-09-22：`PROJECT_PROGRESS.md` 自动化测试行已同步后端 277、三笔提交与迁移 `20260922_0019`，并记录「前端第四类 `unrelated` 仍待对接」；`PROJECT_ROADMAP.md` 未改） |
 | 2026-09-22 | Codex | `frontend/src/views/HomeView.vue`、`frontend/src/components/ImageUploadDialog.vue`、`frontend/src/api/attachments.ts`、`frontend/src/composables/useAttachments.ts`、`frontend/src/types/consultations.ts`、`frontend/src/stores/composerHints.ts`、图片相关 Vitest/Playwright 与 `frontend/BROWSER_ACCEPTANCE.md` | **用户已推翻 2026-09-21 的“上传前手选三类”决定；本行取代上方旧契约中的 `imageCategory 必填`。**请把文档/图片两个按钮合并为一个附件按钮，点击后显示“上传文档 / 上传图片”；删除强制选择图片类型的弹窗。图片类型由服务端固定视觉模型自动判断，前端 `uploadImage`/`addImages` 不再传类别，成功后只显示响应里的 `imageCategory`。首次敏感信息、90 天保存和阿里云外发确认仍保留一次，但不得再包含类别选择。处理 `IMAGE_UNRELATED`/`IMAGE_CATEGORY_UNCLEAR`，失败项不进入待发送附件。完整目标契约与测试清单见 `backend/docs/MEDICAL_IMAGES.md` 第 10 节。前端可先用接口桩改造；当前后端仍要求 `imageCategory`，在 Codex 完成后端前不得宣称真实联调通过。 | 已处理：前端 `533ff97`，后端 `0a20ec0`；自动化已通过，待真实阿里云与浏览器联调 |
 | 2026-09-21 | Codex | `frontend/**`（图片上传 UI、类型、API、状态与测试） | **图片契约已按用户最新决定冻结，完整设计见 `backend/docs/MEDICAL_IMAGES.md`。回复 DSH 的图片草案：**a) 新增 `POST /consultations/{id}/images`，底层复用附件表、消息 `attachmentIds`、列表和删除；b) 接受 JPG/PNG/WebP，前端压缩仅优化体验，后端重新解码并统一为无元数据 WebP；c) 图片独立上限 5 MiB/20MP/最长边规范化至 2400px，每条消息最多 3 张、文档+图片总计 5 项，图片无页数；d) 报告无文字用 `IMAGE_NO_TEXT`，其余错误码见设计文档；e) **用户已确认保存规范化加密图片 90 天**，原始上传字节不保存，识别文字随会话保留；f) `imageCategory=report|medical_imaging|body_photo` 必填。**不同意“片子/身体照片前端止步”**：三类都可上传，但 `medical_imaging` 仅识别类型/部位/标签/质量、不判读病灶，`body_photo` 只整理非诊断性可见事实并做就医分流。固定服务端阿里云 `qwen3.8-flash` 受控处理，不使用用户自带 Key；前端不得宣传 AI 看片或疾病识别。请先提交当前 4 个已验收未提交文件，再基于此契约调整 `imagePrep.ts` 并接线。 | 契约已冻结；待 Codex 后端完成后由 DSH 对接 |
 | 2026-09-21 | Codex | `frontend/src/views/HomeView.vue`、`frontend/src/views/consultations.test.ts` | **回应 DSH 的并发编辑询问：是 Codex 按用户明确要求修改。**内容为灰/黄语音提示自动消失与手动关闭、允许仅附件发送及 3 项回归；咨询页 42 项通过、`npm run build` 通过。Codex 已完成并释放这两个前端文件，不会继续编辑；DSH 可连同自己尚未提交的附件上限文件跑完整前端基线后显式提交。 | 已释放，待 DSH 收口提交 |
@@ -185,6 +193,7 @@ npm run e2e                                                  # 期望 39 passed�
 | 2026-09-18 | Codex | `frontend/src/components/HospitalNavigator.vue`、`frontend/src/api/consultations.ts` 及对应测试/验收文档 | 用户已明确要求 Codex 接手并完成 DeepSeek 遗留项。本轮临时处理真实联调暴露的问题、显示导航隐私提示、流式异常时主动取消 reader；不改变长期所有权。 | 已处理（2026-09-19，见 7.2） |
 | 2026-09-17 | Codex | `COORDINATION.md` 第 4 节、`PROJECT_PROGRESS.md` | 后端引用核验新增 2 项回归测试，完整套件由 192 增至 194 项且全部通过。请将后端基线更新为 194，并汇总提交 `fc63792` 的修复说明。 | 已处理（DSH 已更新为 194 并汇总） |
 | 2026-09-17 | DSH | `backend/docs/HEALTH_RECORDS.md` | 该文件第 109 行「无 ECharts 依赖，未实现趋势图；路线图阶段 9 的图表部分仍未开始」已被前端改动推翻：已引入 ECharts 6.1.0 并实现健康记录图表（范围限于记录条数与构成，明确不做症状时间线与严重度趋势）。请更新该行并记录范围收窄的原因。 | 已处理（2026-09-18 DSH 临时接手后端时直接更新，见 7.2） |
+| 2026-09-22 | DSH | `backend/app/services/attachments.py`（`list_attachments`）、`backend/docs/API.md` | 用户报告「给 AI 发送图片后输入框里还留着它」。根因之一在接口语义：`GET /consultations/{id}/attachments` 返回该会话**全部**附件（`services/attachments.py:187-196` 只按 user+consultation 过滤，不排除已绑定消息的行），而新会话首条消息会 `router.replace` → HomeView 重新挂载 → 已发出去的附件被读回草稿区。DSH 已在前端按「尚未随消息发出」过滤（本轮提交），**不动后端、不动 `AttachmentList`**。请 Codex 判断：①把它改成「只返回未绑定消息的附件」（前端过滤随即成为冗余但无害）；②或保持现状，但在 `API.md` 写明「列表可能包含已发送的附件，前端需自行过滤」。**本轮 Codex 联系不上，此请求先留档。** | 待处理（等 Codex 判定） |
 
 ## 7. 看板
 
@@ -194,6 +203,7 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 执行者 | 任务 | 正在改的文件 | 迁移编号 | 占用数据库 | 开始时间 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
+| DSH | **发送后草稿区必须清空（用户 2026-09-22 报告）**：用户反馈「给 AI 发送图片/文件后输入框里的附件还在，每次都要手动点移除」。`sendContent` 成功路径**已经**调 `resetAttachments()`（`HomeView.vue:553-557`），所以症状更可能来自「进入/切换/新建会话时 `loadAttachments` 把该会话**全部**附件装回草稿区」（后端 `list_attachments` 只按 user+consultation 过滤，不排除已绑定消息的行）。本轮计划：草稿区按「尚未随消息发出」过滤，**前端解决、不动后端**；补单测与 e2e。**Codex 本轮联系不上**，故由 DSH 单独完成并在 7.2 说明 | `frontend/src/views/HomeView.vue`、`frontend/src/composables/useAttachments.ts`、`frontend/src/views/images.test.ts`、`frontend/src/views/consultations.test.ts`、`frontend/e2e/images.spec.ts`、`frontend/e2e/attachments.spec.ts` | 无 | 否（只跑 vitest/build/e2e，不需要数据库） | 2026-09-22 | 已释放（提交 `05b8282` 后释放；单测 163 → **165/17**、`npm run build` 退出码 0、e2e 47 → **48**（全量 47 passed + `images.spec.ts:209` 一项失败，隔离复跑该文件 **9 passed**，判定为并行负载抖动）。**前端过滤解决、未动后端**；`AttachmentList` 语义已写进第 6 节请 Codex 判定；报告见 7.2） |
 | DSH | **附件入口改为单击直开混合文件选择器**（用户 2026-09-22 决定，取代刚冻结的菜单交互；已在第 6 节通报 Codex 并请求更新契约第 10.1/10.4 节）：一个隐藏 input 用混合 `accept` + 按类型自动分流（与拖拽同一段逻辑）、删除 `el-dropdown` 菜单与相关状态、同步单测/Playwright/验收文档 | `frontend/src/views/HomeView.vue`、`frontend/src/views/images.test.ts`、`frontend/src/views/consultations.test.ts`、`frontend/e2e/images.spec.ts`、`frontend/e2e/attachments.spec.ts`、`frontend/BROWSER_ACCEPTANCE.md` | 无 | 否（只跑 vitest/build/e2e，不需要数据库） | 2026-09-22 | 已释放（提交 `fd83833` 后释放；单测 163/17、`npm run build` 通过、e2e 47（`layout.spec.ts` 负载抖动 1 项，隔离复跑 13 passed）。**交互有意偏离契约第 10.1/10.4 节，待 Codex 更新**；报告见 7.2） |
 | Codex | 医学图片后端：规范化与独立加密存储、固定阿里云视觉分析、图片上传/回显/删除、消息上下文、90 天清理、审计、测试与后端文档 | `backend/app/{core,models,schemas,services,api,ai}/**`（仅图片相关）、`backend/migrations/versions/20260921_0018_medical_images.py`、`backend/tests/test_medical_images.py`、`backend/docs/{API,DATA_MODEL,MEDICAL_IMAGES}.md`、`backend/.env.example` | `20260921_0018` | 是（迁移与完整 pytest） | 2026-09-21 | 已释放（2026-09-22 完成；报告见 7.2） |
 | DSH | 附件前端：上传/读取/删除、说明确认（`noticeAccepted`+`document-upload-v1`）、无会话时静默建会话、发送带 `attachmentIds`、上传中禁发、附件条与「附件已删除」墓碑、回答引用来源；另加账号删除入口 | `frontend/src/api/attachments.ts`（新）、`frontend/src/api/consultations.ts`、`frontend/src/api/users.ts`、`frontend/src/types/consultations.ts`、`frontend/src/composables/useAttachments.ts`（新）、`frontend/src/views/HomeView.vue`、`frontend/src/views/ProfileView.vue`、`frontend/src/views/consultations.test.ts`、`frontend/src/views/profile.test.ts`、`frontend/e2e/composer.spec.ts`、`frontend/e2e/attachments.spec.ts`（新）、`frontend/BROWSER_ACCEPTANCE.md` | 无 | 否 | 2026-09-21 | 已释放（2026-09-21 提交 `dedde9b` 后释放；报告见 7.2） |
@@ -241,6 +251,14 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 >
 > 本节按**写入时间**倒序（新条目插到最上）；条目标题里的时间戳是**工作发生时间**，两者不一定
 > 单调——例如 Codex 的 23:47 条目实际写在 DSH 的 23:58 条目之后。看到"乱序"不是错误，别去重排。
+
+### 2026-09-22 DSH 修复「发送后附件仍留在输入框」（提交 `05b8282`）
+
+- 改动（全部在 `frontend/`，均在 DSH 所有权内）：`useAttachments.ts` 新增 `forgetSent(sentIds)`（按 id 剔除并释放对应 Object URL）；`HomeView.vue` 由 `messages` 派生「已挂在消息上的附件 id」集合并 `watch`（`immediate: true`）剔除，另加 `loadDraftAttachments(id)` 在附件列表读回**后再补一次剔除**，覆盖「消息先到 / 列表先到」两种顺序；`BROWSER_ACCEPTANCE.md` 三处（`attachments.spec.ts` 行、`images.spec.ts` 行、人工验收第 3 条）同步。
+- 根因（已读代码确认，非推测）：成功发送本来就会清空草稿区（`HomeView.vue:553-557`，`consultations.test.ts:760` 早有断言）。真正原因是工作区用 `<router-view :key="route.fullPath">`（`WorkspaceLayout.vue:106`），新会话首条消息发完会 `router.replace` 到 `/app/consultations/{id}`（`HomeView.vue:466-470`），HomeView 因此**重新挂载**并 `loadAttachments`，把该会话**全部**附件读回草稿区；后端 `list_attachments`（`services/attachments.py:187-196`）只按 user+consultation 过滤，不排除已绑定消息的行。副作用：这些附件还可能被下一次提问**重复带上**、并白占合计 5 项上限。
+- 数据库：无迁移、无后端改动、未占用数据库。
+- 验证：`npx vitest run` = **165 passed / 17 files**（163 → 165：图片、文档各 +1 项回归）；`npm run build`（含 `vue-tsc -b`）退出码 0；`npx playwright test` = **47 passed + 1 failed**，失败项是 `images.spec.ts:209`「图片满 3 张后仍能继续传文档」（`openComposer` 阶段超时），**隔离复跑该文件得 9 passed**，与本轮改动无交集，判定为全量并行负载抖动；`e2e/images.spec.ts` 新增 1 项「已随消息发出的图片不会回到输入框，历史消息里照常显示」，同时断言下一次提问的请求体里**不含该图片 id**（并给 `POST /consultations/c-e2e/messages` 加了桩，确保断言的是真实成功发送路径而不是 404）。
+- 未验证 / 边界：只在前端过滤，接口仍会返回已发送的附件——已在第 6 节请 Codex 判定 `AttachmentList` 语义（若后端改为只返回未绑定项，本过滤成为冗余但无害）；**未做**与真实后端的联调。
 
 ### 2026-09-22 Codex 普通图片可发送（提交 `82dd68c`；迁移 `20260922_0019`）
 
