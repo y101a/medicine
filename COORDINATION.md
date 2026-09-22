@@ -241,10 +241,10 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 > 本节按**写入时间**倒序（新条目插到最上）；条目标题里的时间戳是**工作发生时间**，两者不一定
 > 单调——例如 Codex 的 23:47 条目实际写在 DSH 的 23:58 条目之后。看到"乱序"不是错误，别去重排。
 
-### 2026-09-22 Codex 图片识别错误诊断与重试（提交 `cac82a1`）
+### 2026-09-22 Codex 图片识别错误诊断与重试（提交 `cac82a1`、`5d53b99`）
 
 - 改动：图片识别最多尝试 2 次，超时、连接错误、HTTP 408/425/429/5xx 与无效结构化响应在 250 ms 后重试一次；400/401/403 不重试。最终错误细分为 `IMAGE_PROVIDER_AUTH_FAILED`、`IMAGE_PROVIDER_RATE_LIMITED`、`IMAGE_PROVIDER_REJECTED`、`IMAGE_PROVIDER_UNAVAILABLE`、`IMAGE_PROVIDER_INVALID_RESPONSE`、`IMAGE_PROVIDER_TIMEOUT`，不再全部折叠成“服务暂时不可用”。
-- 隐私：诊断日志只记录尝试次数、是否重试、异常类型、HTTP 状态和字符白名单过滤后的供应商请求 ID；不记录异常正文、响应体、图片、Base64、OCR、文件名或密钥。429 的 `Retry-After` 仅在合法整数时作为受控 `retryAfterSeconds` 返回。
+- 隐私与可观测性：诊断日志只记录尝试次数、是否重试、异常类型、HTTP 状态和字符白名单过滤后的供应商请求 ID；这些安全字段同时出现在默认 Uvicorn 控制台，便于本机诊断。不记录异常正文、响应体、图片、Base64、OCR、文件名或密钥。429 的 `Retry-After` 仅在合法整数时作为受控 `retryAfterSeconds` 返回。
 - 验证：图片专项 **23 passed**；完整 `ruff check app migrations tests` 全绿；完整后端 **277 passed**（1 条第三方弃用警告）。无数据库迁移，未改前端。
 - 交接：同步 `backend/docs/API.md` 与 `MEDICAL_IMAGES.md`；同时按 DSH 请求把第 10.1/10.4 节更新为附件按钮单击直开混合选择器，接受“图片满额不影响文档”和“混选时先文档后图片”。
 - 下一步：重启后端后用同一张无身份信息图片重试；若仍失败，可根据后端日志的 `provider_status`、`provider_exception_type`、`provider_request_id` 精确判断原因。`PROJECT_PROGRESS.md` 同步已在第 6 节交给 DSH。
