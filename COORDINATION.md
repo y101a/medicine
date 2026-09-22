@@ -164,8 +164,9 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 日期 | 提出方 | 目标文件 | 请求内容 | 状态 |
 | --- | --- | --- | --- | --- |
+| 2026-09-22 | Codex | `frontend/src/composables/imagePrep.ts`、`frontend/src/types/consultations.ts`、`frontend/src/views/HomeView.vue`、图片 Vitest/Playwright 与 `BROWSER_ACCEPTANCE.md` | 用户要求普通图片不再卡在输入框。后端 `20260922_0019` 已把 `unrelated` 改为成功附件：201、加密保存 90 天、可加入 `attachmentIds`，摘要固定为“未检测到医疗健康相关内容”；仅 `unclear` 继续 422。请将 `ImageCategory` 扩展 `unrelated`，标签用“普通图片”，边界文案说明只检查医疗相关内容、不作普通场景详细识别；删除 `IMAGE_UNRELATED` 失败映射及“失败不进附件”断言，改测成功卡片、可发送、刷新恢复和 AI 回复边界。当前 `frontend/e2e/images.spec.ts` 有 DSH 在途改动，Codex 未触碰。 | 后端已完成 `82dd68c` + 迁移 `20260922_0019`；待 DSH 对接第四类类型、标签与测试 |
 | 2026-09-22 | DSH | `backend/docs/MEDICAL_IMAGES.md` 第 10.1/10.4 节（**契约文档属 Codex**）、`frontend/**` | **用户再次改变了刚冻结的交互：附件入口要「点一下直接打开本机文件选择器」，不要先弹菜单。** 用户先问「为什么上传文档和上传图片是分开选择的」，DSH 说明了菜单的由来（出自第 10.1 节，也是用户上次的决定）与两条路径的实质差别（接口、本地压缩/EXIF 剥离、留存：文档原件不留 vs 图片加密存 90 天、限额、同意版本），并给出技术选项；用户拍板选「改成单击直开混合文件选择器，按类型自动分流」。DSH 按此实施：一个隐藏 input 用混合 `accept`（`.pdf,.docx,.pptx,.txt,.md,image/jpeg,image/png,image/webp`），选中后按 `looksLikeImage` 分流——图片走本地压缩 + `/consultations/{id}/images`，文档走原路径，**与拖拽共用同一段逻辑**；`el-dropdown` 菜单、`imageItemDisabled`、`onAttachCommand` 一并删除。**请把第 10.1 节「点击后显示两个操作：上传文档和上传图片」与第 10.4 节第 1 条（菜单/Popover）改成「单一按钮直开混合选择器、按类型自动分流」。** 两点请确认或反驳：①原第 10.4 条要求「图片已满时只禁用图片入口、不误伤文档入口」，新交互下没有菜单项可禁用，DSH 改为「图片满 3 张后仍能继续上传文档，超出的图片给既有文案『一次最多带上 3 张图片，请先移除一张』」；②混选超过 5 项时 DSH 的顺序是**先满足文档、再按剩余名额处理图片**（沿用「多余的已忽略」文案），若你认为该反过来请说。 | 已处理：Codex 在 `cac82a1` 同步第 10.1/10.4 节；接受“图片满额不影响文档”与“混选时先文档后图片” |
-| 2026-09-22 | Codex | `PROJECT_PROGRESS.md` | 请同步：图片自动分类后端 `0a20ec0`；错误诊断与单次重试 `cac82a1`（鉴权/限流/拒绝/网络/无效响应/超时分码，安全日志）；无迁移；Ruff 全绿、后端完整测试 **277 passed**。前端附件入口已由 `fd83833` 改为单击直开混合选择器并自动分流。整项仍待无身份信息图片的真实阿里云/浏览器联调。 | 待 DSH 汇总 |
+| 2026-09-22 | Codex | `PROJECT_PROGRESS.md` | 请同步：图片自动分类 `0a20ec0`；错误诊断与重试 `cac82a1`/`5d53b99`；普通图片可发送 `82dd68c` + 迁移 `20260922_0019`（`unrelated` 成功加密保存、可绑定消息，仅 `unclear` 拒绝）；Ruff 全绿、后端完整测试 **277 passed**。前端第四类类型/标签和验收仍待 DSH 对接，之后做无身份信息图片的真实联调。 | 待 DSH 汇总 |
 | 2026-09-22 | Codex | `frontend/src/views/HomeView.vue`、`frontend/src/components/ImageUploadDialog.vue`、`frontend/src/api/attachments.ts`、`frontend/src/composables/useAttachments.ts`、`frontend/src/types/consultations.ts`、`frontend/src/stores/composerHints.ts`、图片相关 Vitest/Playwright 与 `frontend/BROWSER_ACCEPTANCE.md` | **用户已推翻 2026-09-21 的“上传前手选三类”决定；本行取代上方旧契约中的 `imageCategory 必填`。**请把文档/图片两个按钮合并为一个附件按钮，点击后显示“上传文档 / 上传图片”；删除强制选择图片类型的弹窗。图片类型由服务端固定视觉模型自动判断，前端 `uploadImage`/`addImages` 不再传类别，成功后只显示响应里的 `imageCategory`。首次敏感信息、90 天保存和阿里云外发确认仍保留一次，但不得再包含类别选择。处理 `IMAGE_UNRELATED`/`IMAGE_CATEGORY_UNCLEAR`，失败项不进入待发送附件。完整目标契约与测试清单见 `backend/docs/MEDICAL_IMAGES.md` 第 10 节。前端可先用接口桩改造；当前后端仍要求 `imageCategory`，在 Codex 完成后端前不得宣称真实联调通过。 | 已处理：前端 `533ff97`，后端 `0a20ec0`；自动化已通过，待真实阿里云与浏览器联调 |
 | 2026-09-21 | Codex | `frontend/**`（图片上传 UI、类型、API、状态与测试） | **图片契约已按用户最新决定冻结，完整设计见 `backend/docs/MEDICAL_IMAGES.md`。回复 DSH 的图片草案：**a) 新增 `POST /consultations/{id}/images`，底层复用附件表、消息 `attachmentIds`、列表和删除；b) 接受 JPG/PNG/WebP，前端压缩仅优化体验，后端重新解码并统一为无元数据 WebP；c) 图片独立上限 5 MiB/20MP/最长边规范化至 2400px，每条消息最多 3 张、文档+图片总计 5 项，图片无页数；d) 报告无文字用 `IMAGE_NO_TEXT`，其余错误码见设计文档；e) **用户已确认保存规范化加密图片 90 天**，原始上传字节不保存，识别文字随会话保留；f) `imageCategory=report|medical_imaging|body_photo` 必填。**不同意“片子/身体照片前端止步”**：三类都可上传，但 `medical_imaging` 仅识别类型/部位/标签/质量、不判读病灶，`body_photo` 只整理非诊断性可见事实并做就医分流。固定服务端阿里云 `qwen3.8-flash` 受控处理，不使用用户自带 Key；前端不得宣传 AI 看片或疾病识别。请先提交当前 4 个已验收未提交文件，再基于此契约调整 `imagePrep.ts` 并接线。 | 契约已冻结；待 Codex 后端完成后由 DSH 对接 |
 | 2026-09-21 | Codex | `frontend/src/views/HomeView.vue`、`frontend/src/views/consultations.test.ts` | **回应 DSH 的并发编辑询问：是 Codex 按用户明确要求修改。**内容为灰/黄语音提示自动消失与手动关闭、允许仅附件发送及 3 项回归；咨询页 42 项通过、`npm run build` 通过。Codex 已完成并释放这两个前端文件，不会继续编辑；DSH 可连同自己尚未提交的附件上限文件跑完整前端基线后显式提交。 | 已释放，待 DSH 收口提交 |
@@ -240,6 +241,14 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 >
 > 本节按**写入时间**倒序（新条目插到最上）；条目标题里的时间戳是**工作发生时间**，两者不一定
 > 单调——例如 Codex 的 23:47 条目实际写在 DSH 的 23:58 条目之后。看到"乱序"不是错误，别去重排。
+
+### 2026-09-22 Codex 普通图片可发送（提交 `82dd68c`；迁移 `20260922_0019`）
+
+- 改动：`unrelated` 从 422 拒绝改为第四种成功图片附件；后端返回 201，按现有流程去元数据、WebP 规范化、每图 AES-GCM 加密并保留 90 天，可加入 `attachmentIds`。识别分块固定说明“未检测到医疗健康相关内容”；只有 `unclear` 继续拒绝且不落库、不落盘。
+- 安全边界：聊天模型只收到受限摘要，不直接收到像素；上下文明确禁止把普通图片当医疗证据、推断健康信息或假装看到了未提取的普通场景细节。分析版本升为 `medical-image-auto-category-v3`。
+- 数据库：迁移扩展 `ck_attachments_image_category_supported`。已实测 `0018 -> 0019`、`0019 -> 0018 -> 0019`，最终 `alembic current = 20260922_0019 (head)`；若降级时已有普通图片附件会保守失败，须先经应用删除，避免遗留加密文件。
+- 验证：图片专项 **23 passed**；完整 Ruff 全绿；后端完整 **277 passed**（1 条第三方弃用警告）。新增回归覆盖普通图片落密文、加密摘要、消息绑定及受限上下文，继续覆盖 `unclear` 无残留。
+- 前端交接：第 6 节已要求 DSH 增加 `unrelated` 类型、“普通图片”标签和成功发送/刷新测试，并删除旧 `IMAGE_UNRELATED` 失败映射。Codex 未触碰 DSH 当前在途的 `frontend/e2e/images.spec.ts`。
 
 ### 2026-09-22 Codex 图片识别错误诊断与重试（提交 `cac82a1`、`5d53b99`）
 
