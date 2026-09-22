@@ -113,7 +113,7 @@ async def upload_attachment(
 @router.get(
     "/consultations/{consultation_id}/attachments",
     response_model=AttachmentList,
-    summary="列出指定咨询中仍保留的附件",
+    summary="列出指定咨询中尚未绑定消息的待发送附件",
 )
 async def get_attachments(
     consultation_id: UUID,

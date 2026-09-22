@@ -188,6 +188,9 @@ async def test_image_upload_encryption_access_binding_and_delete(
     assert message.status_code == 201, message.text
     assert message.json()["attachments"][0]["imageCategory"] == "report"
     assert message.json()["attachments"][0]["imageExpiresAt"] is not None
+    listed = await client.get(f"/api/v1/consultations/{cid}/attachments")
+    assert listed.status_code == 200
+    assert listed.json() == {"items": []}
 
     client.cookies.set(ACCESS_COOKIE, create_access_token(second.id))
     assert (

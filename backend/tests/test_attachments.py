@@ -320,6 +320,37 @@ async def test_attachment_upload_reuse_delete_tombstone_and_cascade(profile_cont
     assert {event.action for event in events} >= {"consent", "upload", "delete"}
 
 
+async def test_attachment_list_only_returns_unbound_drafts(profile_context):
+    client, _, (user, _) = profile_context
+    cid = await create_consultation(client, user.id)
+    sent = await upload_txt(client, cid, "已经发送的检查记录", "已发送.txt")
+    draft = await upload_txt(client, cid, "尚未发送的检查记录", "待发送.txt")
+    assert sent.status_code == 201
+    assert draft.status_code == 201
+
+    message = await client.post(
+        f"/api/v1/consultations/{cid}/messages",
+        json={
+            "clientRequestId": str(uuid4()),
+            "content": "请解释已发送的附件",
+            "attachmentIds": [sent.json()["id"]],
+        },
+    )
+    assert message.status_code == 201
+
+    listed = await client.get(f"/api/v1/consultations/{cid}/attachments")
+    assert listed.status_code == 200
+    assert [item["id"] for item in listed.json()["items"]] == [draft.json()["id"]]
+
+    history = await client.get(f"/api/v1/consultations/{cid}/messages")
+    assert history.status_code == 200
+    assert any(
+        attachment["id"] == sent.json()["id"]
+        for item in history.json()["items"]
+        for attachment in item["attachments"]
+    )
+
+
 async def test_attachment_user_and_consultation_isolation(profile_context, monkeypatch):
     client, _, (first, second) = profile_context
     first_cid = await create_consultation(client, first.id)

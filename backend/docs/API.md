@@ -243,13 +243,13 @@ status 可能为 completed、empty、failed 或 skipped。事件不会返回证�
 | 方法与路径 | 用途 |
 | --- | --- |
 | `POST /consultations/{consultation_id}/attachments` | 上传、在本机隔离进程解析并加密保存文字 |
-| `GET /consultations/{consultation_id}/attachments` | 列出该咨询仍保留的附件 |
+| `GET /consultations/{consultation_id}/attachments` | 列出该咨询尚未绑定消息的待发送附件 |
 | `DELETE /attachments/{attachment_id}` | 永久删除附件及全部文本分块 |
 
 上传为单文件 `multipart/form-data`，字段为 `file`、`noticeAccepted=true` 和
 `noticeVersion=document-upload-v1`。响应字段为 `id`、`displayName`、`kind`、
 `byteSize`、`pageCount`、`charCount`、`preview`、`status=ready`、`createdAt`。
-PDF/PPTX 返回页数或幻灯片数；DOCX/TXT/MD 的 `pageCount` 为 `null`。
+PDF/PPTX 返回页数或幻灯片数；DOCX/TXT/MD 的 `pageCount` 为 `null`。`GET` 列表是输入框草稿列表：附件一旦绑定任一消息便不再返回，避免刷新、切换会话或消息分页时把已发送附件重新加入输入框。历史消息中的附件继续由消息接口返回，删除后的墓碑行为不变。
 
 只支持带文本层 PDF、DOCX、PPTX、UTF-8 TXT/MD：单文件最大 30 MB，
 PDF/PPTX 最多 100 页，提取文字最多 500000 字符，解析最长 60 秒；每个用户每

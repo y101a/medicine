@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -190,6 +190,7 @@ async def list_attachments(
             .where(
                 Attachment.user_id == user_id,
                 Attachment.consultation_id == consultation_id,
+                ~exists().where(MessageAttachment.attachment_id == Attachment.id),
             )
             .order_by(Attachment.created_at.asc(), Attachment.id.asc())
         )
