@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  IMAGE_CATEGORY_LABELS,
   IMAGE_CATEGORY_NOTICES,
   IMAGE_CONSENT_NOTICE,
   IMAGE_INPUT_MAX_BYTES,
@@ -180,11 +181,16 @@ describe('图片本地预处理', () => {
     expect(String(error.message)).toContain('压缩后仍超过 5 MiB')
   })
 
-  it('三类各自的能力边界文案都不含判读表述，且首次说明含保留期限与外发声明', () => {
-    expect(Object.keys(IMAGE_CATEGORY_NOTICES)).toEqual(['report', 'medical_imaging', 'body_photo'])
+  it('四类各自的能力边界文案都不含判读表述，且首次说明含保留期限与外发声明', () => {
+    expect(Object.keys(IMAGE_CATEGORY_NOTICES))
+      .toEqual(['report', 'medical_imaging', 'body_photo', 'unrelated'])
     expect(IMAGE_CATEGORY_NOTICES.medical_imaging).toContain('不判断病灶')
     expect(IMAGE_CATEGORY_NOTICES.body_photo).toContain('不判断是什么病')
     expect(IMAGE_CATEGORY_NOTICES.report).toContain('以纸质报告为准')
+    // 第四类：普通图片是成功附件，边界是「只做医疗相关检查、不作普通场景详细识别」。
+    expect(IMAGE_CATEGORY_LABELS.unrelated).toBe('普通图片')
+    expect(IMAGE_CATEGORY_NOTICES.unrelated).toContain('未检测到医疗健康相关内容')
+    expect(IMAGE_CATEGORY_NOTICES.unrelated).toContain('不对普通场景作详细识别')
     expect(IMAGE_CONSENT_NOTICE).toContain('90 天')
     expect(IMAGE_CONSENT_NOTICE).toContain('阿里云视觉模型')
     expect(IMAGE_CONSENT_NOTICE).toContain('建议先遮挡')

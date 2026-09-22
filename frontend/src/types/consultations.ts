@@ -31,7 +31,8 @@ export type AttachmentKind = 'pdf' | 'docx' | 'pptx' | 'txt' | 'md' | 'image'
  * 图片类别，上传时由用户自己选。后端把它当作**处理提示**而不是可信事实：
  * 三类都不输出疾病判断，差别只在能读到什么、以及给出哪段能力边界文案。
  */
-export type ImageCategory = 'report' | 'medical_imaging' | 'body_photo'
+/** 服务端自动分类的四类可保存图片（`unclear` 会被拒绝，前端收不到）。 */
+export type ImageCategory = 'report' | 'medical_imaging' | 'body_photo' | 'unrelated'
 
 /** 上传并解析成功的文档（原件不保存，只留加密文字）。 */
 export interface Attachment {

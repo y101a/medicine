@@ -252,11 +252,13 @@ describe('图片上传与识别（前端）', () => {
     wrapper.unmount()
   })
 
-  it('三类自动分类结果各自显示不同的能力边界文案，都不给疾病判断', async () => {
+  it('四类自动分类结果各自显示不同的能力边界文案，都不给疾病判断', async () => {
     const cases: { category: ImageCategory; label: string; notice: string }[] = [
       { category: 'report', label: '报告 / 检查单', notice: '以纸质报告为准' },
       { category: 'medical_imaging', label: 'X 光 / CT / MRI 片子', notice: '不判断病灶' },
       { category: 'body_photo', label: '患处或身体照片', notice: '不判断是什么病' },
+      // 第四类：普通图片是**成功附件**（后端 `82dd68c` + 迁移 `20260922_0019`），不再报错。
+      { category: 'unrelated', label: '普通图片', notice: '未检测到医疗健康相关内容' },
     ]
 
     for (const item of cases) {
@@ -269,38 +271,54 @@ describe('图片上传与识别（前端）', () => {
     }
   })
 
-  it('服务端判为无关或不清晰的图片不进待发送列表，只给一句短提示', async () => {
+  it('被判为看不清的图片不进待发送列表，只给一句短提示', async () => {
     vi.mocked(attachmentsApi.uploadImage)
-      .mockRejectedValueOnce(new ApiError('未识别为医疗健康相关图片，请换一张', 'IMAGE_UNRELATED', 422))
       .mockRejectedValueOnce(new ApiError('无法判断图片类别', 'IMAGE_CATEGORY_UNCLEAR', 422))
 
-    const unrelated = await setupConsented()
-    await uploadImageDirect(unrelated.wrapper, [imageFile('风景.jpg')])
-    expect(unrelated.wrapper.text()).toContain('未识别为医疗健康相关')
-    expect(unrelated.wrapper.findAll('.attachment-item')).toHaveLength(0)
-    expect(unrelated.wrapper.find('.attachment-notice .el-alert__close-btn').exists(), '提示要可关闭').toBe(true)
-    unrelated.wrapper.unmount()
-
-    const unclear = await setupConsented()
-    await uploadImageDirect(unclear.wrapper, [imageFile('糊了.jpg')])
-    expect(unclear.wrapper.text()).toContain('看不清内容')
-    expect(unclear.wrapper.findAll('.attachment-item')).toHaveLength(0)
-    unclear.wrapper.unmount()
+    const { wrapper } = await setupConsented()
+    await uploadImageDirect(wrapper, [imageFile('糊了.jpg')])
+    expect(wrapper.text()).toContain('看不清内容')
+    expect(wrapper.findAll('.attachment-item')).toHaveLength(0)
+    expect(wrapper.find('.attachment-notice .el-alert__close-btn').exists(), '提示要可关闭').toBe(true)
+    wrapper.unmount()
   })
 
-  it('同一批里被判无关的那张不影响其它图片上传', async () => {
+  /**
+   * 2026-09-22 契约变更：`unrelated` 从 422 拒绝改为第四种**成功**附件。
+   * 旧断言「普通图片不生成卡片 + 提示 IMAGE_UNRELATED」已作废并删除，这里改测成功卡片、标签、
+   * 边界文案与「可以发送」。
+   */
+  it('被判为普通图片的照常是成功附件：显示「普通图片」标签与边界，且能发送', async () => {
+    mockUploadedCategory('unrelated')
+    const { wrapper } = await setupConsented()
+    await uploadImageDirect(wrapper, [imageFile('风景.jpg')])
+
+    expect(wrapper.text()).toContain('风景.jpg')
+    expect(wrapper.text()).toContain('普通图片')
+    expect(wrapper.text()).toContain('未检测到医疗健康相关内容')
+    expect(wrapper.text(), '普通图片不该再出现「没有上传」这种失败文案').not.toContain('没有上传')
+    expect(wrapper.findAll('.attachment-item')).toHaveLength(1)
+
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    const [, , , attachmentIds] = vi.mocked(consultationsApi.send).mock.calls[0]
+    expect(attachmentIds, '普通图片必须能作为附件发出去').toHaveLength(1)
+    wrapper.unmount()
+  })
+
+  it('同一批里被判看不清的那张不影响其它图片上传', async () => {
     vi.mocked(attachmentsApi.uploadImage)
-      .mockRejectedValueOnce(new ApiError('未识别为医疗健康相关图片', 'IMAGE_UNRELATED', 422))
+      .mockRejectedValueOnce(new ApiError('无法判断图片类别', 'IMAGE_CATEGORY_UNCLEAR', 422))
       .mockImplementation(async (_cid, file) => ({
         ...imageAttachment, id: `i-${file.name}`, displayName: file.name,
       }))
     const { wrapper } = await setupConsented()
-    await uploadImageDirect(wrapper, [imageFile('风景.jpg'), imageFile('报告.jpg')])
+    await uploadImageDirect(wrapper, [imageFile('糊了.jpg'), imageFile('报告.jpg')])
 
     expect(attachmentsApi.uploadImage).toHaveBeenCalledTimes(2)
-    expect(wrapper.text()).toContain('未识别为医疗健康相关')
+    expect(wrapper.text()).toContain('看不清内容')
     expect(wrapper.text()).toContain('报告.jpg')
-    expect(wrapper.text()).not.toContain('风景.jpg')
+    expect(wrapper.text()).not.toContain('糊了.jpg')
     wrapper.unmount()
   })
 
@@ -356,6 +374,19 @@ describe('图片上传与识别（前端）', () => {
     expect(wrapper.text()).toContain('检查单.jpg')
     expect(wrapper.text()).toContain('1600×1200')
     expect(wrapper.text()).toContain('报告 / 检查单')
+    wrapper.unmount()
+  })
+
+  it('刷新已有会话时，普通图片的类别与边界照常恢复', async () => {
+    vi.mocked(attachmentsApi.list).mockResolvedValue([
+      { ...imageAttachment, id: 'i-u1', displayName: '风景.jpg', imageCategory: 'unrelated' },
+    ])
+    const { wrapper } = await setupConsented('/app/consultations/c1')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('风景.jpg')
+    expect(wrapper.text()).toContain('普通图片')
+    expect(wrapper.text()).toContain('未检测到医疗健康相关内容')
     wrapper.unmount()
   })
 

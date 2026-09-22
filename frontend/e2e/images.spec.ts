@@ -233,28 +233,86 @@ test.describe('图片上传与识别', () => {
     await expect(page.locator('.attachment-item')).toHaveCount(4, { timeout: 20_000 })
   })
 
-  test('被判为无关或看不清的图片不出现卡片，只给一句短提示', async ({ page }) => {
+  test('被判为看不清的图片不出现卡片，只给一句短提示', async ({ page }) => {
     await installApiStubs(page, {
       extra: {
         ...STUBS,
         'POST /consultations/*/images': {
           status: 422,
-          body: { code: 'IMAGE_UNRELATED', message: '未识别为医疗健康相关图片，请换一张' },
+          body: { code: 'IMAGE_CATEGORY_UNCLEAR', message: '无法判断图片类别，请重新拍摄' },
         },
       },
+    })
+    await openComposer(page)
+
+    await pickImage(page, '糊了.jpg')
+    await confirmDialog(page)
+
+    const notice = page.locator('.attachment-notice')
+    await expect(notice, '应给出可关闭的短提示').toContainText('看不清内容', { timeout: 20_000 })
+    await expect(page.locator('.attachment-item'), '被拒的图片不得进入待发送卡片').toHaveCount(0)
+    await expect(page.locator('.image-boundaries'), '没有成功图片就没有边界说明').toHaveCount(0)
+    // 提示可以自己关掉
+    await notice.locator('.el-alert__close-btn').click()
+    await expect(notice).toBeHidden()
+  })
+
+  /**
+   * 2026-09-22 契约变更（后端 `82dd68c` + 迁移 `20260922_0019`）：`unrelated` 不再是失败，
+   * 而是第四种成功附件——201、加密保存 90 天、可加入 `attachmentIds`。
+   * 本用例替换掉旧断言「普通图片返回 422 且不生成卡片」。
+   */
+  test('普通图片是成功附件：显示「普通图片」标签与边界，并能随提问发出', async ({ page }) => {
+    await installApiStubs(page, {
+      extra: {
+        ...STUBS,
+        'POST /consultations/*/images': {
+          status: 201,
+          body: {
+            ...IMAGE,
+            id: 'img-plain',
+            displayName: '风景.jpg',
+            imageCategory: 'unrelated',
+            preview: '未检测到医疗健康相关内容',
+          },
+        },
+      },
+    })
+    const bodies: string[] = []
+    await page.route('**/api/v1/consultations/*/messages', async (route) => {
+      if (route.request().method() !== 'POST') {
+        await route.fallback()
+        return
+      }
+      bodies.push(route.request().postData() || '')
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 'm-plain',
+          role: 'user',
+          content: '帮我看看这张',
+          sequence: 2,
+          attachments: [],
+          createdAt: '2026-09-21T03:00:00Z',
+        }),
+      })
     })
     await openComposer(page)
 
     await pickImage(page, '风景.jpg')
     await confirmDialog(page)
 
-    const notice = page.locator('.attachment-notice')
-    await expect(notice, '应给出可关闭的短提示').toContainText('未识别为医疗健康相关', { timeout: 20_000 })
-    await expect(page.locator('.attachment-item'), '被拒的图片不得进入待发送卡片').toHaveCount(0)
-    await expect(page.locator('.image-boundaries'), '没有成功图片就没有边界说明').toHaveCount(0)
-    // 提示可以自己关掉
-    await notice.locator('.el-alert__close-btn').click()
-    await expect(notice).toBeHidden()
+    await expect(page.locator('.attachment-item'), '普通图片要进待发送卡片')
+      .toContainText('普通图片', { timeout: 20_000 })
+    await expect(page.locator('.image-boundaries')).toContainText('普通图片')
+    await expect(page.locator('.image-boundaries')).toContainText('未检测到医疗健康相关内容')
+    await expect(page.locator('.attachment-notice'), '普通图片不该再出现失败提示').toHaveCount(0)
+
+    await page.locator('#symptom-input').fill('帮我看看这张')
+    await page.locator('button[aria-label="发送消息"]').click()
+    await expect.poll(() => bodies.length, { message: '应当真的发出了提问' }).toBeGreaterThan(0)
+    expect(bodies[0], '普通图片必须作为附件一起发出').toContain('img-plain')
   })
 
   test('仅图片也能发送，并带上图片版的默认提问', async ({ page }) => {

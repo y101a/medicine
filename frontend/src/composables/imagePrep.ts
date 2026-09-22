@@ -34,17 +34,19 @@ const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp']
 /** iPhone 默认存 HEIC/HEIF，浏览器解不开；要单独给说法，否则用户只看到「格式不支持」。 */
 const UNDECODABLE_EXTENSIONS = ['heic', 'heif']
 
-export type ImageCategory = 'report' | 'medical_imaging' | 'body_photo'
+/** 服务端自动分类的四类可保存结果（`unclear` 由服务端拒绝，不会到这里）。 */
+export type ImageCategory = 'report' | 'medical_imaging' | 'body_photo' | 'unrelated'
 
-/** 类别选择器上的名字。 */
+/** 类别标签（自动分类结果的显示名）。 */
 export const IMAGE_CATEGORY_LABELS: Record<ImageCategory, string> = {
   report: '报告 / 检查单',
   medical_imaging: 'X 光 / CT / MRI 片子',
   body_photo: '患处或身体照片',
+  unrelated: '普通图片',
 }
 
 /**
- * 三类图片各不相同的能力边界文案（契约要求分别显示）。
+ * 四类图片各不相同的能力边界文案（契约要求分别显示）。
  * 都只描述「会做什么、不会做什么」，不给任何疾病判断。
  */
 export const IMAGE_CATEGORY_NOTICES: Record<ImageCategory, string> = {
@@ -53,6 +55,8 @@ export const IMAGE_CATEGORY_NOTICES: Record<ImageCategory, string> = {
     '只识别影像类型、部位与片子上可见的文字，不判断病灶、阴影、骨折等情况；请携带正式影像报告咨询医生。',
   body_photo:
     '只整理肉眼可见、非诊断性的事实（如颜色、范围、是否有明显出血），不判断是什么病；急症请立即就医或拨 120。',
+  unrelated:
+    '未检测到医疗健康相关内容。只做医疗相关的检查，不对普通场景作详细识别，也不会据此推断你的健康情况。',
 }
 
 /** 首次上传图片的一次性说明：敏感信息 + 第三方外发 + 保留期限（契约第 7 节）。 */
