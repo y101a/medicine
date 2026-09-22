@@ -5,7 +5,8 @@ import { installApiStubs, settle, waitForRendered, type StubTable } from './supp
 /**
  * 图片上传与识别的界面验收（契约 `backend/docs/MEDICAL_IMAGES.md` 第 10 节）。
  *
- * 2026-09-22 起输入区只有一个附件按钮，点开是「上传文档 / 上传图片」两项；图片不再由用户选类别，
+ * 2026-09-22 起输入区只有一个附件按钮，**单击就直接打开本机文件选择器**（不再有「上传文档 / 上传图片」菜单）；
+ * 图片也不再由用户选类别，
  * 类别由服务端固定视觉模型自动判断。这里走的是**真实用户路径**：**单击附件按钮 → 系统文件选择器 → 本地压缩
  * → 上传**（按类型自动分流，没有中间菜单），所以这条链路本身也在验收范围内。
  *
@@ -333,5 +334,70 @@ test.describe('图片上传与识别', () => {
     await expect(page.locator('.user-attachments')).toContainText('图片原件已按保留策略清理')
     await expect(page.locator('.user-attachments')).toContainText('旧片子.jpg')
     expect(contentRequests, '到期的图片不该再请求字节').toBe(1)
+  })
+
+  /**
+   * 用户 2026-09-22 报告：发完图片后输入框里还留着它，每次都要手动点「移除」。
+   * 复现条件是「带着历史附件进入会话」——服务端会把该会话的**全部**附件读回草稿区，
+   * 已随消息发出的那些必须被剔除；但历史消息里仍要照常显示。
+   */
+  test('已随消息发出的图片不会回到输入框，历史消息里照常显示', async ({ page }) => {
+    await installApiStubs(page, {
+      extra: {
+        ...STUBS,
+        'GET /consultations/*': { body: { ...CONSULTATION } },
+        'GET /consultations/*/messages': {
+          body: {
+            items: [
+              {
+                id: 'm1',
+                role: 'user',
+                content: '帮我看下这张',
+                sequence: 1,
+                attachments: [
+                  { id: 'img-1', displayName: '血常规.jpg', kind: 'image', status: 'ready', imageAvailable: true },
+                ],
+                createdAt: '2026-09-21T02:00:00Z',
+              },
+            ],
+            hasMore: false,
+          },
+        },
+        'GET /consultations/*/attachments': { body: { items: [IMAGE] } },
+        // 让下一次提问真的发送成功，这样「请求体里没有 img-1」才是对真实发送路径的断言。
+        'POST /consultations/c-e2e/messages': {
+          status: 201,
+          body: {
+            id: 'm2',
+            role: 'user',
+            content: '这张单子里的白细胞怎么看',
+            sequence: 2,
+            attachmentIds: [],
+            createdAt: '2026-09-21T03:00:00Z',
+          },
+        },
+      },
+    })
+    let sendBody = ''
+    await page.route('**/api/v1/consultations/*/messages', async (route) => {
+      if (route.request().method() === 'POST') sendBody = route.request().postData() ?? ''
+      await route.fallback()
+    })
+
+    await page.goto('/app/consultations/c-e2e')
+    await settle(page)
+    await waitForRendered(page, '.messages')
+
+    // 历史消息里照常显示这张图，否则下面的断言可能只是「什么都没渲染」的假通过。
+    await expect(page.locator('.user-attachments')).toContainText('血常规.jpg')
+    // 输入框（草稿区）里不能再有它，也不该再出现「移除」按钮。
+    await expect(page.locator('.composer .attachment-item')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '移除 血常规.jpg' })).toHaveCount(0)
+
+    // 也不该被下一次提问重复带上。
+    await page.locator('#symptom-input').fill('这张单子里的白细胞怎么看')
+    await page.locator('button[aria-label="发送消息"]').click()
+    await expect.poll(() => sendBody, { message: '应当真的发出了一次提问' }).toContain('这张单子里的白细胞怎么看')
+    expect(sendBody, '已经发出去的图片不该被重复带上').not.toContain('img-1')
   })
 })

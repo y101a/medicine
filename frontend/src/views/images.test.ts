@@ -348,7 +348,7 @@ describe('图片上传与识别（前端）', () => {
     wrapper.unmount()
   })
 
-  it('刷新已有会话时，服务端返回的图片附件与类别照常出现在草稿区', async () => {
+  it('刷新已有会话时，尚未随消息发出的图片附件与类别照常出现在草稿区', async () => {
     vi.mocked(attachmentsApi.list).mockResolvedValue([imageAttachment])
     const { wrapper } = await setup('/app/consultations/c1')
     await flushPromises()
@@ -356,6 +356,50 @@ describe('图片上传与识别（前端）', () => {
     expect(wrapper.text()).toContain('检查单.jpg')
     expect(wrapper.text()).toContain('1600×1200')
     expect(wrapper.text()).toContain('报告 / 检查单')
+    wrapper.unmount()
+  })
+
+  /**
+   * 用户 2026-09-22 报告：给 AI 发送图片后，输入框里还留着这张图，每次都要手动点「移除」。
+   * 原因是新会话发完第一条消息会 `router.replace` → HomeView 重新挂载 → 服务端把该会话的
+   * **全部**附件读回草稿区（后端 `list_attachments` 不排除已绑定消息的行）。修法是草稿区按
+   * 「尚未随消息发出」过滤，这里就把重新挂载后的状态钉死。
+   */
+  it('已随消息发出的图片不再回到草稿区', async () => {
+    vi.mocked(attachmentsApi.list).mockResolvedValue([imageAttachment])
+    vi.mocked(consultationsApi.messages).mockResolvedValue({
+      items: [{
+        ...userMessage,
+        attachments: [{
+          id: 'i1', displayName: '检查单.jpg', kind: 'image', status: 'ready', imageCategory: 'report',
+        }],
+      }],
+      hasMore: false,
+    })
+    const { wrapper } = await setup('/app/consultations/c1')
+    await flushPromises()
+
+    // 历史消息里照常显示这张图，但草稿区不能再有它，也不能再出现「移除」按钮。
+    expect(wrapper.text()).toContain('检查单.jpg')
+    expect(wrapper.findAll('.attachment-item')).toHaveLength(0)
+    expect(wrapper.find('button[aria-label="移除 检查单.jpg"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('已随消息发出的文档同样不再回到草稿区', async () => {
+    vi.mocked(attachmentsApi.list).mockResolvedValue([documentAttachment])
+    vi.mocked(consultationsApi.messages).mockResolvedValue({
+      items: [{
+        ...userMessage,
+        attachments: [{ id: 'd1', displayName: '血常规报告.pdf', kind: 'pdf', status: 'ready' }],
+      }],
+      hasMore: false,
+    })
+    const { wrapper } = await setup('/app/consultations/c1')
+    await flushPromises()
+
+    expect(wrapper.findAll('.attachment-item')).toHaveLength(0)
+    expect(wrapper.find('button[aria-label="移除 血常规报告.pdf"]').exists()).toBe(false)
     wrapper.unmount()
   })
 })

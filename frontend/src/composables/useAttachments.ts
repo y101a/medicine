@@ -200,6 +200,23 @@ export function useAttachments() {
     Object.keys(previews.value).forEach(releasePreview)
   }
 
+  /**
+   * 丢掉「已经随消息发出」的附件。
+   *
+   * 工作区是 `<router-view :key="route.fullPath">`，新会话发出第一条消息后 `router.replace` 到
+   * `/app/consultations/{id}`，HomeView 因此重新挂载，`loadAttachments` 会把该会话的历史附件
+   * 一并读回草稿区——其中已绑定消息的那些必须剔除，否则用户每发一次都要手动点「移除」，
+   * 而且下一次发送会把它们重复带上一遍（还占着 5 项上限）。
+   */
+  function forgetSent(sentIds: Set<string>) {
+    if (!sentIds.size) return
+    items.value = items.value.filter((item) => {
+      if (!sentIds.has(item.id)) return true
+      releasePreview(item.id)
+      return false
+    })
+  }
+
   function reset() {
     releasePreviews()
     items.value = []
@@ -224,6 +241,7 @@ export function useAttachments() {
     load,
     remove,
     reset,
+    forgetSent,
     clearError,
     releasePreview,
     releasePreviews,

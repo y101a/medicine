@@ -192,9 +192,36 @@ const {
   load: loadAttachments,
   remove: removeAttachment,
   reset: resetAttachments,
+  forgetSent: forgetSentAttachments,
   clearError: clearAttachmentError,
   releasePreviews: releaseAttachmentPreviews,
 } = useAttachments()
+
+/**
+ * 已经挂在消息上的附件 id。工作区是 `<router-view :key="route.fullPath">`，新会话发出第一条消息后
+ * 会 `router.replace` 到 `/app/consultations/{id}`，HomeView 随之重新挂载，`loadAttachments` 把该会话
+ * 的历史附件一并读回——已随消息发出的那些必须在草稿区剔除：用户已经不需要再手动点「移除」，
+ * 也不会在下一次发送时被重复带上、白占 5 项上限。
+ */
+const sentAttachmentKey = computed(() => messages.value
+  .flatMap(message => message.attachments ?? [])
+  .map(item => item.id)
+  .filter((id): id is string => Boolean(id))
+  .sort()
+  .join('|'))
+watch(sentAttachmentKey, (key) => {
+  forgetSentAttachments(new Set(key ? key.split('|') : []))
+}, { immediate: true })
+
+/**
+ * 读回草稿区后再剔除一次：`messages`（消息及其附件）与附件列表是两条并行请求，
+ * 谁先到不保证。列表后到时要再过滤，否则已发出的附件会重新出现在输入框里。
+ */
+async function loadDraftAttachments(id: string) {
+  await loadAttachments(id)
+  const sentIds = sentAttachmentKey.value ? sentAttachmentKey.value.split('|') : []
+  forgetSentAttachments(new Set(sentIds))
+}
 
 const attachTitle = computed(() => attachments.value.length >= ATTACHMENT_LIMIT
   ? `一次最多带上 ${ATTACHMENT_LIMIT} 份附件`
@@ -376,7 +403,7 @@ async function load(older = false) {
     if (auth.user?.id !== userId) return
     if (!older) retrievalNotice.value = readRetrievalNotice(auth.user?.id, cid)
     title.value = conversation.title
-    if (!older) void loadAttachments(cid)
+    if (!older) void loadDraftAttachments(cid)
     messages.value = older ? [...page.items, ...messages.value] : page.items
     hasOlder.value = page.hasMore
     ready.value = true
