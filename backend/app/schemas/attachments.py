@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-ImageCategory = Literal["report", "medical_imaging", "body_photo"]
+ImageCategory = Literal["report", "medical_imaging", "body_photo", "unrelated"]
 AttachmentKindValue = Literal["pdf", "docx", "pptx", "txt", "md", "image"]
 
 

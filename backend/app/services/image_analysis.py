@@ -17,12 +17,14 @@ from app.core.config import get_settings
 from app.core.errors import AppError
 from app.services.image_validation import NormalizedImage
 
-ANALYSIS_VERSION = "medical-image-auto-category-v2"
+ANALYSIS_VERSION = "medical-image-auto-category-v3"
 MAX_PROVIDER_ATTEMPTS = 2
 RETRY_DELAY_SECONDS = 0.25
 RETRYABLE_PROVIDER_STATUSES = {408, 425, 429, 500, 502, 503, 504}
 logger = logging.getLogger(__name__)
-AcceptedImageCategory = Literal["report", "medical_imaging", "body_photo"]
+AcceptedImageCategory = Literal[
+    "report", "medical_imaging", "body_photo", "unrelated"
+]
 DetectedImageCategory = Literal[
     "report",
     "medical_imaging",
@@ -164,10 +166,15 @@ def _provider_status_error(response: httpx.Response) -> AppError:
 def _render(payload: VisionPayload, model: str) -> ImageAnalysis:
     category = payload.actual_category
     if category == "unrelated":
-        raise AppError(
-            422,
-            "IMAGE_UNRELATED",
-            "未识别为医疗健康相关图片，请换一张图片",
+        text = (
+            "普通图片检查结果：未检测到医疗健康相关内容。\n"
+            "限制：此图片不能作为医学判断依据；未对普通场景内容作详细识别。"
+        )
+        return ImageAnalysis(
+            category=category,
+            text=text,
+            preview=" ".join(text.split())[:200],
+            model=model,
         )
     if category == "unclear":
         raise AppError(

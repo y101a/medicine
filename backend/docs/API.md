@@ -300,11 +300,12 @@ JPEG/PNG/WebP 的静态图片；原始文件不保存。后端纠正方向、移
 
 图片使用固定的服务端阿里云 `qwen3.8-flash`，优先
 `IMAGE_ANALYSIS_API_KEY`，为空时回退服务端 `QWEN_API_KEY`，绝不读取用户自带模型 Key。
-分类只允许 `report|medical_imaging|body_photo|unrelated|unclear`；前三类成功保存并在响应中返回服务端判定的
-`imageCategory`，后两类分别返回 422 `IMAGE_UNRELATED` / `IMAGE_CATEGORY_UNCLEAR`，且不会生成附件、
-密文文件或上下文片段。报告图片只转录文字；医学影像只提取模态、部位、可见标签与质量，不判读病灶；身体照片只整理
-非诊断性肉眼事实并过滤疾病名/概率。识别结果作为加密、不可信附件片段进入现有上下文；图片结果
-不参与确定性红旗预检，紧急症状仍必须由用户主动输入文字。
+分类只允许 `report|medical_imaging|body_photo|unrelated|unclear`；前四类成功保存并在响应中返回服务端判定的
+`imageCategory`。`unrelated` 是普通图片：保存的受限摘要只说明“未检测到医疗健康相关内容”，允许绑定消息，
+聊天模型不得把它当作医疗证据或虚构未提取的普通场景细节。`unclear` 返回 422 `IMAGE_CATEGORY_UNCLEAR`，
+不生成附件、密文文件或上下文片段。报告图片只转录文字；医学影像只提取模态、部位、可见标签与质量，
+不判读病灶；身体照片只整理非诊断性肉眼事实并过滤疾病名/概率。识别结果作为加密、不可信附件片段进入现有
+上下文；图片结果不参与确定性红旗预检，紧急症状仍必须由用户主动输入文字。
 
 规范化 WebP 使用每图随机 AES-256-GCM 数据密钥加密，数据密钥再由字段主密钥包裹。图片密文
 默认保留 90 天，识别文字随会话保留；未绑定消息的图片 24 小时后删除。部署层应每日运行：
@@ -316,7 +317,7 @@ JPEG/PNG/WebP 的静态图片；原始文件不保存。后端纠正方向、移
 
 清理使用 PostgreSQL advisory lock，可安全避免多实例同时执行。用户删除附件、会话或账号也会
 清除相应图片密文。稳定错误码：`IMAGE_TOO_LARGE`、`IMAGE_TYPE_NOT_ALLOWED`、
-`IMAGE_NOTICE_REQUIRED`、`IMAGE_UNRELATED`、`IMAGE_CATEGORY_UNCLEAR`、`IMAGE_INVALID`、
+`IMAGE_NOTICE_REQUIRED`、`IMAGE_CATEGORY_UNCLEAR`、`IMAGE_INVALID`、
 `IMAGE_NO_TEXT`、`IMAGE_NOT_CONFIGURED`、`IMAGE_PROVIDER_AUTH_FAILED`、
 `IMAGE_PROVIDER_RATE_LIMITED`、`IMAGE_PROVIDER_REJECTED`、`IMAGE_PROVIDER_UNAVAILABLE`、
 `IMAGE_PROVIDER_INVALID_RESPONSE`、`IMAGE_PROVIDER_TIMEOUT`、`IMAGE_EXPIRED`、`UPLOAD_RATE_LIMITED`。

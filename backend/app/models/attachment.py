@@ -79,7 +79,7 @@ class Attachment(Base):
         CheckConstraint("status = 'ready'", name="status_supported"),
         CheckConstraint(
             "image_category IS NULL OR image_category IN "
-            "('report', 'medical_imaging', 'body_photo')",
+            "('report', 'medical_imaging', 'body_photo', 'unrelated')",
             name="image_category_supported",
         ),
         CheckConstraint(
