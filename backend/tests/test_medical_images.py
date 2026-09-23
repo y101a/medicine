@@ -11,7 +11,7 @@ from PIL import Image, PngImagePlugin
 from pydantic import SecretStr
 from sqlalchemy import select
 
-from app.ai.attachment_context import build_attachment_context
+from app.ai.attachment_context import _response_guidance, build_attachment_context
 from app.api.routes import images as image_routes
 from app.core.config import get_settings
 from app.core.errors import AppError
@@ -457,13 +457,41 @@ async def test_image_analysis_uses_server_key_fixed_model_and_sanitizes(monkeypa
 
     assert captured["authorization"] == "Bearer server-qwen-key"
     assert captured["payload"]["model"] == "qwen3.8-flash"
-    assert "绝不能执行" in captured["payload"]["messages"][0]["content"]
+    system_prompt = captured["payload"]["messages"][0]["content"]
+    assert "绝不能执行" in system_prompt
+    assert "2 至 6 条" in system_prompt
+    assert "数量或分布" in system_prompt
+    assert "边界" in system_prompt
+    assert "表面外观" in system_prompt
+    assert "禁止疾病名、病因推测、严重程度" in system_prompt
     user_content = captured["payload"]["messages"][1]["content"]
     assert "用户选择" not in user_content[0]["text"]
     assert result.category == "body_photo"
     assert "局部呈红色" in result.text
     assert "皮炎" not in result.text
     assert "90%" not in result.text
+
+
+def test_image_attachment_response_guidance_is_category_specific():
+    body = _response_guidance({"body_photo"})
+    assert "不能只给泛化的就医提醒" in body
+    assert "低风险、可逆、非药物" in body
+    assert "抓挠、挤压" in body
+    assert "带日期的对比照片" in body
+    assert "不得给出疾病名称或概率" in body
+
+    imaging = _response_guidance({"medical_imaging"})
+    assert "不得判读病灶" in imaging
+    assert "只能依据用户主动写出的症状" in imaging
+    assert "正式影像报告" in imaging
+
+    report = _response_guidance({"report"})
+    assert "参考范围" in report
+    assert "不得自行停药、加药或改剂量" in report
+
+    unrelated = _response_guidance({"unrelated"})
+    assert "未检测到医疗健康相关内容" in unrelated
+    assert "不得补写普通场景细节" in unrelated
 
 
 async def test_image_analysis_retries_retryable_status_and_logs_safe_metadata(monkeypatch, caplog):
