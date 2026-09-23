@@ -1,19 +1,27 @@
 # 药品说明书识别：前后端实现方案
 
-> 起草：DSH（2026-09-23）｜状态：**待用户拍板 D1/D2，待 Codex 认领后端**
+> 起草：DSH（2026-09-23）｜状态：**D1/D2 已由用户拍板（A3 / B2）；前端已按 B2 落地（提交 `56df4e5`，单测 171/17）；后端待 Codex 认领**（当前后端基线 285 passed、分析版本 `medical-image-auto-category-v5`）
 > 本文件是**方案**，不是契约。类别取值、边界文案与错误码以 `backend/docs/MEDICAL_IMAGES.md` 为准，Codex 落地时请直接更新那份契约并在 `COORDINATION.md` 第 6 节回执。
 > 触发来源：用户要求「图片识别：借助多模态大模型的能力，识别图片中的图像和文字；可用于识别病历、识别药品说明书等」，并要求核对代码是否已实现。
 
 ---
 
-## 0. 两个必须由用户拍板的决策（未定则后端不要开工）
+## 0. 决策：已由用户拍板（2026-09-23）
+
+> **D1 = A3（用法用量原文照旧转录，并在渲染模板与上下文指令里强制加限定语）**
+> **D2 = B2（新增第五类类别 `medication_leaflet`，而不是归入 `report`）**
+>
+> 用户于 2026-09-23 明确选择。据此：**第 3 节即为定稿实现方案**；第 4 节（B1）与 D1 的 A1/A2 分支保留仅为决策记录，**不再实施**。
+> 由此固定的两条约束：①`ocr_text` 中的用法用量原文**必须原样保留**（不得静默删除），同时必须出现「仅转录、未核对、不可作为用药依据」限定语；②类别字符串定为 **`medication_leaflet`**（前端已按此实现，后端请勿改名；若必须改名，请先在第 6 节回执并通知 DSH 同步前端）。
+
+原始决策依据（供追溯）：
 
 | 编号 | 决策 | 选项 | 影响面 | 推荐 |
 | --- | --- | --- | --- | --- |
 | **D1** | 说明书里的**用法用量原文**怎么处理 | **A1 全文转录**（现状行为）／**A2 一律不转录、遮蔽剂量**／**A3 全文转录 + 强制限定语** | A1 零改动但有「变相传递用药信息」风险；A2 需新增剂量正则过滤与替换文案，且用户拿不到说明书原文；A3 只需在渲染模板与上下文指令里加限定语，信息不丢、责任边界清楚 | **A3** |
 | **D2** | 说明书**是否新增第五类类别** | **B1 归入现有 `report`**／**B2 新增 `medication_leaflet`** | B1 无迁移、无类型变更，但界面会给说明书照片显示「报告 / 检查单」，且与报告共用同一段边界文案，剂量风险无法单独措辞；B2 需要 1 个迁移 + 4 处后端类别列表 + 2 处前端类型与文案 + 测试同步，换来独立标签、独立边界文案与独立上下文指令 | **B2** |
 
-第 3 节按「D1=A3、D2=B2」写全量改动；第 4 节给出选 B1 时的差异清单。
+第 3 节 = **定稿实现方案**（D1=A3、D2=B2）；第 4 节与 D1 的 A1/A2 分支仅作记录，不实施。
 
 ---
 
@@ -103,7 +111,8 @@ medication_leaflet：药品说明书、用药指导单、疫苗说明书等以�
 | --- | --- | --- |
 | `frontend/src/types/consultations.ts` | `ImageCategory`（`:34`）加 `medication_leaflet` | 与 `imagePrep.ts` 是两处历史重复定义，**两处都要改**（本轮不合并，避免夹带重构） |
 | `frontend/src/composables/imagePrep.ts` | `ImageCategory`（`:37`）、`IMAGE_CATEGORY_LABELS`、`IMAGE_CATEGORY_NOTICES` 各加一项 | 建议文案见下 |
-| `frontend/src/views/HomeView.vue` | `IMAGE_ATTACHMENT_PROMPT`（`:70`）补「说明书上的文字」；**无需**改渲染逻辑（标签/边界行按 map 取值，`HIDDEN_AUTO_PROMPTS` 引用常量会自动跟随） | 默认提问仍只发给模型、不显示 |
+| `frontend/src/views/HomeView.vue` | `IMAGE_ATTACHMENT_PROMPT` 补「说明书上的文字」；**无需**改渲染逻辑（标签/边界行按 map 取值、隐藏判定按常量引用） | 默认提问仍只发给模型、不显示给用户 |
+| `frontend/src/composables/composerPrompts.ts` | **新增**：把 `DEFAULT_ATTACHMENT_PROMPT`、`IMAGE_ATTACHMENT_PROMPT`、`HIDDEN_AUTO_PROMPTS`、`isHiddenAutoPrompt` 从 `HomeView.vue` 抽到独立模块 | 同一份文案既发给模型又用于「不该显示」判定，抄两份必然漂移——本次改文案时就真的踩到（测试里硬编码旧句导致隐藏失效），故收成单一来源；`HomeView` 改为 import |
 | `frontend/src/api/attachments.ts`、`useAttachments.ts` | **无需改动** | 类别来自响应，前端不判断 |
 | （可选，建议单列）`frontend/src/components/MessageAttachments.vue` | 历史消息里显示类别标签 | 现在历史图片不显示类别——说明书在历史里更该看得出是哪一类；这属于既有缺口，可与本任务一起做或单列 |
 
@@ -115,7 +124,7 @@ medication_leaflet: '药品说明书'
 '只读取并转写说明书上的文字（含用法用量原文），不作用药建议、不换算剂量；是否适合你请遵医嘱或咨询药师。'
 ```
 
-`IMAGE_ATTACHMENT_PROMPT` 建议改为：
+`IMAGE_ATTACHMENT_PROMPT` 建议改为（**已落地**）：
 
 ```
 请根据我上传的图片，帮我整理能读到的信息（报告上的指标、说明书上的文字，或片子和照片上肉眼可见、非诊断性的情况），并说明下一步该看什么科；不要作出确诊，也不要判读影像。
@@ -140,17 +149,17 @@ medication_leaflet: '药品说明书'
 
 ### 3.4 顺序与冻结点
 
-1. **Codex 先**：类别取值 + 迁移 + 提示词 + 契约文档 → 这一步定死「类别字符串 `medication_leaflet`」与两段限制语文本。
-2. **DSH 后/并行**：前端类型、标签、边界文案、默认提问、单测与 e2e 可以**先用桩按新类别开发**，不阻塞 Codex；等它落地后再跑一次真实链路。
+1. **Codex 先**：类别取值 + 迁移 + 提示词 + 契约文档 → 这一步定死「类别字符串 `medication_leaflet`」与两段限制语文本。**（状态：待 Codex 认领）**
+2. **DSH 后/并行**：前端类型、标签、边界文案、默认提问、单测与 e2e 可以**先用桩按新类别开发**，不阻塞 Codex；等它落地后再跑一次真实链路。**（状态：已完成，提交 `56df4e5`）**
 3. **真实样例评测**（第 5 节）最后做，需要用户确认付费外发。
 
 ### 3.5 验收基线（两侧提交前必须过）
 
 | 侧 | 命令 | 当前基线 | 提交后期望 |
 | --- | --- | --- | --- |
-| 后端 | `.venv\Scripts\python.exe -m pytest -q`、`ruff check --line-length 100 --select E,F,I,UP,B` | 284 passed（Codex 报告）、Ruff 全绿 | 284 + 新增用例数，全绿 |
-| 前端 | `npx vitest run`、`npm run build` | 169 passed / 17 files、构建退出码 0 | 169 + 新增用例数、构建退出码 0 |
-| e2e | `npx playwright test` | 49 项 | 49 + 新增用例数（隔离复跑排除并行抖动） |
+| 后端 | `.venv\Scripts\python.exe -m pytest -q`、`ruff check --line-length 100 --select E,F,I,UP,B` | **285 passed**（Codex 报告，图片专项 30 项）、Ruff 全绿 | 285 + 新增用例数，全绿 |
+| 前端 | `npx vitest run`、`npm run build` | **171 passed / 17 files**、构建退出码 0（DSH `56df4e5` 已达成） | 不低于 171 / 17，构建退出码 0 |
+| e2e | `npx playwright test` | **50 项**（新增说明书用例后；该文件在满负载下偶发超时，需隔离复跑定性） | 不低于 50 项 |
 
 ---
 
