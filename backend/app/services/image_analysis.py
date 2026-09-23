@@ -17,7 +17,7 @@ from app.core.config import get_settings
 from app.core.errors import AppError
 from app.services.image_validation import NormalizedImage
 
-ANALYSIS_VERSION = "medical-image-auto-category-v3"
+ANALYSIS_VERSION = "medical-image-auto-category-v4"
 MAX_PROVIDER_ATTEMPTS = 2
 RETRY_DELAY_SECONDS = 0.25
 RETRYABLE_PROVIDER_STATUSES = {408, 425, 429, 500, 502, 503, 504}
@@ -35,6 +35,23 @@ DetectedImageCategory = Literal[
 _FORBIDDEN_BODY = re.compile(
     r"(确诊|诊断为|患有|概率|可能性.{0,4}%|癌|肿瘤|感染|皮炎|湿疹|银屑病|黑色素瘤)",
     re.IGNORECASE,
+)
+_TEXT_FIELD_LIMITS = {
+    "ocr_text": 20_000,
+    "modality": 80,
+    "body_region": 120,
+}
+_LIST_FIELD_LIMITS = {
+    "visible_labels": 20,
+    "visible_facts": 12,
+    "quality_warnings": 8,
+}
+_BASE_USER_PROMPT = "请按系统规则判断图片类别并进行对应的受限信息提取。"
+_STRICT_RETRY_PROMPT = (
+    "上一次返回结构未通过校验。请只返回一个 JSON 对象；actual_category 必须是 "
+    "report、medical_imaging、body_photo、unrelated、unclear 之一；ocr_text、modality、"
+    "body_region 必须是字符串；visible_labels、visible_facts、quality_warnings 必须是字符串数组；"
+    "不得增加其他字段，不得返回 null、Markdown 或解释文字。"
 )
 
 
@@ -84,6 +101,32 @@ def _clean_items(values: list[str], *, forbid_clinical: bool = False) -> list[st
     return result[:12]
 
 
+def _normalize_payload_shape(value: object) -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise TypeError("Vision payload must be a JSON object")
+    category = value.get("actual_category")
+    if isinstance(category, str):
+        category = category.strip().casefold()
+    normalized: dict[str, object] = {"actual_category": category}
+    for field, limit in _TEXT_FIELD_LIMITS.items():
+        item = value.get(field, "")
+        if item is None:
+            item = ""
+        if isinstance(item, str):
+            item = item[:limit]
+        normalized[field] = item
+    for field, limit in _LIST_FIELD_LIMITS.items():
+        item = value.get(field, [])
+        if item is None:
+            item = []
+        elif isinstance(item, str):
+            item = [item]
+        if isinstance(item, list):
+            item = [entry[:300] for entry in item if isinstance(entry, str)][:limit]
+        normalized[field] = item
+    return normalized
+
+
 def _parse_content(content: object) -> VisionPayload:
     if not isinstance(content, str):
         raise ValueError("Missing model content")
@@ -91,7 +134,22 @@ def _parse_content(content: object) -> VisionPayload:
     fence = chr(96) * 3
     if cleaned.startswith(fence):
         cleaned = re.sub(r"^.{3}(?:json)?\s*|\s*.{3}$", "", cleaned, flags=re.I)
-    return VisionPayload.model_validate(json.loads(cleaned))
+    return VisionPayload.model_validate(_normalize_payload_shape(json.loads(cleaned)))
+
+
+def _validation_error_summary(exc: ValidationError) -> str | None:
+    summaries: list[str] = []
+    for issue in exc.errors(include_input=False, include_url=False):
+        location = ".".join(str(part) for part in issue.get("loc", ())) or "payload"
+        safe_location = re.sub(r"[^A-Za-z0-9_.-]", "?", location)[:80]
+        safe_type = re.sub(r"[^A-Za-z0-9_.-]", "?", str(issue.get("type", "unknown")))[:80]
+        summary = f"{safe_location}:{safe_type}"
+        if summary not in summaries:
+            summaries.append(summary)
+        if len(summaries) >= 8:
+            break
+    rendered = ",".join(summaries)[:512]
+    return rendered or None
 
 
 def _safe_header(value: str | None) -> str | None:
@@ -244,7 +302,7 @@ async def analyze_image(
                 "content": [
                     {
                         "type": "text",
-                        "text": "请按系统规则判断图片类别并进行对应的受限信息提取。",
+                        "text": _BASE_USER_PROMPT,
                     },
                     {
                         "type": "image_url",
@@ -344,23 +402,33 @@ async def analyze_image(
                 result = _parse_content(body["choices"][0]["message"]["content"])
             except (KeyError, IndexError, TypeError, ValueError, ValidationError) as exc:
                 will_retry = attempt < MAX_PROVIDER_ATTEMPTS
+                validation_errors = (
+                    _validation_error_summary(exc)
+                    if isinstance(exc, ValidationError)
+                    else None
+                )
                 logger.warning(
                     "Medical image provider returned an invalid response: "
                     "attempt=%s will_retry=%s status=%s request_id=%s "
-                    "exception_type=%s",
+                    "exception_type=%s validation_errors=%s",
                     attempt,
                     will_retry,
                     response.status_code,
                     _provider_metadata(response)["provider_request_id"],
                     type(exc).__name__,
+                    validation_errors,
                     extra={
                         "provider_attempt": attempt,
                         "provider_will_retry": will_retry,
                         "provider_exception_type": type(exc).__name__,
+                        "provider_validation_errors": validation_errors,
                         **_provider_metadata(response),
                     },
                 )
                 if will_retry:
+                    payload["messages"][1]["content"][0]["text"] = (
+                        f"{_BASE_USER_PROMPT}\n\n{_STRICT_RETRY_PROMPT}"
+                    )
                     await asyncio.sleep(RETRY_DELAY_SECONDS)
                     continue
                 raise AppError(

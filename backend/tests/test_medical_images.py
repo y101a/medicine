@@ -32,6 +32,9 @@ from app.services.image_analysis import (
     analyze_image,
 )
 from app.services.image_analysis import (
+    _parse_content as parse_analysis_content,
+)
+from app.services.image_analysis import (
     _render as render_analysis,
 )
 from app.services.image_validation import normalize_image
@@ -625,6 +628,86 @@ async def test_image_analysis_retries_invalid_response_without_logging_body(monk
     assert "patient-secret" not in caplog.text
     assert all(record.provider_status == 200 for record in caplog.records)
     assert all(record.provider_request_id == "response-request-456" for record in caplog.records)
+
+
+def test_image_analysis_normalizes_harmless_provider_shape_drift():
+    result = parse_analysis_content(
+        json.dumps(
+            {
+                "actual_category": " unrelated ",
+                "ocr_text": None,
+                "modality": None,
+                "body_region": None,
+                "visible_labels": "R",
+                "visible_facts": None,
+                "quality_warnings": ["清晰"] * 20,
+                "provider_explanation": "must be discarded",
+            },
+            ensure_ascii=False,
+        )
+    )
+
+    assert result.actual_category == "unrelated"
+    assert result.ocr_text == ""
+    assert result.modality == ""
+    assert result.body_region == ""
+    assert result.visible_labels == ["R"]
+    assert result.visible_facts == []
+    assert result.quality_warnings == ["清晰"] * 8
+    assert not hasattr(result, "provider_explanation")
+
+
+async def test_image_analysis_logs_safe_validation_shape_and_strengthens_retry(
+    monkeypatch, caplog
+):
+    requests = []
+
+    async def no_wait(seconds):
+        return None
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(json.loads(request.content))
+        return httpx.Response(
+            200,
+            request=request,
+            headers={"x-request-id": f"invalid-shape-{len(requests)}"},
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "actual_category": "patient-secret-category",
+                                    "visible_facts": [],
+                                    "patient_note": "patient-secret-note",
+                                }
+                            )
+                        }
+                    }
+                ]
+            },
+        )
+
+    monkeypatch.setattr(image_analysis_service.asyncio, "sleep", no_wait)
+    caplog.set_level("WARNING", logger="app.services.image_analysis")
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(AppError) as raised:
+            await analyze_image(await normalized_test_image(), client=client)
+
+    assert raised.value.code == "IMAGE_PROVIDER_INVALID_RESPONSE"
+    assert len(requests) == 2
+    first_prompt = requests[0]["messages"][1]["content"][0]["text"]
+    retry_prompt = requests[1]["messages"][1]["content"][0]["text"]
+    assert "上一次返回结构未通过校验" not in first_prompt
+    assert "上一次返回结构未通过校验" in retry_prompt
+    records = [record for record in caplog.records if record.provider_status == 200]
+    assert len(records) == 2
+    assert all(
+        record.provider_validation_errors == "actual_category:literal_error"
+        for record in records
+    )
+    assert "patient-secret-category" not in caplog.text
+    assert "patient-secret-note" not in caplog.text
 
 
 def test_image_analysis_rejects_unclear():

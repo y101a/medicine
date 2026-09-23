@@ -26,6 +26,14 @@ async def test_account_delete_requires_password_and_cascades_private_data(
     uploaded = await upload_txt(client, cid, "姓名：张三 检查结果需要医生结合临床判断")
     assert uploaded.status_code == 201
     attachment_id = UUID(uploaded.json()["id"])
+    existing_event_ids = set(
+        await db.scalars(
+            select(AuditLog.id).where(
+                AuditLog.resource_type == "account",
+                AuditLog.action == "delete",
+            )
+        )
+    )
 
     wrong = await client.request(
         "DELETE",
@@ -50,16 +58,20 @@ async def test_account_delete_requires_password_and_cascades_private_data(
     assert any(ACCESS_COOKIE in header and "Max-Age=0" in header for header in set_cookie_headers)
     assert (await client.get("/api/v1/users/me")).status_code == 401
 
-    events = (
-        await db.scalars(
-            select(AuditLog)
-            .where(
-                AuditLog.resource_type == "account",
-                AuditLog.action == "delete",
+    events = [
+        event
+        for event in (
+            await db.scalars(
+                select(AuditLog)
+                .where(
+                    AuditLog.resource_type == "account",
+                    AuditLog.action == "delete",
+                )
+                .order_by(AuditLog.created_at)
             )
-            .order_by(AuditLog.created_at)
-        )
-    ).all()
+        ).all()
+        if event.id not in existing_event_ids
+    ]
     assert [event.outcome for event in events] == ["rejected", "success"]
     assert events[0].reason_code == "ACCOUNT_PASSWORD_INVALID"
     assert events[1].actor_user_id is None
