@@ -7,6 +7,7 @@ import base64
 import os
 import secrets
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -90,16 +91,33 @@ async def load_image(storage_key: str, key_ciphertext: str) -> bytes:
 def _remove_sync(storage_key: str | None) -> None:
     if not storage_key:
         return
+    target = _resolved_path(storage_key)
+    target.unlink(missing_ok=True)
     try:
-        target = _resolved_path(storage_key)
-        target.unlink(missing_ok=True)
-        try:
-            target.parent.rmdir()
-        except OSError:
-            pass
-    except ValueError:
-        return
+        target.parent.rmdir()
+    except OSError:
+        pass
 
 
 async def remove_image(storage_key: str | None) -> None:
     await asyncio.to_thread(_remove_sync, storage_key)
+
+
+def _list_stored_image_keys_sync(older_than: datetime) -> list[str]:
+    root = _root()
+    cutoff = older_than.timestamp()
+    keys: list[str] = []
+    for target in root.rglob("*"):
+        if target.is_symlink() or not target.is_file():
+            continue
+        if target.suffix not in {".bin", ".tmp"}:
+            continue
+        resolved = target.resolve()
+        if root not in resolved.parents or target.stat().st_mtime > cutoff:
+            continue
+        keys.append(target.relative_to(root).as_posix())
+    return keys
+
+
+async def list_stored_image_keys(older_than: datetime) -> list[str]:
+    return await asyncio.to_thread(_list_stored_image_keys_sync, older_than)

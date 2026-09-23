@@ -1,4 +1,5 @@
 import json
+import os
 from datetime import UTC, datetime, timedelta
 from io import BytesIO
 from uuid import UUID, uuid4
@@ -14,9 +15,16 @@ from app.ai.attachment_context import build_attachment_context
 from app.api.routes import images as image_routes
 from app.core.config import get_settings
 from app.core.errors import AppError
-from app.core.security import create_access_token, decrypt_sensitive
-from app.models import Attachment, AttachmentChunk, AuditLog
+from app.core.security import create_access_token, decrypt_sensitive, hash_password
+from app.models import (
+    Attachment,
+    AttachmentChunk,
+    AuditLog,
+    ImageDeletionJob,
+    UserCredentials,
+)
 from app.services import image_analysis as image_analysis_service
+from app.services import image_deletion as image_deletion_service
 from app.services.auth import ACCESS_COOKIE
 from app.services.image_analysis import (
     ImageAnalysis,
@@ -193,9 +201,7 @@ async def test_image_upload_encryption_access_binding_and_delete(
     assert listed.json() == {"items": []}
 
     client.cookies.set(ACCESS_COOKIE, create_access_token(second.id))
-    assert (
-        await client.get(f"/api/v1/attachments/{attachment_id}/content")
-    ).status_code == 404
+    assert (await client.get(f"/api/v1/attachments/{attachment_id}/content")).status_code == 404
 
     client.cookies.set(ACCESS_COOKIE, create_access_token(first.id))
     deleted = await client.delete(f"/api/v1/attachments/{attachment_id}")
@@ -265,9 +271,8 @@ async def test_image_notice_limit_and_three_image_message_limit(
     assert rejected.status_code == 422
     assert rejected.json()["code"] == "ATTACHMENT_SELECTION_INVALID"
 
-async def test_unclear_auto_category_is_not_stored(
-    profile_context, tmp_path, monkeypatch
-):
+
+async def test_unclear_auto_category_is_not_stored(profile_context, tmp_path, monkeypatch):
     client, db, (user, _) = profile_context
     user_id = user.id
     monkeypatch.setattr(get_settings(), "image_storage_dir", str(tmp_path))
@@ -290,9 +295,7 @@ async def test_unclear_auto_category_is_not_stored(
     assert rejected.json()["code"] == "IMAGE_CATEGORY_UNCLEAR"
     assert not list(tmp_path.rglob("*.bin"))
     attachments = (
-        await db.scalars(
-            select(Attachment).where(Attachment.consultation_id == UUID(cid))
-        )
+        await db.scalars(select(Attachment).where(Attachment.consultation_id == UUID(cid)))
     ).all()
     assert attachments == []
     audit = await db.scalar(
@@ -308,9 +311,7 @@ async def test_unclear_auto_category_is_not_stored(
     assert audit is not None
 
 
-async def test_unrelated_image_is_stored_and_can_be_sent(
-    profile_context, tmp_path, monkeypatch
-):
+async def test_unrelated_image_is_stored_and_can_be_sent(profile_context, tmp_path, monkeypatch):
     client, db, (user, _) = profile_context
     monkeypatch.setattr(get_settings(), "image_storage_dir", str(tmp_path))
     monkeypatch.setattr(image_routes, "analyze_image", fake_unrelated_analysis)
@@ -336,9 +337,7 @@ async def test_unrelated_image_is_stored_and_can_be_sent(
         select(AttachmentChunk).where(AttachmentChunk.attachment_id == attachment_id)
     )
     assert chunk is not None
-    assert "未检测到医疗健康相关内容" in decrypt_sensitive(
-        chunk.content_ciphertext
-    )
+    assert "未检测到医疗健康相关内容" in decrypt_sensitive(chunk.content_ciphertext)
 
     message = await client.post(
         f"/api/v1/consultations/{cid}/messages",
@@ -362,6 +361,7 @@ async def test_unrelated_image_is_stored_and_can_be_sent(
     assert '"imageCategory":"unrelated"' in context
     assert "未检测到医疗健康相关内容" in context
     assert "不能假装看到了未提取的普通场景细节" in context
+
 
 async def test_expired_image_content_is_removed_but_analysis_is_retained(
     profile_context, tmp_path, monkeypatch
@@ -402,6 +402,7 @@ async def test_expired_image_content_is_removed_but_analysis_is_retained(
         select(AttachmentChunk).where(AttachmentChunk.attachment_id == attachment_id)
     )
     assert chunk is not None
+
 
 async def test_image_analysis_uses_server_key_fixed_model_and_sanitizes(monkeypatch):
     settings = get_settings()
@@ -462,9 +463,7 @@ async def test_image_analysis_uses_server_key_fixed_model_and_sanitizes(monkeypa
     assert "90%" not in result.text
 
 
-async def test_image_analysis_retries_retryable_status_and_logs_safe_metadata(
-    monkeypatch, caplog
-):
+async def test_image_analysis_retries_retryable_status_and_logs_safe_metadata(monkeypatch, caplog):
     attempts = 0
 
     async def no_wait(seconds):
@@ -512,9 +511,7 @@ async def test_image_analysis_retries_retryable_status_and_logs_safe_metadata(
 
     assert attempts == 2
     assert result.category == "report"
-    record = next(
-        item for item in caplog.records if item.provider_status == 503
-    )
+    record = next(item for item in caplog.records if item.provider_status == 503)
     assert record.provider_attempt == 1
     assert record.provider_will_retry is True
     assert record.provider_request_id == "safe-request-123"
@@ -598,9 +595,7 @@ async def test_image_analysis_retries_transport_failures(
     assert "private upstream detail" not in raised.value.message
 
 
-async def test_image_analysis_retries_invalid_response_without_logging_body(
-    monkeypatch, caplog
-):
+async def test_image_analysis_retries_invalid_response_without_logging_body(monkeypatch, caplog):
     calls = 0
 
     async def no_wait(seconds):
@@ -613,11 +608,7 @@ async def test_image_analysis_retries_invalid_response_without_logging_body(
             200,
             request=request,
             headers={"x-request-id": "response-request-456"},
-            json={
-                "choices": [
-                    {"message": {"content": "patient-secret invalid-json"}}
-                ]
-            },
+            json={"choices": [{"message": {"content": "patient-secret invalid-json"}}]},
         )
 
     monkeypatch.setattr(image_analysis_service.asyncio, "sleep", no_wait)
@@ -633,10 +624,7 @@ async def test_image_analysis_retries_invalid_response_without_logging_body(
     assert "exception_type=JSONDecodeError" in caplog.text
     assert "patient-secret" not in caplog.text
     assert all(record.provider_status == 200 for record in caplog.records)
-    assert all(
-        record.provider_request_id == "response-request-456"
-        for record in caplog.records
-    )
+    assert all(record.provider_request_id == "response-request-456" for record in caplog.records)
 
 
 def test_image_analysis_rejects_unclear():
@@ -646,9 +634,7 @@ def test_image_analysis_rejects_unclear():
     assert raised.value.code == "IMAGE_CATEGORY_UNCLEAR"
 
 
-@pytest.mark.parametrize(
-    "category", ["report", "medical_imaging", "body_photo", "unrelated"]
-)
+@pytest.mark.parametrize("category", ["report", "medical_imaging", "body_photo", "unrelated"])
 def test_image_analysis_accepts_supported_categories(category):
     payload = VisionPayload(
         actual_category=category,
@@ -685,3 +671,171 @@ async def test_deleting_consultation_removes_encrypted_image(
     deleted = await client.delete(f"/api/v1/consultations/{cid}")
     assert deleted.status_code == 204
     assert not encrypted_path.exists()
+    job = await db.scalar(
+        select(ImageDeletionJob).where(ImageDeletionJob.storage_key == row.image_storage_key)
+    )
+    assert job is not None
+    assert job.reason == "CONSULTATION_DELETED"
+    assert job.status == "completed"
+
+
+async def test_image_delete_failure_is_durable_and_retryable(
+    profile_context, tmp_path, monkeypatch
+):
+    client, db, (user, _) = profile_context
+    monkeypatch.setattr(get_settings(), "image_storage_dir", str(tmp_path))
+    monkeypatch.setattr(image_routes, "analyze_image", fake_analysis)
+    cid = await create_consultation(client, user.id)
+    uploaded = await client.post(
+        f"/api/v1/consultations/{cid}/images",
+        data={
+            "noticeAccepted": "true",
+            "noticeVersion": "medical-image-upload-v1",
+        },
+        files={"file": ("report.png", image_bytes(), "image/png")},
+    )
+    assert uploaded.status_code == 201
+    attachment_id = UUID(uploaded.json()["id"])
+    row = await db.get(Attachment, attachment_id)
+    assert row is not None and row.image_storage_key
+    storage_key = row.image_storage_key
+    encrypted_path = tmp_path / storage_key
+    real_remove = image_deletion_service.remove_image
+
+    async def permission_denied(key):
+        raise PermissionError("simulated locked file")
+
+    monkeypatch.setattr(image_deletion_service, "remove_image", permission_denied)
+    deleted = await client.delete(f"/api/v1/attachments/{attachment_id}")
+
+    assert deleted.status_code == 204
+    assert await db.get(Attachment, attachment_id) is None
+    assert encrypted_path.exists()
+    job = await db.scalar(
+        select(ImageDeletionJob).where(ImageDeletionJob.storage_key == storage_key)
+    )
+    assert job is not None
+    assert job.status == "retrying"
+    assert job.attempt_count == 1
+    assert job.last_error_code == "PermissionError"
+    assert job.next_attempt_at is not None
+
+    monkeypatch.setattr(image_deletion_service, "remove_image", real_remove)
+    job.next_attempt_at = datetime.now(UTC) - timedelta(seconds=1)
+    await db.commit()
+    retried = await image_deletion_service.process_image_deletion_jobs(
+        db,
+        storage_keys=[storage_key],
+    )
+
+    assert retried.completed == 1
+    assert not encrypted_path.exists()
+    await db.refresh(job)
+    assert job.status == "completed"
+    assert job.attempt_count == 2
+    assert job.completed_at is not None
+
+
+async def test_cleanup_reconciles_stale_orphan_and_temp_files(
+    profile_context, tmp_path, monkeypatch
+):
+    _, db, _ = profile_context
+    monkeypatch.setattr(get_settings(), "image_storage_dir", str(tmp_path))
+    now = datetime.now(UTC)
+    stale = now - timedelta(hours=25)
+    orphan = tmp_path / "aa" / "orphan.bin"
+    temporary = tmp_path / "bb" / "interrupted.tmp"
+    orphan.parent.mkdir(parents=True)
+    temporary.parent.mkdir(parents=True)
+    orphan.write_bytes(b"encrypted-orphan")
+    temporary.write_bytes(b"interrupted-write")
+    timestamp = stale.timestamp()
+    os.utime(orphan, (timestamp, timestamp))
+    os.utime(temporary, (timestamp, timestamp))
+
+    stats = await cleanup_medical_images(db, now=now)
+
+    assert stats.lock_acquired is True
+    assert stats.filesystem_orphans == 2
+    assert stats.deletion_completed == 2
+    assert not orphan.exists()
+    assert not temporary.exists()
+    jobs = (
+        await db.scalars(
+            select(ImageDeletionJob).where(ImageDeletionJob.reason == "FILESYSTEM_ORPHAN")
+        )
+    ).all()
+    assert len(jobs) == 2
+    assert {job.status for job in jobs} == {"completed"}
+
+
+async def test_image_deletion_job_is_idempotent_and_rejects_unsafe_path(
+    profile_context,
+):
+    _, db, _ = profile_context
+    now = datetime.now(UTC)
+    await image_deletion_service.enqueue_image_deletion(
+        db, "aa/already-missing.bin", "TEST_MISSING", now=now
+    )
+    await image_deletion_service.enqueue_image_deletion(
+        db, "../escape.bin", "TEST_INVALID", now=now
+    )
+    await db.commit()
+
+    result = await image_deletion_service.process_image_deletion_jobs(db, now=now)
+
+    assert result.completed == 1
+    assert result.failed == 1
+    rows = (
+        await db.scalars(
+            select(ImageDeletionJob).where(
+                ImageDeletionJob.reason.in_(["TEST_MISSING", "TEST_INVALID"])
+            )
+        )
+    ).all()
+    by_reason = {row.reason: row for row in rows}
+    assert by_reason["TEST_MISSING"].status == "completed"
+    assert by_reason["TEST_INVALID"].status == "failed"
+    assert by_reason["TEST_INVALID"].last_error_code == "INVALID_STORAGE_KEY"
+
+
+async def test_account_deletion_queues_and_removes_encrypted_images(
+    profile_context, tmp_path, monkeypatch
+):
+    client, db, (user, _) = profile_context
+    password = "correct-password"
+    db.add(UserCredentials(user_id=user.id, password_hash=hash_password(password)))
+    await db.commit()
+    monkeypatch.setattr(get_settings(), "image_storage_dir", str(tmp_path))
+    monkeypatch.setattr(image_routes, "analyze_image", fake_analysis)
+    cid = await create_consultation(client, user.id)
+    uploaded = await client.post(
+        f"/api/v1/consultations/{cid}/images",
+        data={
+            "noticeAccepted": "true",
+            "noticeVersion": "medical-image-upload-v1",
+        },
+        files={"file": ("report.png", image_bytes(), "image/png")},
+    )
+    assert uploaded.status_code == 201
+    attachment_id = UUID(uploaded.json()["id"])
+    row = await db.get(Attachment, attachment_id)
+    assert row is not None and row.image_storage_key
+    storage_key = row.image_storage_key
+    encrypted_path = tmp_path / storage_key
+    assert encrypted_path.exists()
+
+    deleted = await client.request(
+        "DELETE",
+        "/api/v1/users/me",
+        json={"currentPassword": password},
+    )
+
+    assert deleted.status_code == 204
+    assert not encrypted_path.exists()
+    job = await db.scalar(
+        select(ImageDeletionJob).where(ImageDeletionJob.storage_key == storage_key)
+    )
+    assert job is not None
+    assert job.reason == "ACCOUNT_DELETED"
+    assert job.status == "completed"

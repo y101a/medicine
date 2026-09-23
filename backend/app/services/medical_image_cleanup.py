@@ -11,7 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.models import Attachment, MessageAttachment
 from app.services.audit_logs import AUDIT_OUTCOME_SUCCESS, add_audit_log
-from app.services.medical_image_storage import remove_image
+from app.services.image_deletion import (
+    enqueue_image_deletion,
+    process_image_deletion_jobs_best_effort,
+    reconcile_orphaned_image_files,
+)
 
 _LOCK_ID = 6_214_831_908
 
@@ -21,6 +25,10 @@ class ImageCleanupStats:
     expired: int
     orphaned: int
     lock_acquired: bool
+    filesystem_orphans: int = 0
+    deletion_completed: int = 0
+    deletion_retrying: int = 0
+    deletion_failed: int = 0
 
 
 async def cleanup_medical_images(
@@ -40,9 +48,7 @@ async def cleanup_medical_images(
     settings = get_settings()
     orphan_before = current - timedelta(hours=settings.image_orphan_hours)
     linked = exists(
-        select(MessageAttachment.id).where(
-            MessageAttachment.attachment_id == Attachment.id
-        )
+        select(MessageAttachment.id).where(MessageAttachment.attachment_id == Attachment.id)
     )
     orphan_rows = (
         await db.scalars(
@@ -78,10 +84,11 @@ async def cleanup_medical_images(
         await db.rollback()
         return stats
 
-    storage_keys: list[str] = []
     for row in orphan_rows:
         if row.image_storage_key:
-            storage_keys.append(row.image_storage_key)
+            await enqueue_image_deletion(
+                db, row.image_storage_key, "UNBOUND_IMAGE_24H", now=current
+            )
         await add_audit_log(
             db,
             actor_user_id=row.user_id,
@@ -94,7 +101,9 @@ async def cleanup_medical_images(
         await db.delete(row)
     for row in expired_rows:
         if row.image_storage_key:
-            storage_keys.append(row.image_storage_key)
+            await enqueue_image_deletion(
+                db, row.image_storage_key, "IMAGE_RETENTION_EXPIRED", now=current
+            )
         row.image_storage_key = None
         row.image_key_ciphertext = None
         row.image_deleted_at = current
@@ -108,6 +117,22 @@ async def cleanup_medical_images(
             reason_code="IMAGE_RETENTION_EXPIRED",
         )
     await db.commit()
-    for storage_key in storage_keys:
-        await remove_image(storage_key)
-    return stats
+    try:
+        filesystem_orphans = await reconcile_orphaned_image_files(
+            db,
+            older_than=orphan_before,
+            now=current,
+        )
+    except OSError:
+        await db.rollback()
+        filesystem_orphans = 0
+    deletion = await process_image_deletion_jobs_best_effort(db, now=current)
+    return ImageCleanupStats(
+        expired=stats.expired,
+        orphaned=stats.orphaned,
+        lock_acquired=stats.lock_acquired,
+        filesystem_orphans=filesystem_orphans,
+        deletion_completed=deletion.completed,
+        deletion_retrying=deletion.retrying,
+        deletion_failed=deletion.failed,
+    )

@@ -14,7 +14,10 @@ from app.services.audit_logs import (
     add_audit_log,
 )
 from app.services.avatars import delete_avatar
-from app.services.medical_image_storage import remove_image
+from app.services.image_deletion import (
+    enqueue_image_deletions,
+    process_image_deletion_jobs_best_effort,
+)
 
 
 async def delete_account(
@@ -44,6 +47,11 @@ async def delete_account(
 
     # Capture encrypted blob keys before the database cascade removes attachment rows.
     image_keys = await attachment_service.image_storage_keys_for_user(db, user_id)
+    await enqueue_image_deletions(
+        db,
+        image_keys,
+        "ACCOUNT_DELETED",
+    )
     # Filesystem data cannot participate in the database transaction. Remove the
     # avatar first so a successful account deletion never leaves that personal file behind.
     delete_avatar(user_id)
@@ -56,5 +64,7 @@ async def delete_account(
     )
     await db.delete(user)
     await db.commit()
-    for storage_key in image_keys:
-        await remove_image(storage_key)
+    await process_image_deletion_jobs_best_effort(
+        db,
+        storage_keys=image_keys,
+    )

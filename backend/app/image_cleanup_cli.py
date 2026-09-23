@@ -14,7 +14,11 @@ async def _run(dry_run: bool) -> None:
         result = await cleanup_medical_images(db, dry_run=dry_run)
     print(
         f"lock_acquired={result.lock_acquired} "
-        f"expired={result.expired} orphaned={result.orphaned} dry_run={dry_run}"
+        f"expired={result.expired} orphaned={result.orphaned} dry_run={dry_run} "
+        f"filesystem_orphans={result.filesystem_orphans} "
+        f"deletion_completed={result.deletion_completed} "
+        f"deletion_retrying={result.deletion_retrying} "
+        f"deletion_failed={result.deletion_failed}"
     )
 
 

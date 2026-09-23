@@ -16,7 +16,10 @@ from app.services.audit_logs import (
     add_audit_log,
 )
 from app.services.document_extract import extract_document
-from app.services.medical_image_storage import remove_image
+from app.services.image_deletion import (
+    enqueue_image_deletion,
+    process_image_deletion_jobs_best_effort,
+)
 from app.services.upload_limits import enforce_upload_rate_limit
 
 router = APIRouter(tags=["病历附件"])
@@ -66,9 +69,7 @@ async def upload_attachment(
             )
         # Reject nonexistent or cross-user consultations before spending parser
         # CPU or exposing document contents to the isolated worker.
-        await attachment_service.ensure_owned_consultation(
-            db, current_user.id, consultation_id
-        )
+        await attachment_service.ensure_owned_consultation(db, current_user.id, consultation_id)
         document = await extract_document(
             file,
             max_bytes=settings.attachment_max_bytes,
@@ -140,9 +141,13 @@ async def remove_attachment(
     current_user: CurrentUser,
     db: DbSession,
 ) -> Response:
-    deleted = await attachment_service.delete_attachment(
-        db, current_user.id, attachment_id
-    )
+    deleted = await attachment_service.delete_attachment(db, current_user.id, attachment_id)
+    if deleted.storage_key:
+        await enqueue_image_deletion(
+            db,
+            deleted.storage_key,
+            "ATTACHMENT_DELETED",
+        )
     await add_audit_log(
         db,
         actor_user_id=current_user.id,
@@ -150,8 +155,12 @@ async def remove_attachment(
         resource_type="medical_image" if deleted.kind == "image" else "medical_document",
         resource_id=attachment_id,
         outcome=AUDIT_OUTCOME_SUCCESS,
+        reason_code="IMAGE_DELETE_QUEUED" if deleted.storage_key else None,
     )
     await db.commit()
     if deleted.storage_key:
-        await remove_image(deleted.storage_key)
+        await process_image_deletion_jobs_best_effort(
+            db,
+            storage_keys=[deleted.storage_key],
+        )
     return Response(status_code=204)

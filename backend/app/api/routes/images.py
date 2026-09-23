@@ -20,8 +20,9 @@ from app.services.audit_logs import (
     add_audit_log,
 )
 from app.services.image_analysis import analyze_image
+from app.services.image_deletion import discard_untracked_image
 from app.services.image_validation import normalize_image
-from app.services.medical_image_storage import load_image, remove_image, store_image
+from app.services.medical_image_storage import load_image, store_image
 from app.services.upload_limits import enforce_upload_rate_limit
 
 router = APIRouter(tags=["医学图片"])
@@ -76,9 +77,7 @@ async def upload_medical_image(
                 "IMAGE_NOTICE_REQUIRED",
                 "上传前请确认图片处理、外发和保留期限说明",
             )
-        await attachment_service.ensure_owned_consultation(
-            db, current_user.id, consultation_id
-        )
+        await attachment_service.ensure_owned_consultation(db, current_user.id, consultation_id)
         image = await normalize_image(
             file,
             max_bytes=settings.image_max_bytes,
@@ -99,13 +98,13 @@ async def upload_medical_image(
         )
     except AppError as exc:
         if storage_key:
-            await remove_image(storage_key)
+            await discard_untracked_image(storage_key)
         if exc.code != "UPLOAD_RATE_LIMITED":
             await _record_rejection(db, actor_user_id, exc.code)
         raise
     except SQLAlchemyError as exc:
         if storage_key:
-            await remove_image(storage_key)
+            await discard_untracked_image(storage_key)
         await _record_rejection(db, actor_user_id, "IMAGE_SAVE_FAILED")
         raise AppError(500, "IMAGE_SAVE_FAILED", "图片保存失败，请稍后重试") from exc
 
@@ -139,7 +138,7 @@ async def upload_medical_image(
         await db.commit()
     except SQLAlchemyError as exc:
         await db.rollback()
-        await remove_image(storage_key)
+        await discard_untracked_image(storage_key)
         raise AppError(500, "IMAGE_SAVE_FAILED", "图片保存失败，请稍后重试") from exc
     response.headers["Cache-Control"] = "no-store"
     return result
@@ -154,9 +153,7 @@ async def get_medical_image_content(
     current_user: CurrentUser,
     db: DbSession,
 ) -> Response:
-    row = await attachment_service.get_image_attachment(
-        db, current_user.id, attachment_id
-    )
+    row = await attachment_service.get_image_attachment(db, current_user.id, attachment_id)
     assert row.image_storage_key is not None
     assert row.image_key_ciphertext is not None
     content = await load_image(row.image_storage_key, row.image_key_ciphertext)

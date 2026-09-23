@@ -13,6 +13,7 @@ from app.models.health_record import (
     HealthRecordSettings,
     HealthRecordSource,
 )
+from app.models.image_deletion_job import ImageDeletionJob
 from app.models.knowledge import (
     IngestionJob,
     KnowledgeChunk,
@@ -33,6 +34,7 @@ __all__ = [
     "HealthRecordCategory",
     "HealthRecordSettings",
     "HealthRecordSource",
+    "ImageDeletionJob",
     "IngestionJob",
     "KnowledgeChunk",
     "KnowledgeDocument",

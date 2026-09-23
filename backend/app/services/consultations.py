@@ -24,7 +24,10 @@ from app.schemas.consultations import (
     TriageResult,
 )
 from app.services import attachments as attachment_service
-from app.services.medical_image_storage import remove_image
+from app.services.image_deletion import (
+    enqueue_image_deletions,
+    process_image_deletion_jobs_best_effort,
+)
 
 
 def summary(row: Consultation) -> ConsultationOut:
@@ -47,9 +50,7 @@ def message_out(
         decrypt_sensitive(row.triage_ciphertext) if row.triage_ciphertext else None
     )
     citations = deserialize_citations(
-        decrypt_sensitive(row.citations_ciphertext)
-        if row.citations_ciphertext
-        else None
+        decrypt_sensitive(row.citations_ciphertext) if row.citations_ciphertext else None
     )
     return MessageOut(
         id=row.id,
@@ -149,9 +150,7 @@ async def list_messages(db: AsyncSession, user_id: UUID, cid: UUID, before: int 
         query = query.where(Message.sequence < before)
     rows = (await db.scalars(query.order_by(Message.sequence.desc()).limit(limit + 1))).all()
     visible = list(reversed(rows[:limit]))
-    refs = await attachment_service.message_attachment_refs(
-        db, [row.id for row in visible]
-    )
+    refs = await attachment_service.message_attachment_refs(db, [row.id for row in visible])
     return MessagePage(
         items=[message_out(row, refs.get(row.id, [])) for row in visible],
         has_more=len(rows) > limit,
@@ -378,9 +377,7 @@ async def append_assistant_message(
             .limit(1)
         )
         if user_message_id is not None:
-            await attachment_service.copy_message_attachments(
-                db, user_message_id, row.id
-            )
+            await attachment_service.copy_message_attachments(db, user_message_id, row.id)
     refs = await attachment_service.message_attachment_refs(db, [row.id])
     result = message_out(row, refs.get(row.id, []))
     await db.commit()
@@ -389,8 +386,11 @@ async def append_assistant_message(
 
 async def remove(db: AsyncSession, user_id: UUID, cid: UUID):
     await owned(db, user_id, cid, lock=True)
-    image_keys = await attachment_service.image_storage_keys_for_consultation(
-        db, user_id, cid
+    image_keys = await attachment_service.image_storage_keys_for_consultation(db, user_id, cid)
+    await enqueue_image_deletions(
+        db,
+        image_keys,
+        "CONSULTATION_DELETED",
     )
     await db.execute(
         delete(Consultation).where(
@@ -399,5 +399,7 @@ async def remove(db: AsyncSession, user_id: UUID, cid: UUID):
         )
     )
     await db.commit()
-    for storage_key in image_keys:
-        await remove_image(storage_key)
+    await process_image_deletion_jobs_best_effort(
+        db,
+        storage_keys=image_keys,
+    )
