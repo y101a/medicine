@@ -181,9 +181,9 @@ describe('图片本地预处理', () => {
     expect(String(error.message)).toContain('压缩后仍超过 5 MiB')
   })
 
-  it('四类各自的能力边界文案都不含判读表述，且首次说明含保留期限与外发声明', () => {
+  it('五类各自的能力边界文案都不含判读表述，且首次说明含保留期限与外发声明', () => {
     expect(Object.keys(IMAGE_CATEGORY_NOTICES))
-      .toEqual(['report', 'medical_imaging', 'body_photo', 'unrelated'])
+      .toEqual(['report', 'medical_imaging', 'body_photo', 'unrelated', 'medication_leaflet'])
     expect(IMAGE_CATEGORY_NOTICES.medical_imaging).toContain('不判断病灶')
     expect(IMAGE_CATEGORY_NOTICES.body_photo).toContain('不判断是什么病')
     expect(IMAGE_CATEGORY_NOTICES.report).toContain('以纸质报告为准')
@@ -191,6 +191,12 @@ describe('图片本地预处理', () => {
     expect(IMAGE_CATEGORY_LABELS.unrelated).toBe('普通图片')
     expect(IMAGE_CATEGORY_NOTICES.unrelated).toContain('未检测到医疗健康相关内容')
     expect(IMAGE_CATEGORY_NOTICES.unrelated).toContain('不对普通场景作详细识别')
+    // 第五类：药品说明书。用户 2026-09-23 拍板 D2=B2（新增类别）、D1=A3（用法用量原文照旧转录 + 强制限定语）。
+    expect(IMAGE_CATEGORY_LABELS.medication_leaflet).toBe('药品说明书')
+    expect(IMAGE_CATEGORY_NOTICES.medication_leaflet).toContain('含用法用量原文')
+    expect(IMAGE_CATEGORY_NOTICES.medication_leaflet).toContain('不作用药建议')
+    expect(IMAGE_CATEGORY_NOTICES.medication_leaflet).toContain('不换算剂量')
+    expect(IMAGE_CATEGORY_NOTICES.medication_leaflet).toContain('遵医嘱或咨询药师')
     expect(IMAGE_CONSENT_NOTICE).toContain('90 天')
     expect(IMAGE_CONSENT_NOTICE).toContain('阿里云视觉模型')
     expect(IMAGE_CONSENT_NOTICE).toContain('建议先遮挡')

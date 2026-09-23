@@ -34,8 +34,13 @@ const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp']
 /** iPhone 默认存 HEIC/HEIF，浏览器解不开；要单独给说法，否则用户只看到「格式不支持」。 */
 const UNDECODABLE_EXTENSIONS = ['heic', 'heif']
 
-/** 服务端自动分类的四类可保存结果（`unclear` 由服务端拒绝，不会到这里）。 */
-export type ImageCategory = 'report' | 'medical_imaging' | 'body_photo' | 'unrelated'
+/** 服务端自动分类的五类可保存结果（`unclear` 由服务端拒绝，不会到这里）。 */
+export type ImageCategory =
+  | 'report'
+  | 'medical_imaging'
+  | 'body_photo'
+  | 'unrelated'
+  | 'medication_leaflet'
 
 /** 类别标签（自动分类结果的显示名）。 */
 export const IMAGE_CATEGORY_LABELS: Record<ImageCategory, string> = {
@@ -43,10 +48,11 @@ export const IMAGE_CATEGORY_LABELS: Record<ImageCategory, string> = {
   medical_imaging: 'X 光 / CT / MRI 片子',
   body_photo: '患处或身体照片',
   unrelated: '普通图片',
+  medication_leaflet: '药品说明书',
 }
 
 /**
- * 四类图片各不相同的能力边界文案（契约要求分别显示）。
+ * 五类图片各不相同的能力边界文案（契约要求分别显示）。
  * 都只描述「会做什么、不会做什么」，不给任何疾病判断。
  */
 export const IMAGE_CATEGORY_NOTICES: Record<ImageCategory, string> = {
@@ -57,6 +63,9 @@ export const IMAGE_CATEGORY_NOTICES: Record<ImageCategory, string> = {
     '只整理肉眼可见、非诊断性的事实（如颜色、范围、是否有明显出血），不判断是什么病；急症请立即就医或拨 120。',
   unrelated:
     '未检测到医疗健康相关内容。只做医疗相关的检查，不对普通场景作详细识别，也不会据此推断你的健康情况。',
+  // 说明书含用法用量：用户已拍板「原文照旧转录 + 强制限定语」（方案 D1=A3），不给用药建议、不换算剂量。
+  medication_leaflet:
+    '只读取并转写说明书上的文字（含用法用量原文），不作用药建议、不换算剂量；是否适合你、剂量如何调整，请以说明书原文为准并遵医嘱或咨询药师。',
 }
 
 /** 首次上传图片的一次性说明：敏感信息 + 第三方外发 + 保留期限（契约第 7 节）。 */

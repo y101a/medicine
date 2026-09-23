@@ -13,6 +13,7 @@ import { ApiError } from '../api/http'
 import { DOCUMENT_NOTICE_STORAGE_KEY, IMAGE_CONSENT_STORAGE_KEY } from '../stores/composerHints'
 import { ImagePrepError } from '../composables/imagePrep'
 import { IMAGE_LIMIT } from '../composables/useAttachments'
+import { IMAGE_ATTACHMENT_PROMPT } from '../composables/composerPrompts'
 import type { Attachment, ImageCategory, Message, MessageAttachment } from '../types/consultations'
 
 vi.mock('../api/consultations', () => ({ consultationsApi: {
@@ -252,13 +253,15 @@ describe('图片上传与识别（前端）', () => {
     wrapper.unmount()
   })
 
-  it('四类自动分类结果各自显示不同的能力边界文案，都不给疾病判断', async () => {
+  it('五类自动分类结果各自显示不同的能力边界文案，都不给疾病判断', async () => {
     const cases: { category: ImageCategory; label: string; notice: string }[] = [
       { category: 'report', label: '报告 / 检查单', notice: '以纸质报告为准' },
       { category: 'medical_imaging', label: 'X 光 / CT / MRI 片子', notice: '不判断病灶' },
       { category: 'body_photo', label: '患处或身体照片', notice: '不判断是什么病' },
       // 第四类：普通图片是**成功附件**（后端 `82dd68c` + 迁移 `20260922_0019`），不再报错。
       { category: 'unrelated', label: '普通图片', notice: '未检测到医疗健康相关内容' },
+      // 第五类：药品说明书（用户 2026-09-23 拍板 D2=B2、D1=A3），后端未落地前只用桩验证前端。
+      { category: 'medication_leaflet', label: '药品说明书', notice: '不作用药建议' },
     ]
 
     for (const item of cases) {
@@ -303,6 +306,29 @@ describe('图片上传与识别（前端）', () => {
     await flushPromises()
     const [, , , attachmentIds] = vi.mocked(consultationsApi.send).mock.calls[0]
     expect(attachmentIds, '普通图片必须能作为附件发出去').toHaveLength(1)
+    wrapper.unmount()
+  })
+
+  /**
+   * 第五类：药品说明书。用户 2026-09-23 拍板 D2=B2（新增类别 `medication_leaflet`）与
+   * D1=A3（用法用量原文照旧转录 + 强制限定语）。**后端尚未落地**，这里只用接口桩验证前端的
+   * 标签、A3 边界文案与「能发出去」。
+   */
+  it('被判为药品说明书的显示「药品说明书」标签与 A3 边界，且能发送', async () => {
+    mockUploadedCategory('medication_leaflet')
+    const { wrapper } = await setupConsented()
+    await uploadImageDirect(wrapper, [imageFile('说明书.jpg')])
+
+    expect(wrapper.text()).toContain('说明书.jpg')
+    expect(wrapper.text()).toContain('药品说明书')
+    expect(wrapper.text()).toContain('含用法用量原文')
+    expect(wrapper.text()).toContain('不作用药建议')
+    expect(wrapper.findAll('.attachment-item')).toHaveLength(1)
+
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    const [, , , attachmentIds] = vi.mocked(consultationsApi.send).mock.calls[0]
+    expect(attachmentIds, '说明书必须能作为附件发出去').toHaveLength(1)
     wrapper.unmount()
   })
 
@@ -370,7 +396,8 @@ describe('图片上传与识别（前端）', () => {
     vi.mocked(consultationsApi.messages).mockResolvedValue({
       items: [{
         ...userMessage,
-        content: '请根据我上传的图片，帮我整理能读到的信息（报告上的指标，或片子和照片上肉眼可见、非诊断性的情况），并说明下一步该看什么科；不要作出确诊，也不要判读影像。',
+        // 直接引用同一份常量：文案改了，这条用例跟着走，不会再出现「改了文案、隐藏失效」。
+        content: IMAGE_ATTACHMENT_PROMPT,
         attachments: [{
           id: 'i1', displayName: '检查单.jpg', kind: 'image', status: 'ready', imageCategory: 'report',
         }],
@@ -436,6 +463,19 @@ describe('图片上传与识别（前端）', () => {
     expect(wrapper.text()).toContain('风景.jpg')
     expect(wrapper.text()).toContain('普通图片')
     expect(wrapper.text()).toContain('未检测到医疗健康相关内容')
+    wrapper.unmount()
+  })
+
+  it('刷新已有会话时，药品说明书的类别与边界照常恢复', async () => {
+    vi.mocked(attachmentsApi.list).mockResolvedValue([
+      { ...imageAttachment, id: 'i-m1', displayName: '说明书.jpg', imageCategory: 'medication_leaflet' },
+    ])
+    const { wrapper } = await setupConsented('/app/consultations/c1')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('说明书.jpg')
+    expect(wrapper.text()).toContain('药品说明书')
+    expect(wrapper.text()).toContain('含用法用量原文')
     wrapper.unmount()
   })
 

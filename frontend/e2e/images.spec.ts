@@ -315,6 +315,39 @@ test.describe('图片上传与识别', () => {
     expect(bodies[0], '普通图片必须作为附件一起发出').toContain('img-plain')
   })
 
+  /**
+   * 第五类：药品说明书（用户 2026-09-23 拍板 D2=B2 新增类别、D1=A3 原文照旧转录 + 强制限定语）。
+   * 后端尚未落地，这里用桩验证前端：标签「药品说明书」、A3 边界文案、不出失败提示。
+   */
+  test('药品说明书显示「药品说明书」标签与 A3 边界，且不出现失败提示', async ({ page }) => {
+    await installApiStubs(page, {
+      extra: {
+        ...STUBS,
+        'POST /consultations/*/images': {
+          status: 201,
+          body: {
+            ...IMAGE,
+            id: 'img-leaflet',
+            displayName: '说明书.jpg',
+            imageCategory: 'medication_leaflet',
+            preview: '用法用量：口服，一次 1 片，一日 3 次',
+          },
+        },
+      },
+    })
+    await openComposer(page)
+
+    await pickImage(page, '说明书.jpg')
+    await confirmDialog(page)
+
+    await expect(page.locator('.attachment-item'), '说明书要进待发送卡片')
+      .toContainText('药品说明书', { timeout: 20_000 })
+    await expect(page.locator('.image-boundaries')).toContainText('含用法用量原文')
+    await expect(page.locator('.image-boundaries')).toContainText('不作用药建议')
+    await expect(page.locator('.image-boundaries')).toContainText('不换算剂量')
+    await expect(page.locator('.attachment-notice'), '说明书不该出现失败提示').toHaveCount(0)
+  })
+
   test('仅图片也能发送，并带上图片版的默认提问', async ({ page }) => {
     await installApiStubs(page, { extra: STUBS })
     const bodies: string[] = []

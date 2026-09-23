@@ -28,11 +28,17 @@ export interface Message {
 export type AttachmentKind = 'pdf' | 'docx' | 'pptx' | 'txt' | 'md' | 'image'
 
 /**
- * 图片类别，上传时由用户自己选。后端把它当作**处理提示**而不是可信事实：
- * 三类都不输出疾病判断，差别只在能读到什么、以及给出哪段能力边界文案。
+ * 图片类别**由服务端固定的视觉模型判定**（2026-09-22 起前端不再手选），前端只如实展示：
+ * 上传时传 `imageCategory` 会被忽略，响应里的 `imageCategory` 才是事实。
+ * 各类都不输出疾病判断，差别只在能读到什么、以及给出哪段能力边界文案。
+ * `unclear` 会被服务端拒绝，前端收不到；其余五类都会保存成图片附件。
  */
-/** 服务端自动分类的四类可保存图片（`unclear` 会被拒绝，前端收不到）。 */
-export type ImageCategory = 'report' | 'medical_imaging' | 'body_photo' | 'unrelated'
+export type ImageCategory =
+  | 'report'
+  | 'medical_imaging'
+  | 'body_photo'
+  | 'unrelated'
+  | 'medication_leaflet'
 
 /** 上传并解析成功的文档（原件不保存，只留加密文字）。 */
 export interface Attachment {

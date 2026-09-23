@@ -26,6 +26,9 @@ import {
 import { useVoiceRecorder } from '../composables/useVoiceRecorder'
 import { useAttachments, formatAttachmentSize, ATTACHMENT_LIMIT } from '../composables/useAttachments'
 import { IMAGE_CATEGORY_LABELS, IMAGE_CATEGORY_NOTICES, isUndecodableImage, type ImageCategory } from '../composables/imagePrep'
+import {
+  DEFAULT_ATTACHMENT_PROMPT, IMAGE_ATTACHMENT_PROMPT, isHiddenAutoPrompt,
+} from '../composables/composerPrompts'
 import ImageUploadDialog from '../components/ImageUploadDialog.vue'
 import { voiceApi } from '../api/voice'
 
@@ -65,21 +68,10 @@ const suggestions = [
 const DRAFT_LIMIT = 2000
 // 语音输入多为连续长句，容易不知不觉逼近上限；接近时提醒用户分次发送。
 const DRAFT_NEAR_LIMIT = 1800
-const DEFAULT_ATTACHMENT_PROMPT = '请帮我解读上传的病历文档，解释其中的医学术语和指标，并在必要时给出就医分流建议；不要作出确诊。'
-// 只传图片时的默认提问：仍然只要「整理可见信息 + 下一步看什么科」，不要疾病判断。
-const IMAGE_ATTACHMENT_PROMPT = '请根据我上传的图片，帮我整理能读到的信息（报告上的指标，或片子和照片上肉眼可见、非诊断性的情况），并说明下一步该看什么科；不要作出确诊，也不要判读影像。'
 const VOICE_TIP_AUTO_HIDE_MS = 8_000
 const VOICE_NOTICE_AUTO_HIDE_MS = 5_000
-/**
- * 上面两句默认提问照旧发给后端（模型必须看到），但**不在对话里显示**：
- * 用户只是没打字，不该看到这句机器话被当成自己说的话。用户自己打的字照常显示。
- * 注意：会话标题仍由后端取首条消息前 40 字（`services/consultations.py:276-277`），
- * 所以图片/文档作为第一条消息时，标题还会是这句话的前半句——改标题需要后端配合（第 6 节）。
- */
-const HIDDEN_AUTO_PROMPTS = new Set([DEFAULT_ATTACHMENT_PROMPT, IMAGE_ATTACHMENT_PROMPT])
-function isHiddenAutoPrompt(content: string): boolean {
-  return HIDDEN_AUTO_PROMPTS.has(content.trim())
-}
+// 默认提问与「是否隐藏」的判定都在 `composables/composerPrompts.ts`：同一份文本既发给模型，
+// 又用于判断不该显示给用户，放两处迟早会不一致（2026-09-23 就因为改文案踩过一次）。
 let voiceTipTimer: ReturnType<typeof setTimeout> | undefined
 const nearDraftLimit = computed(() => draft.value.length >= DRAFT_NEAR_LIMIT)
 function dismissVoiceTip() {
