@@ -1,3 +1,4 @@
+import importlib
 import json
 import os
 from datetime import UTC, datetime, timedelta
@@ -104,6 +105,22 @@ async def fake_appendicitis_report_analysis(image):
     )
     return ImageAnalysis(
         category="report",
+        text=text,
+        preview=" ".join(text.split())[:200],
+        model="qwen3.8-flash",
+    )
+
+
+async def fake_medication_leaflet_analysis(image):
+    text = (
+        "药品说明书文字提取（仅转录，未核对，不可作为用药依据）：\n"
+        "用法用量：一次2片，一日3次\n"
+        "图片质量：文字清晰\n"
+        "限制：以上是说明书原文转录；是否适合你、剂量是否需要调整，请以说明书原文并遵医嘱或咨询药师；"
+        "本回答不提供是否服用、剂量加减、替代或停用建议。"
+    )
+    return ImageAnalysis(
+        category="medication_leaflet",
         text=text,
         preview=" ".join(text.split())[:200],
         model="qwen3.8-flash",
@@ -426,6 +443,65 @@ async def test_report_context_does_not_inject_unrelated_result(
     assert "未检测到医疗健康相关内容" not in context
 
 
+async def test_medication_leaflet_is_stored_and_context_is_restricted(
+    profile_context, tmp_path, monkeypatch
+):
+    client, db, (user, _) = profile_context
+    monkeypatch.setattr(get_settings(), "image_storage_dir", str(tmp_path))
+    monkeypatch.setattr(
+        image_routes,
+        "analyze_image",
+        fake_medication_leaflet_analysis,
+    )
+    cid = await create_consultation(client, user.id)
+    uploaded = await client.post(
+        f"/api/v1/consultations/{cid}/images",
+        data={
+            "noticeAccepted": "true",
+            "noticeVersion": "medical-image-upload-v1",
+        },
+        files={"file": ("药品说明书.png", image_bytes(), "image/png")},
+    )
+
+    assert uploaded.status_code == 201, uploaded.text
+    payload = uploaded.json()
+    assert payload["imageCategory"] == "medication_leaflet"
+    attachment_id = UUID(payload["id"])
+    row = await db.get(Attachment, attachment_id)
+    assert row is not None
+    assert row.analysis_version == "medical-image-auto-category-v6"
+    chunk = await db.scalar(
+        select(AttachmentChunk).where(AttachmentChunk.attachment_id == attachment_id)
+    )
+    assert chunk is not None
+    extracted = decrypt_sensitive(chunk.content_ciphertext)
+    assert "一次2片，一日3次" in extracted
+    assert "仅转录，未核对，不可作为用药依据" in extracted
+
+    message = await client.post(
+        f"/api/v1/consultations/{cid}/messages",
+        json={
+            "clientRequestId": str(uuid4()),
+            "content": "我该吃多少？",
+            "attachmentIds": [str(attachment_id)],
+        },
+    )
+    assert message.status_code == 201, message.text
+    context = await build_attachment_context(
+        db,
+        user_id=user.id,
+        consultation_id=UUID(cid),
+        message_id=UUID(message.json()["id"]),
+        question="我该吃多少？",
+        max_chars=12_000,
+    )
+    assert context is not None
+    assert '"imageCategory":"medication_leaflet"' in context
+    assert "一次2片，一日3次" in context
+    assert "以说明书原文与医生或药师意见为准" in context
+    assert "不提供是否服用、剂量加减、替代或停用建议" in context
+
+
 async def test_expired_image_content_is_removed_but_analysis_is_retained(
     profile_context, tmp_path, monkeypatch
 ):
@@ -524,6 +600,8 @@ async def test_image_analysis_uses_server_key_fixed_model_and_sanitizes(monkeypa
     assert "边界" in system_prompt
     assert "表面外观" in system_prompt
     assert "禁止疾病名、病因推测、严重程度" in system_prompt
+    assert "medication_leaflet" in system_prompt
+    assert "不得改写剂量" in system_prompt
     user_content = captured["payload"]["messages"][1]["content"]
     assert "用户选择" not in user_content[0]["text"]
     assert result.category == "body_photo"
@@ -552,6 +630,11 @@ def test_image_attachment_response_guidance_is_category_specific():
     unrelated = _response_guidance({"unrelated"})
     assert "未检测到医疗健康相关内容" in unrelated
     assert "不得补写普通场景细节" in unrelated
+
+    leaflet = _response_guidance({"medication_leaflet"})
+    assert "以说明书原文与医生或药师意见为准" in leaflet
+    assert "不提供是否服用、剂量加减、替代或停用建议" in leaflet
+    assert "不能判断能否与其他药同服" in leaflet
 
 
 async def test_image_analysis_retries_retryable_status_and_logs_safe_metadata(monkeypatch, caplog):
@@ -805,11 +888,57 @@ def test_image_analysis_rejects_unclear():
     assert raised.value.code == "IMAGE_CATEGORY_UNCLEAR"
 
 
-@pytest.mark.parametrize("category", ["report", "medical_imaging", "body_photo", "unrelated"])
+def test_image_analysis_renders_medication_leaflet_verbatim_with_warning():
+    dosage = "用法用量：一次2片，一日3次；儿童每次1片"
+    payload = VisionPayload(
+        actual_category="medication_leaflet",
+        ocr_text=dosage,
+        quality_warnings=["边缘略模糊"],
+    )
+
+    result = render_analysis(payload, "qwen3.8-flash")
+
+    assert result.category == "medication_leaflet"
+    assert dosage in result.text
+    assert "仅转录，未核对，不可作为用药依据" in result.text
+    assert "本回答不提供是否服用、剂量加减、替代或停用建议" in result.text
+
+
+def test_image_analysis_rejects_medication_leaflet_without_text():
+    payload = VisionPayload(actual_category="medication_leaflet", ocr_text="")
+    with pytest.raises(AppError) as raised:
+        render_analysis(payload, "qwen3.8-flash")
+    assert raised.value.code == "IMAGE_NO_TEXT"
+
+
+def test_medication_leaflet_migration_refuses_unsafe_downgrade(monkeypatch):
+    migration = importlib.import_module(
+        "migrations.versions.20260923_0021_medication_leaflet"
+    )
+
+    class Bind:
+        @staticmethod
+        def scalar(statement):
+            assert "medication_leaflet" in str(statement)
+            return 1
+
+    monkeypatch.setattr(migration.op, "get_bind", lambda: Bind())
+    with pytest.raises(RuntimeError, match="medication leaflet image attachments exist"):
+        migration.downgrade()
+
+
+@pytest.mark.parametrize(
+    "category",
+    ["report", "medical_imaging", "body_photo", "unrelated", "medication_leaflet"],
+)
 def test_image_analysis_accepts_supported_categories(category):
     payload = VisionPayload(
         actual_category=category,
-        ocr_text="白细胞 6.2" if category == "report" else "",
+        ocr_text=(
+            "白细胞 6.2"
+            if category == "report"
+            else "用法用量：一次2片" if category == "medication_leaflet" else ""
+        ),
         modality="CT" if category == "medical_imaging" else "",
         visible_facts=["局部可见红色区域"] if category == "body_photo" else [],
     )
