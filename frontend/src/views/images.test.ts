@@ -336,6 +336,55 @@ describe('图片上传与识别（前端）', () => {
     wrapper.unmount()
   })
 
+  it('自动补的默认提问照旧发给模型，但不显示在对话里', async () => {
+    // 发完第一条后 `router.replace` 会让 HomeView 重挂载（`WorkspaceLayout` 的 `:key=fullPath`），
+    // 消息改从服务端读回（`HomeView.vue:503-504`）。所以桩要像真实服务端一样，把这条消息也回显给
+    // `GET /messages`，否则断言看到的是重挂载后的旧夹具，测不到真实渲染。
+    vi.mocked(consultationsApi.send).mockImplementation(async (_cid, content) => {
+      const sent: Message = {
+        ...userMessage,
+        content,
+        attachments: [{
+          id: 'i1', displayName: '检查单.jpg', kind: 'image', status: 'ready', imageCategory: 'report',
+        }],
+      }
+      vi.mocked(consultationsApi.messages).mockResolvedValue({ items: [sent], hasMore: false })
+      return sent
+    })
+    const { wrapper } = await setup()
+    await uploadImage(wrapper)
+
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    const [, content, , attachmentIds] = vi.mocked(consultationsApi.send).mock.calls[0]
+    expect(content, '没有文字时仍按图片版默认提问发给模型').toContain('不要判读影像')
+    expect(attachmentIds).toHaveLength(1)
+    expect(wrapper.text(), '这句默认提问不该出现在用户看到的消息里')
+      .not.toContain('请根据我上传的图片')
+    expect(wrapper.find('.user-attachments').exists(), '附件卡片照常显示').toBe(true)
+    wrapper.unmount()
+  })
+
+  it('历史消息里的默认提问同样不显示，附件卡片照常显示', async () => {
+    vi.mocked(consultationsApi.messages).mockResolvedValue({
+      items: [{
+        ...userMessage,
+        content: '请根据我上传的图片，帮我整理能读到的信息（报告上的指标，或片子和照片上肉眼可见、非诊断性的情况），并说明下一步该看什么科；不要作出确诊，也不要判读影像。',
+        attachments: [{
+          id: 'i1', displayName: '检查单.jpg', kind: 'image', status: 'ready', imageCategory: 'report',
+        }],
+      }],
+      hasMore: false,
+    })
+    const { wrapper } = await setup('/app/consultations/c1')
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('不要判读影像')
+    expect(wrapper.find('.user-attachments').exists(), '附件卡片照常显示').toBe(true)
+    wrapper.unmount()
+  })
+
   it('本地解不开的 HEIC 不上传，并给出可操作的提示', async () => {
     prep.prepare.mockRejectedValueOnce(new ImagePrepError('undecodable', 'iPhone 的 HEIC 照片浏览器打不开，请先在相册里导出为 JPG 再上传'))
     const { wrapper } = await setup()

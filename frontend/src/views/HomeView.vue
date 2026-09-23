@@ -70,6 +70,16 @@ const DEFAULT_ATTACHMENT_PROMPT = '请帮我解读上传的病历文档，解释
 const IMAGE_ATTACHMENT_PROMPT = '请根据我上传的图片，帮我整理能读到的信息（报告上的指标，或片子和照片上肉眼可见、非诊断性的情况），并说明下一步该看什么科；不要作出确诊，也不要判读影像。'
 const VOICE_TIP_AUTO_HIDE_MS = 8_000
 const VOICE_NOTICE_AUTO_HIDE_MS = 5_000
+/**
+ * 上面两句默认提问照旧发给后端（模型必须看到），但**不在对话里显示**：
+ * 用户只是没打字，不该看到这句机器话被当成自己说的话。用户自己打的字照常显示。
+ * 注意：会话标题仍由后端取首条消息前 40 字（`services/consultations.py:276-277`），
+ * 所以图片/文档作为第一条消息时，标题还会是这句话的前半句——改标题需要后端配合（第 6 节）。
+ */
+const HIDDEN_AUTO_PROMPTS = new Set([DEFAULT_ATTACHMENT_PROMPT, IMAGE_ATTACHMENT_PROMPT])
+function isHiddenAutoPrompt(content: string): boolean {
+  return HIDDEN_AUTO_PROMPTS.has(content.trim())
+}
 let voiceTipTimer: ReturnType<typeof setTimeout> | undefined
 const nearDraftLimit = computed(() => draft.value.length >= DRAFT_NEAR_LIMIT)
 function dismissVoiceTip() {
@@ -752,7 +762,8 @@ onBeforeRouteUpdate(canLeave)
         <p class="saved-heading">{{ title || '当前咨询' }}</p>
         <div v-for="message in messages" :key="message.id" class="message-pair">
           <template v-if="message.role === 'user'">
-            <div class="user-message">{{ message.content }}</div>
+            <!-- 自动补的默认提问只发给模型，不显示给用户；用户自己写的文字照常显示。 -->
+            <div v-if="!isHiddenAutoPrompt(message.content)" class="user-message">{{ message.content }}</div>
             <div v-if="message.attachments?.length" class="user-attachments">
               <MessageAttachments :items="message.attachments" />
             </div>

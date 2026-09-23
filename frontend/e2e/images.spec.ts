@@ -318,19 +318,38 @@ test.describe('图片上传与识别', () => {
   test('仅图片也能发送，并带上图片版的默认提问', async ({ page }) => {
     await installApiStubs(page, { extra: STUBS })
     const bodies: string[] = []
+    // 发完第一条会重挂载并从服务端读回消息，桩要像真实服务端一样把这条回显出来。
+    let sentContent = ''
     await page.route('**/api/v1/consultations/*/messages', async (route) => {
       if (route.request().method() !== 'POST') {
-        await route.fallback()
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            items: [{
+              id: 'm-e2e', role: 'user', content: sentContent, sequence: 1, answerFormat: 'plain',
+              citations: [], attachments: [IMAGE], createdAt: '2026-09-21T02:05:00Z',
+            }],
+            hasMore: false,
+          }),
+        })
         return
       }
-      bodies.push(route.request().postData() || '')
+      const body = route.request().postData() || ''
+      bodies.push(body)
+      // 回显真正发出去的内容：这样才能验证「默认提问发出去了、但对话里不显示」。
+      try {
+        sentContent = JSON.parse(body).content || sentContent
+      } catch {
+        // 请求体不是 JSON 时保留原值，后续断言会直接失败。
+      }
       await route.fulfill({
         status: 201,
         contentType: 'application/json',
         body: JSON.stringify({
           id: 'm-e2e',
           role: 'user',
-          content: '图片提问',
+          content: sentContent,
           sequence: 1,
           answerFormat: 'plain',
           citations: [],
@@ -350,6 +369,9 @@ test.describe('图片上传与识别', () => {
     expect(bodies[0], '图片 id 必须随消息提交').toContain('"attachmentIds":["img-1"]')
     expect(bodies[0], '没有文字时用图片版默认提问，不能写成解读病历文档').toContain('不要判读影像')
     expect(bodies[0]).not.toContain('解读上传的病历文档')
+    // 发出去 ≠ 显示给用户：这段话只给模型看。
+    await expect(page.locator('.user-message'), '默认提问不得显示在对话里').toHaveCount(0)
+    await expect(page.locator('.user-attachments'), '附件卡片照常显示').toContainText('血常规')
   })
 
   test('历史消息里的图片走鉴权接口取字节，到期则显示固定墓碑', async ({ page }) => {
