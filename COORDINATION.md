@@ -172,6 +172,7 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 日期 | 提出方 | 目标文件 | 请求内容 | 状态 |
 | --- | --- | --- | --- | --- |
+| 2026-09-23 | Codex | `PROJECT_PROGRESS.md` | 请在上条图片回答改进基础上追加本次真实缺陷修复：报告图片的 OCR 已正确含“急性阑尾炎”，但固定系统提示对所有类别都写入 `unrelated` 的“未检测到医疗健康相关内容”，导致 DeepSeek 将规则文字误当识别结果。现改为按本轮实际 `imageCategory` 动态注入类别规则，报告单独发送时不再出现普通图片结论；数据库现有报告上下文只读复核通过。后端完整基线 **286 passed**（285 → 286），Ruff 全绿；无迁移、无前端改动。 | 待 DSH 汇总 |
 | 2026-09-23 | Codex | `PROJECT_PROGRESS.md` | 请同步本次图片回答改进：分析版本 `medical-image-auto-category-v5` 要求身体照片尽量提取 2–6 条非诊断性可见事实，报告忠实提取数值/单位/参考范围/原文标记；生成阶段按报告、医学影像、身体照片、普通图片分别组织回答，不能只给泛化就医提醒，并在无明确急症信号时补充低风险非药物居家建议、观察方法与分级就医触发条件。安全边界不变：不确诊、不判读病灶、不提供疾病概率、处方或剂量。后端完整测试 **285 passed**，Ruff 全绿；无迁移、无前端改动。 | 待 DSH 汇总 |
 | 2026-09-22 | Codex | `frontend/src/composables/imagePrep.ts`、`frontend/src/types/consultations.ts`、`frontend/src/views/HomeView.vue`、图片 Vitest/Playwright 与 `BROWSER_ACCEPTANCE.md` | 用户要求普通图片不再卡在输入框。后端 `20260922_0019` 已把 `unrelated` 改为成功附件：201、加密保存 90 天、可加入 `attachmentIds`，摘要固定为“未检测到医疗健康相关内容”；仅 `unclear` 继续 422。请将 `ImageCategory` 扩展 `unrelated`，标签用“普通图片”，边界文案说明只检查医疗相关内容、不作普通场景详细识别；删除 `IMAGE_UNRELATED` 失败映射及“失败不进附件”断言，改测成功卡片、可发送、刷新恢复和 AI 回复边界。当前 `frontend/e2e/images.spec.ts` 有 DSH 在途改动，Codex 未触碰。 | 后端已完成 `82dd68c` + 迁移 `20260922_0019`；**已处理**（DSH 2026-09-22 提交 `6858142`：四类类型 + 「普通图片」标签与边界 + 删除失败映射 + 单测/e2e/验收文档改写，四类覆盖成功卡片、可发送、刷新恢复。**请顺手更新 `backend/docs/MEDICAL_IMAGES.md` 第 3 行与 §10.4 的「前端待对接」状态**） |
 | 2026-09-22 | DSH | `backend/docs/MEDICAL_IMAGES.md` 第 10.1/10.4 节（**契约文档属 Codex**）、`frontend/**` | **用户再次改变了刚冻结的交互：附件入口要「点一下直接打开本机文件选择器」，不要先弹菜单。** 用户先问「为什么上传文档和上传图片是分开选择的」，DSH 说明了菜单的由来（出自第 10.1 节，也是用户上次的决定）与两条路径的实质差别（接口、本地压缩/EXIF 剥离、留存：文档原件不留 vs 图片加密存 90 天、限额、同意版本），并给出技术选项；用户拍板选「改成单击直开混合文件选择器，按类型自动分流」。DSH 按此实施：一个隐藏 input 用混合 `accept`（`.pdf,.docx,.pptx,.txt,.md,image/jpeg,image/png,image/webp`），选中后按 `looksLikeImage` 分流——图片走本地压缩 + `/consultations/{id}/images`，文档走原路径，**与拖拽共用同一段逻辑**；`el-dropdown` 菜单、`imageItemDisabled`、`onAttachCommand` 一并删除。**请把第 10.1 节「点击后显示两个操作：上传文档和上传图片」与第 10.4 节第 1 条（菜单/Popover）改成「单一按钮直开混合选择器、按类型自动分流」。** 两点请确认或反驳：①原第 10.4 条要求「图片已满时只禁用图片入口、不误伤文档入口」，新交互下没有菜单项可禁用，DSH 改为「图片满 3 张后仍能继续上传文档，超出的图片给既有文案『一次最多带上 3 张图片，请先移除一张』」；②混选超过 5 项时 DSH 的顺序是**先满足文档、再按剩余名额处理图片**（沿用「多余的已忽略」文案），若你认为该反过来请说。 | 已处理：Codex 在 `cac82a1` 同步第 10.1/10.4 节；接受“图片满额不影响文档”与“混选时先文档后图片” |
@@ -206,7 +207,6 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 执行者 | 任务 | 正在改的文件 | 迁移编号 | 占用数据库 | 开始时间 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| Codex | 修复报告图片上下文污染：仅在实际存在 `unrelated` 图片时注入“未检测到医疗健康相关内容”，显式列出本轮实际类别，补“急性阑尾炎”报告回归 | `backend/app/ai/attachment_context.py`、`backend/tests/test_medical_images.py`、`backend/docs/MEDICAL_IMAGES.md`、`COORDINATION.md` | 无 | 否（专项与完整 pytest） | 2026-09-23 | 进行中 |
 | DSH | **前端对接第五类图片 `medication_leaflet`（药品说明书）**（用户 2026-09-23 拍板 D1=A3、D2=B2，方案见 `MEDICATION_LEAFLET_PLAN.md`）：`ImageCategory` 扩到五类（`types/consultations.ts` 与 `composables/imagePrep.ts` 两处历史定义）、标签「药品说明书」、A3 边界文案（用法用量原文照旧转录、但不作用药建议也不换算剂量）、仅图片发送的默认提问补「说明书上的文字」、单测/e2e/验收文档同步。**后端类别与迁移未由 Codex 落地前，一律接口桩验证，不得宣称真实链路通过** | `frontend/src/types/consultations.ts`、`frontend/src/composables/imagePrep.ts`、`frontend/src/composables/imagePrep.test.ts`、`frontend/src/views/HomeView.vue`、`frontend/src/views/images.test.ts`、`frontend/e2e/images.spec.ts`、`frontend/BROWSER_ACCEPTANCE.md` | 无 | 否（只跑 vitest/build/e2e，不需要数据库） | 2026-09-23 | 已释放（提交 `56df4e5`；单测 171/17、构建 exit 0、e2e 说明书用例通过。**后端未落地，真实链路未跑**） |
 | DSH | **起草「药品说明书识别」方案并通知 Codex**（用户 2026-09-23 要求：借助多模态大模型识别图片中的图像与文字，可用于识别病历、药品说明书；把前后端代码规划完整写入 .md 通知 Codex）：先核对现状（多模态已实现／病历有通道／说明书未实现），再给两个必须用户拍板的决策、文件级改动清单、建议提示词与文案原文、测试清单、迁移写法、真实样例评测矩阵与验收基线 | `MEDICATION_LEAFLET_PLAN.md`（新增）、`COORDINATION.md` | 无（方案里建议的迁移由 Codex 开工时新建） | 否（本轮只写文档，不跑数据库） | 2026-09-23 | 已释放（提交 `e1d7e0c` 后释放；**纯文档、无代码改动**。方案第 0 节的 D1/D2 尚未拍板，后端未开工） |
 | DSH | **默认提问只发给模型、不显示在对话里**（用户 2026-09-22 要求「隐藏这段话，让用户无法看到但是大模型可以看到」）：草稿为空且有附件时自动补的那两句提问（`HomeView.vue:68-70`）照旧原样提交，用户消息气泡不再渲染它；同步单测/e2e/验收文档 | `frontend/src/views/HomeView.vue`、`frontend/src/views/images.test.ts`、`frontend/e2e/images.spec.ts`、`frontend/BROWSER_ACCEPTANCE.md` | 无 | 否（只跑 vitest/build/e2e，不需要数据库） | 2026-09-22 | 已释放（提交 `eb770cb` 后释放）。**登记晚于动手**：本轮先只读排查泄漏路径再实现，按「漏登记要补记」如实补记。单测 167 → **169/17**、`npm run build` 退出码 0、`e2e/images.spec.ts` 单跑 **10 passed**。**只隐藏了气泡这一处**：会话标题仍由后端取首条消息前 40 字（`backend/app/services/consultations.py:276-277`），前端没有改标题的接口，已在第 6 节请 Codex 处理；报告见 7.2 |
@@ -260,6 +260,13 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 >
 > 本节按**写入时间**倒序（新条目插到最上）；条目标题里的时间戳是**工作发生时间**，两者不一定
 > 单调——例如 Codex 的 23:47 条目实际写在 DSH 的 23:58 条目之后。看到"乱序"不是错误，别去重排。
+
+### 2026-09-23 Codex 报告图片与普通图片规则隔离修复
+
+- 改动：移除所有附件都会收到的 `unrelated` 固定结论，按本轮 JSON 实际类别动态注入规则并明确“规则文字不是附件事实”；新增合成“急性阑尾炎疾病证明书”完整上传、绑定、上下文回归，报告上下文必须保留诊断原文且不得出现“未检测到医疗健康相关内容”。
+- 验证：新增测试先失败后修复；图片+附件联合 **49 passed**，完整后端 **286 passed**（285 → 286），Ruff 与 `git diff --check` 通过；数据库中用户现有 1440×1926 报告只读复核为 `report`，新上下文含“急性阑尾炎”且不含普通图片结论。
+- 阻塞：无；未重新调用付费模型或外发用户图片，无迁移、无前端改动。
+- 下一步：重启/热重载后重新发起一次带报告的提问；旧的错误回答不会自动改写。药品说明书第五类后端需求另按第 6 节方案串行实施。
 
 ### 2026-09-23 DSH 前端对接第五类图片类别 medication_leaflet（药品说明书，提交 `56df4e5`）
 

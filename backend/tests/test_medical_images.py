@@ -97,6 +97,19 @@ async def fake_unrelated_analysis(image):
     )
 
 
+async def fake_appendicitis_report_analysis(image):
+    text = (
+        "报告图片文字提取（仅转录，不代表诊断）：\n"
+        "疾病证明书\n诊断：急性阑尾炎\n建议休息并按原就诊医生安排复诊"
+    )
+    return ImageAnalysis(
+        category="report",
+        text=text,
+        preview=" ".join(text.split())[:200],
+        model="qwen3.8-flash",
+    )
+
+
 async def test_normalize_image_removes_metadata_and_enforces_geometry():
     upload = UploadFile(
         file=BytesIO(image_bytes(metadata=True)),
@@ -364,6 +377,53 @@ async def test_unrelated_image_is_stored_and_can_be_sent(profile_context, tmp_pa
     assert '"imageCategory":"unrelated"' in context
     assert "未检测到医疗健康相关内容" in context
     assert "不能假装看到了未提取的普通场景细节" in context
+
+
+async def test_report_context_does_not_inject_unrelated_result(
+    profile_context, tmp_path, monkeypatch
+):
+    client, db, (user, _) = profile_context
+    monkeypatch.setattr(get_settings(), "image_storage_dir", str(tmp_path))
+    monkeypatch.setattr(
+        image_routes,
+        "analyze_image",
+        fake_appendicitis_report_analysis,
+    )
+    cid = await create_consultation(client, user.id)
+    uploaded = await client.post(
+        f"/api/v1/consultations/{cid}/images",
+        data={
+            "noticeAccepted": "true",
+            "noticeVersion": "medical-image-upload-v1",
+        },
+        files={"file": ("疾病证明书.png", image_bytes(), "image/png")},
+    )
+    assert uploaded.status_code == 201, uploaded.text
+    assert uploaded.json()["imageCategory"] == "report"
+
+    message = await client.post(
+        f"/api/v1/consultations/{cid}/messages",
+        json={
+            "clientRequestId": str(uuid4()),
+            "content": "请解释这张报告并给出适当建议",
+            "attachmentIds": [uploaded.json()["id"]],
+        },
+    )
+    assert message.status_code == 201, message.text
+    context = await build_attachment_context(
+        db,
+        user_id=user.id,
+        consultation_id=UUID(cid),
+        message_id=UUID(message.json()["id"]),
+        question="请解释这张报告并给出适当建议",
+        max_chars=12_000,
+    )
+
+    assert context is not None
+    assert '"imageCategory":"report"' in context
+    assert "急性阑尾炎" in context
+    assert "本轮图片实际类别仅有：report" in context
+    assert "未检测到医疗健康相关内容" not in context
 
 
 async def test_expired_image_content_is_removed_but_analysis_is_retained(
