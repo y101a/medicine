@@ -1,6 +1,6 @@
 # 药品说明书识别：前后端实现方案
 
-> 起草：DSH（2026-09-23）｜状态：**D1/D2 已由用户拍板（A3 / B2）；前端已按 B2 落地（提交 `56df4e5`，单测 171/17）；后端待 Codex 认领**（当前后端基线 285 passed、分析版本 `medical-image-auto-category-v5`）
+> 起草：DSH（2026-09-23）｜状态：**已全部落地并通过复核**——前端 DSH `56df4e5`；后端 Codex `f8d9482` + `1221a03`（v6、迁移 `20260923_0021`、291 passed，DSH 已独立重跑）。**真实说明书样例的识别效果仍待联调**（第 5 节）
 > 本文件是**方案**，不是契约。类别取值、边界文案与错误码以 `backend/docs/MEDICAL_IMAGES.md` 为准，Codex 落地时请直接更新那份契约并在 `COORDINATION.md` 第 6 节回执。
 > 触发来源：用户要求「图片识别：借助多模态大模型的能力，识别图片中的图像和文字；可用于识别病历、识别药品说明书等」，并要求核对代码是否已实现。
 
@@ -149,7 +149,7 @@ medication_leaflet: '药品说明书'
 
 ### 3.4 顺序与冻结点
 
-1. **Codex 先**：类别取值 + 迁移 + 提示词 + 契约文档 → 这一步定死「类别字符串 `medication_leaflet`」与两段限制语文本。**（状态：待 Codex 认领）**
+1. **Codex 先**：类别取值 + 迁移 + 提示词 + 契约文档 → 这一步定死「类别字符串 `medication_leaflet`」与两段限制语文本。**（状态：已完成，提交 `1221a03`，见第 9 节复核）**
 2. **DSH 后/并行**：前端类型、标签、边界文案、默认提问、单测与 e2e 可以**先用桩按新类别开发**，不阻塞 Codex；等它落地后再跑一次真实链路。**（状态：已完成，提交 `56df4e5`）**
 3. **真实样例评测**（第 5 节）最后做，需要用户确认付费外发。
 
@@ -157,7 +157,7 @@ medication_leaflet: '药品说明书'
 
 | 侧 | 命令 | 当前基线 | 提交后期望 |
 | --- | --- | --- | --- |
-| 后端 | `.venv\Scripts\python.exe -m pytest -q`、`ruff check --line-length 100 --select E,F,I,UP,B` | **285 passed**（Codex 报告，图片专项 30 项）、Ruff 全绿 | 285 + 新增用例数，全绿 |
+| 后端 | `.venv\Scripts\python.exe -m pytest -q`、`ruff check --line-length 100 --select E,F,I,UP,B` | **291 passed**（Codex 报告，DSH 已独立重跑）、Ruff 全绿、迁移 `0021 -> 0020 -> 0021` 往返通过 | 不低于 291，全绿 |
 | 前端 | `npx vitest run`、`npm run build` | **171 passed / 17 files**、构建退出码 0（DSH `56df4e5` 已达成） | 不低于 171 / 17，构建退出码 0 |
 | e2e | `npx playwright test` | **50 项**（新增说明书用例后；该文件在满负载下偶发超时，需隔离复跑定性） | 不低于 50 项 |
 
@@ -218,3 +218,33 @@ medication_leaflet: '药品说明书'
 2. 落地时同步更新契约 `backend/docs/MEDICAL_IMAGES.md`（类别表、边界、§10.2/§10.4）与迁移说明。
 3. 在 `COORDINATION.md` 7.2 顶部写四行报告（改动 / 根因或设计 / 验证 / 未验证），并给出新基线数字。
 4. 若你认为 D2 应选 B1、或 D1 应选 A1/A2，请直接在本文件对应行批注并说明理由——**不要静默改方案**。
+
+---
+
+## 9. 复核结论（DSH，2026-09-24，针对 Codex `f8d9482` + `1221a03`）
+
+### 逐条核对方案第 3.1 节：全部通过
+
+| 要求 | 结果 |
+| --- | --- |
+| `ANALYSIS_VERSION` 升版 | ✅ `medical-image-auto-category-v6`（`image_analysis.py:20`；测试断言记录里的 `analysis_version == v6`） |
+| 两个 Literal 加 `medication_leaflet` | ✅ `:26`（Accepted）/ `:32`（Detected） |
+| `_SYSTEM_PROMPT` 类别定义 | ✅ `:94-96`；且 `report` 明确写「不包括药品说明书」`:86`——比方案建议更严，直接消除两类摇摆 |
+| `_render()` 新分支与 A3 | ✅ `:263-273`：`ocr[:20_000]` **原文保留**、标题含「仅转录，未核对，不可作为用药依据」、结尾含「不提供是否服用、剂量加减、替代或停用建议」；空文字 → 422 `IMAGE_NO_TEXT`，不落库不落盘 |
+| 上下文护栏 | ✅ `attachment_context.py:57-62` 说明书专属规则；`:32-40` 只按本轮**实际**类别注入，并声明「不得虚构或套用未出现的类别结论」——正好覆盖此前跨类别污染那类问题 |
+| Schema / ORM 约束 | ✅ `schemas/attachments.py:8`、`models/attachment.py:82` |
+| 迁移与降级保守失败 | ✅ `20260923_0021`，`down_revision = 20260923_0020`，照 `0019` 先例 drop+create；降级先 `count(*)`，命中即 `RuntimeError` |
+| 测试 | ✅ A3 渲染（原文 + 限定语）、空文字 422、降级拒绝、五类参数化、API 端到端（201 / v6 / chunk 含原文与限定语 / 上下文含类别与两条护栏） |
+| 契约文档 | ✅ `MEDICAL_IMAGES.md` 第 3 行与类别表、错误码、迁移章节；`API.md:303-307`；`DATA_MODEL.md:45` |
+
+### DSH 亲自重跑（独立于 Codex 的自述）
+后端 `pytest -q` **291 passed**；Ruff 全绿；`alembic current` = `20260923_0021 (head)`；迁移 `0021 → 0020 → 0021` 往返成功；并直接查询线上库约束定义，五个取值都在（含 `medication_leaflet`）。
+
+### 复核发现（都不影响可用性）
+1. `image_analysis.py:98` 的 `unclear` 定义仍写「无法可靠判断是否属于**前四类**」，加了第五类后应为「前五类」（`:97` 的 `unrelated` 写「前四类」是对的，因为说明书已进入前四）。属 Codex 文件，已写进 `COORDINATION.md` 第 6 节。
+2. `attachment_context.py:79` 的 `unrelated` 护栏列的是「不得套用到 report、medical_imaging 或 body_photo」，**漏了 `medication_leaflet`**——同一轮里既有说明书又有普通图片时，普通图片的结论有外溢到说明书的余地。建议补上类别名。
+3. `PROJECT_PROGRESS.md` 两处仍写「四类」（已由 DSH 更新为五类）。
+4. 可选建议（取向问题，非缺陷）：`_response_guidance` 的通用要求（③给 2–4 条居家建议、④分级就医条件）对「只上传说明书」的一轮略显生硬，可考虑对纯说明书轮次放宽「凑建议」的压力。
+
+### 仍然未验证
+真实说明书照片的类别判定与 OCR 准确率（第 5 节评测矩阵，需用户确认付费外发才能做）；**v6 的真实付费调用未由 DSH 执行**。

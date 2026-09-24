@@ -46,7 +46,8 @@ export function isImageAttachment(item: Attachment): boolean {
  * 并给出下一步。服务端 messages 也可能带中文说明，但错误码是契约固定的，这里以错误码为准。
  *
  * 注意：`unrelated`（普通、非医疗图片）自 2026-09-22 起**不再是失败**——后端返回 201 并加密保存，
- * 前端按第四类类别显示「普通图片」标签与边界文案（见 `imagePrep.ts` 的 `IMAGE_CATEGORY_*`）。
+ * 前端按类别显示标签与边界文案（`unrelated` 是「普通图片」，`medication_leaflet` 是「药品说明书」，
+ * 见 `imagePrep.ts` 的 `IMAGE_CATEGORY_*`）。
  */
 const IMAGE_CLASSIFY_MESSAGES: Record<string, string> = {
   IMAGE_CATEGORY_UNCLEAR: '这张图片看不清内容，没有上传。请重新拍摄，或改传报告文件（PDF / Word）。',
