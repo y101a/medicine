@@ -30,6 +30,18 @@ import {
   DEFAULT_ATTACHMENT_PROMPT, IMAGE_ATTACHMENT_PROMPT, isHiddenAutoPrompt,
 } from '../composables/composerPrompts'
 import ImageUploadDialog from '../components/ImageUploadDialog.vue'
+import ImageGenerationOffer from '../components/ImageGenerationOffer.vue'
+import ImageGenerationDialog from '../components/ImageGenerationDialog.vue'
+import GeneratedImageCard from '../components/GeneratedImageCard.vue'
+import {
+  useImageGeneration,
+  type ImageGenerationDraft,
+} from '../composables/useImageGeneration'
+import type {
+  ImageGeneration,
+  ImageGenerationAspectRatio,
+  ImageGenerationStyle,
+} from '../types/imageGenerations'
 import { voiceApi } from '../api/voice'
 
 const route = useRoute()
@@ -68,6 +80,30 @@ const suggestions = [
 const DRAFT_LIMIT = 2000
 // 语音输入多为连续长句，容易不知不觉逼近上限；接近时提醒用户分次发送。
 const DRAFT_NEAR_LIMIT = 1800
+
+// ── AI 科普配图（方案 `IMAGE_GENERATION_PLAN.md` A：回答底部入口）────────────────────
+/**
+ * `cid` 是普通变量（见上方 `let cid = ...`），而组合式需要 Ref，所以这里维护一个镜像，
+ * 在「懒建会话」与「首次发送建会话」两处赋值后同步；路由本来就带 id 时由初值覆盖。
+ */
+const generationCid = ref<string | null>(cid || null)
+const {
+  tasksByMessage: generationTasks,
+  submitting: generationSubmitting,
+  notices: generationNotices,
+  loadingImages: generationLoadingImages,
+  objectUrls: generationObjectUrls,
+  loadHistory: loadGenerationHistory,
+  submit: submitGeneration,
+  remove: removeGeneration,
+} = useImageGeneration(generationCid)
+
+const generationDialogVisible = ref(false)
+const generationDialogError = ref('')
+const generationSourceId = ref('')
+const generationInitialPrompt = ref('')
+const generationInitialStyle = ref<ImageGenerationStyle>('medical_illustration')
+const generationInitialAspectRatio = ref<ImageGenerationAspectRatio>('4:3')
 const VOICE_TIP_AUTO_HIDE_MS = 8_000
 const VOICE_NOTICE_AUTO_HIDE_MS = 5_000
 // 默认提问与「是否隐藏」的判定都在 `composables/composerPrompts.ts`：同一份文本既发给模型，
@@ -259,6 +295,7 @@ function chooseAttachments() {
 async function ensureConsultation(): Promise<string> {
   if (cid) return cid
   cid = (await consultationsApi.create(createRequestId)).id
+  generationCid.value = cid
   return cid
 }
 
@@ -406,6 +443,8 @@ async function load(older = false) {
     if (!older) retrievalNotice.value = readRetrievalNotice(auth.user?.id, cid)
     title.value = conversation.title
     if (!older) void loadDraftAttachments(cid)
+    // 生成任务只在进入会话时恢复一次；与消息并行加载，不互相阻塞。
+    if (!older) void loadGenerationHistory()
     messages.value = older ? [...page.items, ...messages.value] : page.items
     hasOlder.value = page.hasMore
     ready.value = true
@@ -573,7 +612,10 @@ async function sendContent(content: string, clearDraft = false) {
   saving.value = true
   error.value = ''
   try {
-    if (!cid) cid = (await consultationsApi.create(createRequestId)).id
+    if (!cid) {
+      cid = (await consultationsApi.create(createRequestId)).id
+      generationCid.value = cid
+    }
     // 附件只在主发送时带上：追问与卡片生成不重复引用同一份文档。
     const attachmentIds = clearDraft ? attachments.value.map(item => item.id) : []
     const message = await consultationsApi.send(cid, pending.content, pending.id, attachmentIds)
@@ -617,6 +659,51 @@ async function submitFollowUp(message: Message, answers: FollowUpAnswers) {
 }
 function stopGeneration() {
   generationController?.abort()
+}
+
+/**
+ * 只有「已完成的医疗类回答」才给生成配图的入口（方案 §3.2）：
+ * 追问卡、失败或停止的回答、紧急分流、普通闲聊都不显示；流式占位气泡也不算完成。
+ */
+function canOfferGeneration(message: Message) {
+  return message.role === 'assistant'
+    && message.medicalContent === true
+    && message.generationStatus === 'completed'
+    && !message.followUp
+    && !message.triage
+    && !message.id.startsWith('stream-')
+}
+
+function openGenerationDialog(message: Message) {
+  generationSourceId.value = message.id
+  generationInitialPrompt.value = ''
+  generationInitialStyle.value = 'medical_illustration'
+  generationInitialAspectRatio.value = '4:3'
+  generationDialogError.value = ''
+  generationDialogVisible.value = true
+}
+
+/**
+ * 「重新生成」**不直接计费**：用户必须再经弹窗确认一次。
+ * 描述不预填——前端不保存 prompt 明文（方案 §7.2），只带回上一次的风格与比例。
+ */
+function retryGeneration(task: ImageGeneration) {
+  generationSourceId.value = task.sourceMessageId
+  generationInitialPrompt.value = ''
+  generationInitialStyle.value = task.style
+  generationInitialAspectRatio.value = task.aspectRatio
+  generationDialogError.value = ''
+  generationDialogVisible.value = true
+}
+
+async function onGenerationSubmit(draft: ImageGenerationDraft) {
+  const result = await submitGeneration(generationSourceId.value, draft)
+  if (result.ok) {
+    generationDialogVisible.value = false
+    generationDialogError.value = ''
+    return
+  }
+  generationDialogError.value = result.message || '提交失败，请稍后重试'
 }
 
 function canOfferPathologyCard(message: Message) {
@@ -779,6 +866,21 @@ onBeforeRouteUpdate(canLeave)
                 :loading="cardGeneratingSourceId === message.id"
                 @generate="generatePathologyCard(message)"
               />
+              <!-- 生成任务按 `sourceMessageId` 挂回对应回答下方（契约 §4.2 的历史恢复方式）。 -->
+              <GeneratedImageCard
+                v-for="task in generationTasks[message.id] || []"
+                :key="task.id"
+                :task="task"
+                :url="generationObjectUrls[task.id]"
+                :notice="generationNotices[task.id]"
+                :loading="generationLoadingImages[task.id]"
+                @retry="retryGeneration(task)"
+                @remove="removeGeneration(task)"
+              />
+              <ImageGenerationOffer
+                v-if="canOfferGeneration(message)"
+                @open="openGenerationDialog(message)"
+              />
             </div>
           </div>
           <p class="saved-at" :class="{ assistant: message.role === 'assistant' }">
@@ -881,6 +983,15 @@ onBeforeRouteUpdate(canLeave)
       :files="pendingImageFiles"
       :uploading="attachmentUploading"
       @confirm="confirmImages"
+    />
+    <ImageGenerationDialog
+      v-model="generationDialogVisible"
+      :submitting="generationSubmitting"
+      :error="generationDialogError"
+      :initial-prompt="generationInitialPrompt"
+      :initial-style="generationInitialStyle"
+      :initial-aspect-ratio="generationInitialAspectRatio"
+      @submit="onGenerationSubmit"
     />
   </main>
 </template>
