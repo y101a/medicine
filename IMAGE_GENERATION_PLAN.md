@@ -1,18 +1,12 @@
 # AI 图片生成前后端实施计划
 
-> 状态：2026-09-24 用户决定不实施图片生成功能；本文件仅保留为历史方案，不得据此开工。
+> 状态：2026-09-25 方案 A 已完成前后端实现与自动化验证；尚未执行真实付费调用。用户已确认生成图片不包含水印文字。
 > 产品边界：面向健康科普的 AI 示意图，不作诊断，不生成可冒充真实医疗资料的图片。
-> 当前基线：后端 FastAPI + PostgreSQL，前端 Vue 3；已有用户上传图片识别与加密保存链路，但没有图片生成链路。
+> 当前基线：后端 FastAPI + PostgreSQL，前端 Vue 3；用户上传图片识别和独立图片生成链路均已实现。
 
-## 0. 已取消实施
+## 0. 已确认的产品决定
 
-用户已明确决定“不生成”。前后端均不实现本功能，不新增入口、接口、数据表、迁移、配置或模型调用，
-DeepSeek 与 Codex 均不得依据下述历史规划自行开工。若未来重新提出需求，必须重新确认范围并复核当时的
-模型、价格、接口与安全要求。
-
-以下为取消前的历史方案：
-
-第一版入口和范围二选一：
+第一版采用 **A（回答底部医学科普配图）**；B 不在本版范围：
 
 - **A（推荐）医学科普配图**：只在已完成的医疗类 AI 回答底部显示“生成科普配图”；用户在弹窗中确认或修改一段短提示词后生成。图片与来源回答关联，不自动生成，不阻塞文字回答。
 - **B 通用文生图**：在输入区增加独立“生成图片”入口，允许生成与医疗无关的普通图片。这会扩大内容审核、费用治理、UI 和产品定位范围。
@@ -57,7 +51,8 @@ DeepSeek 与 Codex 均不得依据下述历史规划自行开工。若未来重�
 
 - 每次 `n=1`，禁止前端改变数量。
 - 1K 固定尺寸映射：`1:1=1280*1280`、`16:9=1696*960`、`3:4=1104*1472`、`4:3=1472*1104`。
-- `watermark=true`，保留供应商“AI生成”水印；界面另显示“AI 生成·科普示意，不作为诊断依据”。
+- `watermark=false`：生成图片的像素内容中不添加“AI生成”等水印文字。界面在图片外显示
+  “AI 生成·科普示意，不作为诊断依据”，下载文件名使用 `AI科普配图-YYYYMMDD.webp`。
 - 提示词最多 500 字；用户不能自定义 negative prompt，反向提示词由后端固定。
 - 成品加密保存 90 天，与现有医学图片保留期一致；删除会话或账号时一并删除。
 - 每用户同时最多 1 个未完成任务；10 分钟最多 3 次、自然日最多 10 次。按数据库记录共享限流，不能复用现有进程内 `upload_limits.py` 作为唯一保障。
@@ -97,6 +92,7 @@ DeepSeek 与 Codex 均不得依据下述历史规划自行开工。若未来重�
 ```json
 {
   "id": "uuid",
+  "contentId": "uuid",
   "sourceMessageId": "uuid",
   "status": "submitted",
   "style": "medical_illustration",
@@ -104,6 +100,7 @@ DeepSeek 与 Codex 均不得依据下述历史规划自行开工。若未来重�
   "model": "wan2.6-t2i",
   "imageAvailable": false,
   "imageExpiresAt": null,
+  "errorCode": null,
   "createdAt": "2026-09-24T00:00:00Z",
   "updatedAt": "2026-09-24T00:00:00Z"
 }
@@ -171,7 +168,14 @@ DeepSeek 与 Codex 均不得依据下述历史规划自行开工。若未来重�
 - 索引：`(user_id, created_at)` 用于共享限流，`(status, next_poll_at)` 用于恢复轮询，`(consultation_id, source_message_id, created_at)` 用于历史展示。
 - 降级若仍有行必须保守失败，要求先通过应用删除，避免遗留加密文件。
 
-生成图片沿用现有图片加密思路，但实施时先从 `medical_image_storage.py` 抽出中性的 `encrypted_image_storage.py`，使用不同 AAD（`generated-image-v1`）。现有 `image_deletion_jobs` 增加存储命名空间或安全分派；孤儿对账必须把 `attachments.image_storage_key` 与 `generated_images.storage_key` 一起视为有效引用，不能误删新成品。
+新增 `generated_image_delivery_logs` 表：不保存明文用户标识，只保存不可逆接收者指纹、
+内容编号、来源会话、提供时间与至少 183 天留存截止时间；即使用户删除图片、会话或账号，
+该最小化留痕仍保留，以满足无显式标识成品提供对象日志不少于六个月的要求。
+
+生成图片沿用现有图片加密思路，但使用独立 `generated_image_storage.py` 和不同 AAD
+（`generated-image-v1`），避免改动既有上传图片密文格式。现有 `image_deletion_jobs`
+复用安全路径校验；孤儿对账把 `attachments.image_storage_key` 与
+`generated_images.storage_key` 一起视为有效引用，不能误删新成品。
 
 ## 6. 后端实现（Codex）
 
@@ -182,8 +186,8 @@ DeepSeek 与 Codex 均不得依据下述历史规划自行开工。若未来重�
 - `backend/app/schemas/image_generations.py`：请求、任务状态、历史列表响应。
 - `backend/app/services/image_generation_provider.py`：创建异步任务、查询任务；不自动重试“创建任务超时”，避免未知状态下重复计费；查询可安全重试。
 - `backend/app/services/image_generations.py`：鉴权、幂等、共享限流、状态机、任务锁、审计、下载与最终入库。
-- `backend/app/services/generated_image_validation.py`：供应商 URL 防 SSRF、HTTPS/443、禁止重定向或逐跳复核、DNS 私网地址拒绝、大小上限、真实图片解码、像素上限、去元数据、WebP 重编码。
-- `backend/app/services/encrypted_image_storage.py`：从医学图片存储中抽取带命名空间/AAD 的通用能力；保持现有上传图片兼容。
+- `backend/app/services/generated_image_validation.py`：供应商 URL 防 SSRF、HTTPS/443、禁止重定向、DNS 私网地址拒绝、大小上限、真实图片解码、像素上限；移除供应商/源图片元数据后重编码 WebP，并只写入规范化 AIGC 隐式标识（属性、服务提供者编码、内容编号）。
+- `backend/app/services/generated_image_storage.py`：独立命名空间与 AAD 的信封加密存储；保持现有上传图片密文格式不变。
 - `backend/app/api/routes/image_generations.py`、`api/router.py`：四个接口。
 - `backend/app/image_generation_cli.py`：恢复无人轮询的活跃任务；部署每分钟运行，必须在供应商 24 小时任务/URL 时效内完成下载。
 - `backend/app/services/{image_deletion,medical_image_cleanup,consultations,account_deletion}.py`：统一删除、90 天清理、会话/账号级联和孤儿对账。
@@ -195,7 +199,7 @@ DeepSeek 与 Codex 均不得依据下述历史规划自行开工。若未来重�
 
 - 用户提示词先 `strip`、长度校验、身份信息脱敏，再作为不可信内容嵌入后端固定模板。
 - 固定模板强制：科普插画、非诊断、无患者身份、无医院/医生/公章、无真实检查结果、无处方和剂量、无血腥细节、图内不放关键医学文字。
-- 固定 negative prompt；前端不能覆盖安全模板、模型、数量、水印或分辨率。
+- 固定 negative prompt；前端不能覆盖安全模板、模型、数量、`watermark=false` 或分辨率。
 - 本地先拒绝仿造医疗文件、真实患者病灶、处方剂量、未成年人不当内容、色情、暴恐、自伤指导、违法和冒充真人等请求；供应商审核是第二层，不是唯一防线。
 - 只记录受控错误码、状态、耗时、模型和安全请求 ID；禁止记录 prompt、供应商 URL、图片字节、Base64、密钥和响应正文。
 
@@ -242,7 +246,7 @@ DeepSeek 可在后端完成前使用接口桩开发，但不得宣称真实链�
 - 数据库共享的并发、10 分钟和每日限额；进程重启后仍有效。
 - prompt 脱敏和允许/拒绝边界；日志不含 prompt、URL、Base64、密钥或供应商正文。
 - 创建超时不自动重试；查询超时可重试；供应商审核、限流、无效 JSON、未知状态和 24 小时过期映射。
-- URL 防 SSRF、私网 DNS、重定向、超大文件、伪图片、动画、像素炸弹、元数据剥离与 WebP 重编码。
+- URL 防 SSRF、私网 DNS、重定向、超大文件、伪图片、动画、像素炸弹、源元数据剥离、AIGC 隐式标识与 WebP 重编码。
 - 加密落盘、鉴权读取、90 天清理、删除重试、会话删除、账号删除、孤儿对账。
 - 生成图绝不进入附件上下文、红旗预检、RAG 或健康记录抽取。
 - 迁移 upgrade/downgrade/upgrade 与含数据降级保护。
@@ -258,7 +262,7 @@ DeepSeek 可在后端完成前使用接口桩开发，但不得宣称真实链�
 
 ### 8.3 真实付费验收
 
-须由用户再次明确同意后才调用。只用不含身份信息的合成提示词，至少覆盖：人体结构、疾病机制、预防动作三类允许案例，以及仿造诊断证明、处方剂量、真实病灶三类拒绝案例。人工核对：水印、解剖明显错误、错误文字、刷新恢复、删除、90 天文案和移动端布局。
+须由用户再次明确同意后才调用。只用不含身份信息的合成提示词，至少覆盖：人体结构、疾病机制、预防动作三类允许案例，以及仿造诊断证明、处方剂量、真实病灶三类拒绝案例。人工核对：图片像素内没有水印文字、页面外部 AI 标识存在、解剖明显错误、错误文字、刷新恢复、删除、90 天文案和移动端布局。
 
 ## 9. 实施顺序与分工
 

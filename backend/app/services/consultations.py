@@ -24,6 +24,7 @@ from app.schemas.consultations import (
     TriageResult,
 )
 from app.services import attachments as attachment_service
+from app.services import image_generations as image_generation_service
 from app.services.image_deletion import (
     enqueue_image_deletions,
     process_image_deletion_jobs_best_effort,
@@ -387,6 +388,9 @@ async def append_assistant_message(
 async def remove(db: AsyncSession, user_id: UUID, cid: UUID):
     await owned(db, user_id, cid, lock=True)
     image_keys = await attachment_service.image_storage_keys_for_consultation(db, user_id, cid)
+    image_keys.extend(
+        await image_generation_service.storage_keys_for_consultation(db, user_id, cid)
+    )
     await enqueue_image_deletions(
         db,
         image_keys,

@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Attachment, ImageDeletionJob
+from app.models import Attachment, GeneratedImage, ImageDeletionJob
 from app.services.medical_image_storage import (
     list_stored_image_keys,
     remove_image,
@@ -188,11 +188,13 @@ async def reconcile_orphaned_image_files(
     candidates = await list_stored_image_keys(older_than)
     if not candidates:
         return 0
-    live_keys = set(
-        await db.scalars(
-            select(Attachment.image_storage_key).where(Attachment.image_storage_key.in_(candidates))
-        )
+    attachment_keys = select(Attachment.image_storage_key.label("storage_key")).where(
+        Attachment.image_storage_key.in_(candidates)
     )
+    generated_keys = select(GeneratedImage.storage_key.label("storage_key")).where(
+        GeneratedImage.storage_key.in_(candidates)
+    )
+    live_keys = set(await db.scalars(attachment_keys.union(generated_keys)))
     orphaned = sorted(set(candidates) - live_keys)
     await enqueue_image_deletions(
         db,

@@ -5,6 +5,7 @@ from app.api.routes import (
     auth,
     consultations,
     health_records,
+    image_generations,
     images,
     knowledge,
     models,
@@ -16,6 +17,7 @@ from app.api.routes import (
 api_router = APIRouter()
 api_router.include_router(attachments.router)
 api_router.include_router(images.router)
+api_router.include_router(image_generations.router)
 api_router.include_router(auth.router)
 api_router.include_router(users.router)
 api_router.include_router(consultations.router)

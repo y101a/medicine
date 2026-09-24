@@ -8,6 +8,7 @@ from app.core.errors import AppError
 from app.core.security import verify_password
 from app.models import User
 from app.services import attachments as attachment_service
+from app.services import image_generations as image_generation_service
 from app.services.audit_logs import (
     AUDIT_OUTCOME_REJECTED,
     AUDIT_OUTCOME_SUCCESS,
@@ -47,6 +48,7 @@ async def delete_account(
 
     # Capture encrypted blob keys before the database cascade removes attachment rows.
     image_keys = await attachment_service.image_storage_keys_for_user(db, user_id)
+    image_keys.extend(await image_generation_service.storage_keys_for_user(db, user_id))
     await enqueue_image_deletions(
         db,
         image_keys,

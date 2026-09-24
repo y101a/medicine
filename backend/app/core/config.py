@@ -76,6 +76,23 @@ class Settings(BaseSettings):
     image_orphan_hours: int = Field(default=24, ge=1, le=168)
     image_storage_dir: str = "data/medical_images"
 
+    # Server-controlled AI educational illustration generation. User-supplied
+    # chat credentials are never used, and the native MaaS URL is not the
+    # OpenAI-compatible QWEN_BASE_URL.
+    image_generation_api_key: SecretStr | None = None
+    image_generation_base_url: str = "https://dashscope.aliyuncs.com/api/v1"
+    image_generation_model: str = "wan2.6-t2i"
+    image_generation_provider_code: str = "medical-assistant-local"
+    image_generation_timeout_seconds: float = Field(default=30, ge=5, le=60)
+    image_generation_poll_seconds: int = Field(default=3, ge=2, le=30)
+    image_generation_retention_days: int = Field(default=90, ge=1, le=365)
+    image_generation_max_download_bytes: int = Field(
+        default=15 * 1024 * 1024, ge=1024 * 1024, le=30 * 1024 * 1024
+    )
+    image_generation_max_pixels: int = Field(default=25_000_000, ge=1_000_000, le=30_000_000)
+    image_generation_limit_10m: int = Field(default=3, ge=1, le=20)
+    image_generation_limit_daily: int = Field(default=10, ge=1, le=100)
+
     # Consultation document extraction stays local until the user sends a question.
     # 2026-09-21（用户确认的方案 B）把这三项放宽：手机扫描的多页 PDF 经常同时撞体积与页数上限。
     # 代价是解析内存与单次 CPU 时间上升——multipart 与解析子进程都是整份进内存，
@@ -193,6 +210,48 @@ class Settings(BaseSettings):
         if value.strip() != "qwen3.8-flash":
             raise ValueError("当前只允许 qwen3.8-flash 图片识别模型")
         return value.strip()
+
+    @field_validator("image_generation_base_url")
+    @classmethod
+    def validate_image_generation_base_url(cls, value: str) -> str:
+        normalized = value.strip().rstrip("/")
+        parsed = urlparse(normalized)
+        hostname = (parsed.hostname or "").lower()
+        allowed_host = hostname in {
+            "dashscope.aliyuncs.com",
+            "dashscope-intl.aliyuncs.com",
+        } or hostname.endswith(".maas.aliyuncs.com")
+        if (
+            parsed.scheme != "https"
+            or not allowed_host
+            or parsed.username
+            or parsed.password
+            or parsed.port not in {None, 443}
+            or parsed.query
+            or parsed.fragment
+            or parsed.path != "/api/v1"
+        ):
+            raise ValueError("IMAGE_GENERATION_BASE_URL 必须是阿里云百炼原生 HTTPS API 地址")
+        return normalized
+
+    @field_validator("image_generation_model")
+    @classmethod
+    def validate_image_generation_model(cls, value: str) -> str:
+        if value.strip() != "wan2.6-t2i":
+            raise ValueError("当前只允许 wan2.6-t2i 图片生成模型")
+        return value.strip()
+
+    @field_validator("image_generation_provider_code")
+    @classmethod
+    def validate_image_generation_provider_code(cls, value: str) -> str:
+        normalized = value.strip()
+        if (
+            not 1 <= len(normalized) <= 64
+            or any(ord(char) < 33 or ord(char) > 126 for char in normalized)
+            or any(char in {'"', "\\"} for char in normalized)
+        ):
+            raise ValueError("IMAGE_GENERATION_PROVIDER_CODE 必须是 1-64 位安全 ASCII 标识")
+        return normalized
 
     @field_validator("external_tool_timeout_seconds")
     @classmethod

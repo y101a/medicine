@@ -328,6 +328,37 @@ JPEG/PNG/WebP 的静态图片；原始文件不保存。后端纠正方向、移
 等确定性失败不重试。诊断日志只记录尝试次数、异常类型、HTTP 状态与过滤后的供应商请求 ID，
 不记录图片、Base64、OCR、文件名、密钥、异常正文或供应商响应体。
 
+## AI 医学科普配图
+
+图片生成与用户上传图片是两条独立链路。全部接口要求登录；任务只能关联当前用户、当前
+会话内已完成的普通医疗回答：
+
+| 方法与路径 | 用途 |
+| --- | --- |
+| `POST /consultations/{consultation_id}/image-generations` | 创建一张异步科普配图 |
+| `GET /image-generations/{id}` | 查询并机会式推进任务 |
+| `GET /consultations/{consultation_id}/image-generations` | 恢复会话中的全部任务 |
+| `GET /image-generations/{id}/content` | 鉴权读取规范化 WebP |
+| `DELETE /image-generations/{id}` | 取消未完成任务或永久删除结果 |
+
+创建请求字段为 `clientRequestId`、`sourceMessageId`、`prompt`、`style`、
+`aspectRatio`、`noticeAccepted=true`、`noticeVersion=image-generation-v1`。
+相同用户与 `clientRequestId` 幂等，不会重复创建收费任务。状态为
+`submitted|running|completed|failed|cancelled|expired`；响应不返回提示词、供应商任务
+ID 或供应商结果 URL。
+
+服务端固定阿里云 `wan2.6-t2i`、`n=1`、1K 尺寸映射和 `watermark=false`，图片像素内不
+叠加水印文字。允许三种固定风格和四种比例。后端先脱敏并包裹安全模板，拒绝仿造医疗文件、
+真实医疗影像、处方剂量、个体化病灶、血腥内容等请求。每用户同时最多一个任务，10 分钟
+最多 3 次、UTC 自然日最多 10 次，限额由 PostgreSQL 记录共享。
+
+成品 URL 只在本次供应商查询响应内使用：要求阿里云 HTTPS 结果域名、公网 DNS、443、
+禁止重定向，下载后验证真实静态图片、像素与大小限制，移除源元数据并重编码 WebP，只写入
+AIGC 隐式标识（生成属性、服务提供者编码、内容编号），再使用独立 AAD 和每图随机
+AES-256-GCM 数据密钥加密保存 90 天。任务响应包含 `contentId`；每次鉴权读取按内容编号与
+不可逆接收者指纹幂等留痕至少 183 天。前端只读取本项目的鉴权 Blob 接口。稳定错误码见
+`docs/IMAGE_GENERATION.md`。
+
 ## 删除账号
 
 `DELETE /users/me`，请求为 `{"currentPassword":"当前密码"}`。密码错误返回 422

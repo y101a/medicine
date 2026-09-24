@@ -73,6 +73,31 @@ pdf/docx/pptx/txt/md/image。文档原件不保存，只记录真实内容嗅探
 任务使用 `FOR UPDATE SKIP LOCKED` 领取，可由多个清理进程安全竞争。非法越界路径进入终止失败状态，
 不会访问图片存储根目录之外的位置。
 
-每日清理还会对账超过安全宽限期、但不再被 `attachments.image_storage_key` 引用的 `.bin` 和 `.tmp`
-文件，为其补建任务。这覆盖上传进程在文件原子落盘后、数据库提交前崩溃形成的无主密文。
+每日清理还会对账超过安全宽限期、但不再被 `attachments.image_storage_key` 或
+`generated_images.storage_key` 引用的 `.bin` 和 `.tmp` 文件，为其补建任务。这覆盖文件原子
+落盘后、数据库提交前崩溃形成的无主密文。
 `audit_logs.actor_user_id` 使用 `SET NULL`，只保留受控代码组成的最小化审计记录。
+
+## generated_images
+
+AI 医学科普配图的异步任务与加密成品。`user_id`、`consultation_id`、
+`source_message_id` 均为数据库外键；账号、会话或来源消息删除时级联删除任务，应用服务在
+级联前先把仍存在的随机存储键写入 `image_deletion_jobs`。
+
+- `(user_id, client_request_id)` 唯一，保障创建幂等；部分唯一索引保证每个用户同时最多一个
+  `submitted/running` 任务。
+- `prompt_ciphertext` 只保存脱敏并加安全模板后的实际外发提示词密文；供应商任务 ID 同样加密，
+  成品保存后立即清空。供应商 URL 从不入库。
+- 状态约束保证只有 `completed` 行可以同时持有 `storage_key`、包裹密钥、WebP 元数据与到期时间；
+  `failed/cancelled/expired` 等状态不得持有图片密文引用。
+- 成品默认保留 90 天。到期清空随机存储键和包裹密钥，设置 `expired` 与删除时间，并通过持久化
+  删除任务移除磁盘密文。
+- 表中不保存供应商响应正文、公开 URL、Base64、用户自带模型 Key 或诊断结论；生成图不进入
+  附件上下文、RAG、红旗预检或健康记录抽取。
+
+## generated_image_delivery_logs
+
+无显式水印成品的最小化提供对象留痕。保存不可逆 `recipient_fingerprint`、`content_id`、
+`source_consultation_id`、`delivered_at` 和至少 183 天后的 `retain_until`；不保存用户名、
+姓名或其他明文身份信息。该表不设用户、会话或成品外键，避免用户删除业务数据时提前删除法定
+留痕；`(content_id, recipient_fingerprint)` 唯一，使同一用户重复读取同一成品不会重复写入。
