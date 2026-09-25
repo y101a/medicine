@@ -30,11 +30,16 @@ export type ImageGenerationStatus =
 export interface ImageGenerationRequest {
   /** 幂等键：同一用户重复提交必须返回同一任务，绝不能重复调用收费接口。 */
   clientRequestId: string
-  /** 来源回答；服务端会校验它属于本会话且是一条已完成的医疗类回答。 */
+  /**
+   * 来源消息。2026-09-25 起允许是**命中意图的用户消息**：服务端会重新解密它的原文作为主题
+   * （`backend/app/services/image_generations.py:226`），所以下面的 `prompt` 只是契约要求的
+   * 非空占位，不会被外发；前端也不再让用户单独编辑提示词。
+   */
   sourceMessageId: string
   prompt: string
-  style: ImageGenerationStyle
-  aspectRatio: ImageGenerationAspectRatio
+  /** 省略则由服务端套用固定默认值（`medical_illustration` / `4:3`），前端不提供选择。 */
+  style?: ImageGenerationStyle
+  aspectRatio?: ImageGenerationAspectRatio
   noticeAccepted: true
   noticeVersion: string
 }

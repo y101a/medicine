@@ -22,6 +22,7 @@ import { readRetrievalNotice, rememberRetrievalNotice } from '../stores/retrieva
 import {
   readVoiceTipSeen, rememberVoiceTipSeen, readVoiceConsentSeen, rememberVoiceConsentSeen,
   readDocumentNoticeSeen, rememberDocumentNoticeSeen, readImageConsentSeen, rememberImageConsentSeen,
+  readImageGenerationNoticeVersion, rememberImageGenerationNoticeVersion,
 } from '../stores/composerHints'
 import { useVoiceRecorder } from '../composables/useVoiceRecorder'
 import { useAttachments, formatAttachmentSize, ATTACHMENT_LIMIT } from '../composables/useAttachments'
@@ -30,18 +31,11 @@ import {
   DEFAULT_ATTACHMENT_PROMPT, IMAGE_ATTACHMENT_PROMPT, isHiddenAutoPrompt,
 } from '../composables/composerPrompts'
 import ImageUploadDialog from '../components/ImageUploadDialog.vue'
-import ImageGenerationOffer from '../components/ImageGenerationOffer.vue'
 import ImageGenerationDialog from '../components/ImageGenerationDialog.vue'
 import GeneratedImageCard from '../components/GeneratedImageCard.vue'
-import {
-  useImageGeneration,
-  type ImageGenerationDraft,
-} from '../composables/useImageGeneration'
-import type {
-  ImageGeneration,
-  ImageGenerationAspectRatio,
-  ImageGenerationStyle,
-} from '../types/imageGenerations'
+import { useImageGeneration } from '../composables/useImageGeneration'
+import type { ImageGeneration } from '../types/imageGenerations'
+import { IMAGE_GENERATION_NOTICE_VERSION } from '../api/imageGenerations'
 import { voiceApi } from '../api/voice'
 
 const route = useRoute()
@@ -100,10 +94,8 @@ const {
 
 const generationDialogVisible = ref(false)
 const generationDialogError = ref('')
-const generationSourceId = ref('')
-const generationInitialPrompt = ref('')
-const generationInitialStyle = ref<ImageGenerationStyle>('medical_illustration')
-const generationInitialAspectRatio = ref<ImageGenerationAspectRatio>('4:3')
+/** 待提交的来源：命中意图的用户消息（id + 原文，原文只在内存里做契约占位）。 */
+const generationSource = ref<{ id: string; prompt: string } | null>(null)
 const VOICE_TIP_AUTO_HIDE_MS = 8_000
 const VOICE_NOTICE_AUTO_HIDE_MS = 5_000
 // 默认提问与「是否隐藏」的判定都在 `composables/composerPrompts.ts`：同一份文本既发给模型，
@@ -629,6 +621,12 @@ async function sendContent(content: string, clearDraft = false) {
     pending = null
     void recent.load()
     saving.value = false
+    // 命中「明确要求生成医学配图」：跳过文字回答，直接走配图链路（方案 §7.1）。
+    // 这里绝不能回退到 generateAnswer——那只会让模型回一句「不能生成图片」。
+    if (message.imageGenerationIntent === true) {
+      startGeneration(message)
+      return
+    }
     if (message.triage?.level === 'emergency') {
       if (route.params.id !== cid) {
         await router.replace({ name: 'consultation', params: { id: cid } })
@@ -662,48 +660,49 @@ function stopGeneration() {
 }
 
 /**
- * 只有「已完成的医疗类回答」才给生成配图的入口（方案 §3.2）：
- * 追问卡、失败或停止的回答、紧急分流、普通闲聊都不显示；流式占位气泡也不算完成。
+ * 命中服务端意图判定（`imageGenerationIntent`）后的落点（方案 §7.1）：
+ * **不再请求文字回答**，直接以这条用户消息为来源创建科普配图任务。
+ * 首次使用必须先过一遍费用/标识协议；确认后按协议版本记忆，之后明确请求直接生成。
  */
-function canOfferGeneration(message: Message) {
-  return message.role === 'assistant'
-    && message.medicalContent === true
-    && message.generationStatus === 'completed'
-    && !message.followUp
-    && !message.triage
-    && !message.id.startsWith('stream-')
+function startGeneration(source: Message) {
+  generationSource.value = { id: source.id, prompt: source.content }
+  generationDialogError.value = ''
+  if (readImageGenerationNoticeVersion() === IMAGE_GENERATION_NOTICE_VERSION) {
+    void runGeneration()
+    return
+  }
+  generationDialogVisible.value = true
 }
 
-function openGenerationDialog(message: Message) {
-  generationSourceId.value = message.id
-  generationInitialPrompt.value = ''
-  generationInitialStyle.value = 'medical_illustration'
-  generationInitialAspectRatio.value = '4:3'
-  generationDialogError.value = ''
-  generationDialogVisible.value = true
+/** 真正提交。失败只显示受控原因，**不回退聊天模型**（方案 §7.1⑥）。 */
+async function runGeneration() {
+  const pending = generationSource.value
+  if (!pending) return
+  const result = await submitGeneration(pending.id, pending.prompt)
+  if (result.ok) {
+    rememberImageGenerationNoticeVersion(IMAGE_GENERATION_NOTICE_VERSION)
+    generationDialogError.value = ''
+    generationSource.value = null
+    generationDialogVisible.value = false
+    return
+  }
+  const message = result.message || '生成请求没有提交成功，请稍后重试'
+  // 协议弹窗开着就显示在弹窗里，否则走页面提示；两种情况都不改走文字回答。
+  if (generationDialogVisible.value) generationDialogError.value = message
+  else error.value = message
 }
 
 /**
- * 「重新生成」**不直接计费**：用户必须再经弹窗确认一次。
- * 描述不预填——前端不保存 prompt 明文（方案 §7.2），只带回上一次的风格与比例。
+ * 任务卡上的「重新生成」：来源仍是同一条用户消息，同样要过协议门（首次）或直接提交。
+ * 前端不保存 prompt 明文，所以原文从当前已加载的消息里取；取不到就让用户刷新后再试。
  */
 function retryGeneration(task: ImageGeneration) {
-  generationSourceId.value = task.sourceMessageId
-  generationInitialPrompt.value = ''
-  generationInitialStyle.value = task.style
-  generationInitialAspectRatio.value = task.aspectRatio
-  generationDialogError.value = ''
-  generationDialogVisible.value = true
-}
-
-async function onGenerationSubmit(draft: ImageGenerationDraft) {
-  const result = await submitGeneration(generationSourceId.value, draft)
-  if (result.ok) {
-    generationDialogVisible.value = false
-    generationDialogError.value = ''
+  const source = messages.value.find(item => item.id === task.sourceMessageId)
+  if (!source) {
+    error.value = '找不到这条消息的原文，请刷新页面后再试'
     return
   }
-  generationDialogError.value = result.message || '提交失败，请稍后重试'
+  startGeneration(source)
 }
 
 function canOfferPathologyCard(message: Message) {
@@ -847,6 +846,17 @@ onBeforeRouteUpdate(canLeave)
               <MessageAttachments :items="message.attachments" />
             </div>
             <EmergencyTriageCard v-if="message.triage" :triage="message.triage" />
+            <!-- 命中的配图任务挂在这条用户消息下；服务端也按 sourceMessageId 恢复（方案 §7.1）。 -->
+            <GeneratedImageCard
+              v-for="task in generationTasks[message.id] || []"
+              :key="task.id"
+              :task="task"
+              :url="generationObjectUrls[task.id]"
+              :notice="generationNotices[task.id]"
+              :loading="generationLoadingImages[task.id]"
+              @retry="retryGeneration(task)"
+              @remove="removeGeneration(task)"
+            />
           </template>
           <div v-else class="assistant-message">
             <img class="assistant-avatar" :src="medicalAiAvatar" alt="医疗 AI 助手" />
@@ -866,7 +876,8 @@ onBeforeRouteUpdate(canLeave)
                 :loading="cardGeneratingSourceId === message.id"
                 @generate="generatePathologyCard(message)"
               />
-              <!-- 生成任务按 `sourceMessageId` 挂回对应回答下方（契约 §4.2 的历史恢复方式）。 -->
+              <!-- 旧入口（回答底部按钮）已于 2026-09-25 删除：改为用户在对话里直接说明需求。
+                   下面是兼容历史数据：早期以「回答」为来源的任务仍然挂回回答下方。 -->
               <GeneratedImageCard
                 v-for="task in generationTasks[message.id] || []"
                 :key="task.id"
@@ -876,10 +887,6 @@ onBeforeRouteUpdate(canLeave)
                 :loading="generationLoadingImages[task.id]"
                 @retry="retryGeneration(task)"
                 @remove="removeGeneration(task)"
-              />
-              <ImageGenerationOffer
-                v-if="canOfferGeneration(message)"
-                @open="openGenerationDialog(message)"
               />
             </div>
           </div>
@@ -988,10 +995,7 @@ onBeforeRouteUpdate(canLeave)
       v-model="generationDialogVisible"
       :submitting="generationSubmitting"
       :error="generationDialogError"
-      :initial-prompt="generationInitialPrompt"
-      :initial-style="generationInitialStyle"
-      :initial-aspect-ratio="generationInitialAspectRatio"
-      @submit="onGenerationSubmit"
+      @confirm="runGeneration"
     />
   </main>
 </template>

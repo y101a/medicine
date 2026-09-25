@@ -4,9 +4,7 @@ import { IMAGE_GENERATION_NOTICE_VERSION, imageGenerationsApi } from '../api/ima
 import {
   IMAGE_GENERATION_ACTIVE_STATUSES,
   type ImageGeneration,
-  type ImageGenerationAspectRatio,
   type ImageGenerationStatus,
-  type ImageGenerationStyle,
 } from '../types/imageGenerations'
 
 /**
@@ -32,7 +30,7 @@ const POLL_FACTOR = 1.5
 const ERROR_MESSAGES: Record<string, string> = {
   IMAGE_GENERATION_NOTICE_REQUIRED: '请先确认生成说明再试',
   IMAGE_GENERATION_PROMPT_INVALID: '这段描述不能用于科普配图，请改成非诊断性的科普描述',
-  IMAGE_GENERATION_SOURCE_INVALID: '这条回答不支持生成配图，请换一条已完成的医疗类回答',
+  IMAGE_GENERATION_SOURCE_INVALID: '这条消息不能作为配图来源，请直接说「帮我生成一张关于…的图片」',
   IMAGE_GENERATION_ACTIVE: '上一张还在生成，请等它结束后再试',
   IMAGE_GENERATION_NOT_READY: '图片还在生成中，请稍候',
   IMAGE_GENERATION_RATE_LIMITED: '生成次数已达上限（10 分钟 3 次、每日 10 次），请稍后再试',
@@ -49,13 +47,7 @@ export function imageGenerationErrorMessage(cause: unknown): string {
   return ERROR_MESSAGES[code] || getApiErrorMessage(cause)
 }
 
-/** 用户在弹窗里确认的内容；风格与比例都是契约固定枚举。 */
-export interface ImageGenerationDraft {
-  prompt: string
-  style: ImageGenerationStyle
-  aspectRatio: ImageGenerationAspectRatio
-}
-
+/** 用户在弹窗里确认协议后提交一次生成。 */
 export interface ImageGenerationSubmitResult {
   ok: boolean
   message?: string
@@ -216,10 +208,13 @@ export function useImageGeneration(consultationId: Ref<string | null>) {
   /**
    * 提交一次生成。每次调用都会生成**新的** `clientRequestId`：
    * 重试是用户明确点击后的一次新任务，可能产生新费用，不能当成原任务的免费重试。
+   *
+   * 2026-09-25 起没有提示词/风格/比例表单：主题来自**用户自己那条命中意图的消息**，
+   * 服务端会重新解密取值；这里传的 `prompt` 只是契约要求的非空占位，不会被外发。
    */
   async function submit(
     sourceMessageId: string,
-    draft: ImageGenerationDraft,
+    prompt: string,
   ): Promise<ImageGenerationSubmitResult> {
     const id = consultationId.value
     if (!id) return { ok: false, message: '会话还没准备好，请稍后再试' }
@@ -229,9 +224,7 @@ export function useImageGeneration(consultationId: Ref<string | null>) {
       const created = await imageGenerationsApi.create(id, {
         clientRequestId: newClientRequestId(),
         sourceMessageId,
-        prompt: draft.prompt.trim(),
-        style: draft.style,
-        aspectRatio: draft.aspectRatio,
+        prompt: prompt.trim(),
         noticeAccepted: true,
         noticeVersion: IMAGE_GENERATION_NOTICE_VERSION,
       })

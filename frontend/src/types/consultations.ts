@@ -17,6 +17,14 @@ export interface Message {
   answerFormat?: 'plain' | 'card'
   medicalContent?: boolean
   sourceMessageId?: string | null
+  /**
+   * 服务端本地意图判定：用户消息里同时出现「主动生成动作 + 图片对象 + 医学主题」才为 true
+   * （否定请求、普通文生图、仅询问功能、带附件或紧急分流都为 false，见
+   * `backend/app/services/image_generation_intent.py`）。
+   *
+   * 命中时前端**不再调用 `/stream`**，直接以这条用户消息为来源创建科普配图任务。
+   */
+  imageGenerationIntent?: boolean
   followUp?: FollowUpCard | null
   triage?: TriageResult | null
   citations?: MessageCitation[]

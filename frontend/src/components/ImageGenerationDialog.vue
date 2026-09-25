@@ -1,51 +1,28 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import {
-  IMAGE_GENERATION_ASPECT_RATIO_LABELS,
-  IMAGE_GENERATION_PROMPT_MAX_LENGTH,
-  IMAGE_GENERATION_STYLE_LABELS,
-  type ImageGenerationAspectRatio,
-  type ImageGenerationStyle,
-} from '../types/imageGenerations'
 
 /**
- * 生成前的确认弹窗（方案 §7.1/§7.2）。
+ * AI 科普配图的**一次性协议**（方案 §7.1「收窄为首次使用自动弹出的费用、标识和用途协议」）。
  *
- * 三条硬要求都落在这里：
- * 1. **不自动生成、不默认收费**：用户必须自己写/改一段描述、勾选说明，再点确认。
- * 2. 模型、数量、分辨率、水印、反向提示词**都不在弹窗里**——那些由服务端固定，前端不给开关。
- * 3. 说明里必须写明「AI 生成 / 只作科普示意 / 可能出错 / 不作诊断依据 / 可能产生费用」，
- *    并按用户 2026-09-24 选定的水印策略（《标识办法》第九条：图内无标识）写明**用户转发时的声明义务**。
+ * 2026-09-25 起不再有回答底部按钮：用户在对话里直接说「帮我生成一张关于人体结构的图片」，
+ * 服务端消息响应给 `imageGenerationIntent=true`，前端跳过 `/stream` 直接生成。
+ * 所以这个弹窗只负责**首次**把费用与标识讲清楚，确认后按协议版本记忆，之后明确请求直接生成。
+ *
+ * 没有提示词/风格/比例输入：主题来自用户自己那条消息，其余参数由服务端固定
+ * （`watermark=false`、模型、分辨率、反向提示词前端都不可覆盖）。
  */
 const props = defineProps<{
   modelValue: boolean
   submitting?: boolean
-  /** 提交失败时由父组件塞进来的受控中文短句。 */
+  /** 受控中文短句：限额、来源不合规、未配置等，都来自服务端受控错误码。 */
   error?: string
-  initialPrompt?: string
-  initialStyle?: ImageGenerationStyle
-  initialAspectRatio?: ImageGenerationAspectRatio
 }>()
 
 const emit = defineEmits<{
   (event: 'update:modelValue', value: boolean): void
-  (event: 'submit', draft: {
-    prompt: string
-    style: ImageGenerationStyle
-    aspectRatio: ImageGenerationAspectRatio
-  }): void
+  (event: 'confirm'): void
 }>()
 
-const STYLE_ORDER: ImageGenerationStyle[] = [
-  'medical_illustration',
-  'flat_illustration',
-  'friendly_cartoon',
-]
-const RATIO_ORDER: ImageGenerationAspectRatio[] = ['1:1', '4:3', '3:4', '16:9']
-
-const prompt = ref('')
-const style = ref<ImageGenerationStyle>('medical_illustration')
-const aspectRatio = ref<ImageGenerationAspectRatio>('4:3')
 const agreed = ref(false)
 
 const visible = computed({
@@ -53,31 +30,19 @@ const visible = computed({
   set: (value: boolean) => emit('update:modelValue', value),
 })
 
-const trimmedPrompt = computed(() => prompt.value.trim())
-const remaining = computed(() => IMAGE_GENERATION_PROMPT_MAX_LENGTH - trimmedPrompt.value.length)
-const canSubmit = computed(
-  () => agreed.value && trimmedPrompt.value.length > 0 && remaining.value >= 0 && !props.submitting,
-)
+const canConfirm = computed(() => agreed.value && !props.submitting)
 
-// 每次打开都重置：勾选状态与提示词都回到调用方给的初始值，避免沿用上一次的确认。
+// 每次打开都重置勾选：取消或失败后再次生成，仍要重新确认一次。
 watch(
   () => props.modelValue,
   (opened) => {
-    if (!opened) return
-    prompt.value = props.initialPrompt || ''
-    style.value = props.initialStyle || 'medical_illustration'
-    aspectRatio.value = props.initialAspectRatio || '4:3'
-    agreed.value = false
+    if (opened) agreed.value = false
   },
 )
 
-function onSubmit() {
-  if (!canSubmit.value) return
-  emit('submit', {
-    prompt: trimmedPrompt.value,
-    style: style.value,
-    aspectRatio: aspectRatio.value,
-  })
+function onConfirm() {
+  if (!canConfirm.value) return
+  emit('confirm')
 }
 </script>
 
@@ -85,43 +50,15 @@ function onSubmit() {
   <el-dialog
     v-model="visible"
     class="image-generation-dialog"
-    title="生成医学科普配图"
+    title="生成 AI 科普配图前请确认"
     width="min(560px, 92vw)"
     append-to-body
     :close-on-click-modal="false"
   >
     <p class="image-generation-dialog__lead">
-      描述你想科普的内容（例如「呼吸道与肺部关系的示意」）。只发送这段描述，
-      不会读取你的病历、上传的图片或完整对话。
+      你的这条消息会被识别为「生成科普配图」请求。图片只使用这条消息里的主题，
+      不会读取你的病历、上传的图片、健康记录或完整对话。
     </p>
-
-    <el-input
-      v-model="prompt"
-      class="image-generation-dialog__prompt"
-      type="textarea"
-      :rows="3"
-      :maxlength="IMAGE_GENERATION_PROMPT_MAX_LENGTH"
-      show-word-limit
-      placeholder="例：一张展示呼吸道与肺部关系的友好医学科普插画"
-    />
-
-    <div class="image-generation-dialog__row">
-      <span class="image-generation-dialog__label">风格</span>
-      <el-radio-group v-model="style" :disabled="submitting">
-        <el-radio-button v-for="item in STYLE_ORDER" :key="item" :value="item">
-          {{ IMAGE_GENERATION_STYLE_LABELS[item] }}
-        </el-radio-button>
-      </el-radio-group>
-    </div>
-
-    <div class="image-generation-dialog__row">
-      <span class="image-generation-dialog__label">比例</span>
-      <el-radio-group v-model="aspectRatio" :disabled="submitting">
-        <el-radio-button v-for="item in RATIO_ORDER" :key="item" :value="item">
-          {{ IMAGE_GENERATION_ASPECT_RATIO_LABELS[item] }}
-        </el-radio-button>
-      </el-radio-group>
-    </div>
 
     <div class="image-generation-dialog__consent">
       <p class="image-generation-dialog__consent-text">
@@ -136,8 +73,8 @@ function onSubmit() {
 
     <template #footer>
       <el-button text :disabled="submitting" @click="visible = false">取消</el-button>
-      <el-button type="primary" :disabled="!canSubmit" :loading="submitting" @click="onSubmit">
-        确认生成
+      <el-button type="primary" :disabled="!canConfirm" :loading="submitting" @click="onConfirm">
+        同意并生成
       </el-button>
     </template>
   </el-dialog>
@@ -145,9 +82,6 @@ function onSubmit() {
 
 <style scoped>
 .image-generation-dialog__lead { margin: 0 0 10px; color: var(--text-main); line-height: 1.7; }
-.image-generation-dialog__prompt { margin-bottom: 12px; }
-.image-generation-dialog__row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
-.image-generation-dialog__label { flex: none; width: 32px; color: var(--text-secondary); font-size: 13px; }
 .image-generation-dialog__consent { margin-top: 12px; padding: 10px 12px; border: 1px solid #e6eef6; border-radius: 8px; background: #fbfdff; }
 .image-generation-dialog__consent-text { margin: 0 0 8px; color: var(--text-secondary); font-size: 12px; line-height: 1.9; }
 .image-generation-dialog__error { margin-top: 10px; }
