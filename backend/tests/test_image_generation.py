@@ -153,6 +153,72 @@ async def test_notice_source_prompt_and_active_rules(profile_context, monkeypatc
     assert active.json()["code"] == "IMAGE_GENERATION_ACTIVE"
 
 
+async def test_explicit_medical_image_request_can_be_source(profile_context, monkeypatch):
+    client, db, (user, _) = profile_context
+    client.cookies.set(ACCESS_COOKIE, create_access_token(user.id))
+    consultation = await client.post(
+        "/api/v1/consultations",
+        json={"clientRequestId": str(uuid4())},
+    )
+    consultation_id = UUID(consultation.json()["id"])
+    message = await client.post(
+        f"/api/v1/consultations/{consultation_id}/messages",
+        json={
+            "clientRequestId": str(uuid4()),
+            "content": "帮我生成一张关于人体结构的图片",
+        },
+    )
+    assert message.status_code == 201
+    assert message.json()["imageGenerationIntent"] is True
+    monkeypatch.setattr(generation_service, "create_provider_task", fake_create)
+
+    created = await client.post(
+        f"/api/v1/consultations/{consultation_id}/image-generations",
+        json={
+            "clientRequestId": str(uuid4()),
+            "sourceMessageId": message.json()["id"],
+            "prompt": "这段内容会被服务端来源消息替代",
+            "style": "medical_illustration",
+            "aspectRatio": "4:3",
+            "noticeAccepted": True,
+            "noticeVersion": "image-generation-v1",
+        },
+    )
+    assert created.status_code == 202
+    row = await db.get(GeneratedImage, UUID(created.json()["id"]))
+    assert row is not None
+    outbound = decrypt_sensitive(row.prompt_ciphertext)
+    assert "人体结构" in outbound
+    assert "会被服务端来源消息替代" not in outbound
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "为什么 AI 说无法生成图片",
+        "帮我生成一张风景图片",
+        "不要生成一张人体结构图",
+        "请介绍人体结构",
+    ],
+)
+async def test_non_generation_messages_do_not_trigger_intent(
+    profile_context,
+    content,
+):
+    client, _, (user, _) = profile_context
+    client.cookies.set(ACCESS_COOKIE, create_access_token(user.id))
+    consultation = await client.post(
+        "/api/v1/consultations",
+        json={"clientRequestId": str(uuid4())},
+    )
+    message = await client.post(
+        f"/api/v1/consultations/{consultation.json()['id']}/messages",
+        json={"clientRequestId": str(uuid4()), "content": content},
+    )
+    assert message.status_code == 201
+    assert message.json()["imageGenerationIntent"] is False
+
+
 async def test_poll_download_content_and_delete(profile_context, tmp_path, monkeypatch):
     client, db, (user, _) = profile_context
     settings = get_settings()

@@ -29,6 +29,7 @@ from app.services.image_deletion import (
     enqueue_image_deletions,
     process_image_deletion_jobs_best_effort,
 )
+from app.services.image_generation_intent import medical_image_generation_prompt
 
 
 def summary(row: Consultation) -> ConsultationOut:
@@ -64,6 +65,12 @@ def message_out(
         generation_status=row.generation_status,
         answer_format=row.answer_format,
         medical_content=row.is_medical_content,
+        image_generation_intent=bool(
+            row.role == "user"
+            and triage is None
+            and not attachments
+            and medical_image_generation_prompt(stored_content)
+        ),
         source_message_id=row.source_message_id,
         follow_up=follow_up,
         triage=triage,

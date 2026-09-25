@@ -149,6 +149,10 @@ class MessageOut(BaseModel):
         serialization_alias="answerFormat",
     )
     medical_content: bool = Field(default=False, serialization_alias="medicalContent")
+    image_generation_intent: bool = Field(
+        default=False,
+        serialization_alias="imageGenerationIntent",
+    )
     source_message_id: UUID | None = Field(default=None, serialization_alias="sourceMessageId")
     follow_up: FollowUpCard | None = Field(default=None, serialization_alias="followUp")
     triage: TriageResult | None = None

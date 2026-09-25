@@ -41,6 +41,7 @@ from app.services.image_deletion import (
     enqueue_image_deletion,
     process_image_deletion_jobs_best_effort,
 )
+from app.services.image_generation_intent import medical_image_generation_prompt
 from app.services.image_generation_provider import (
     ProviderTask,
     create_provider_task,
@@ -123,7 +124,7 @@ async def _owned_source(
     user_id: UUID,
     consultation_id: UUID,
     source_message_id: UUID,
-) -> Message:
+) -> tuple[Message, str | None]:
     row = await db.scalar(
         select(Message)
         .join(Consultation, Consultation.id == Message.consultation_id)
@@ -131,20 +132,25 @@ async def _owned_source(
             Message.id == source_message_id,
             Message.consultation_id == consultation_id,
             Consultation.user_id == user_id,
-            Message.role == "assistant",
-            Message.generation_status == "completed",
-            Message.is_medical_content.is_(True),
-            Message.answer_format == "plain",
-            Message.source_message_id.is_(None),
         )
     )
-    if row is None:
-        raise AppError(
-            422,
-            "IMAGE_GENERATION_SOURCE_INVALID",
-            "只能为本会话内已完成的医疗回答生成科普配图",
-        )
-    return row
+    if row is not None and row.role == "assistant":
+        if (
+            row.generation_status == "completed"
+            and row.is_medical_content
+            and row.answer_format == "plain"
+            and row.source_message_id is None
+        ):
+            return row, None
+    elif row is not None and row.role == "user" and row.triage_ciphertext is None:
+        source_prompt = medical_image_generation_prompt(decrypt_sensitive(row.content_ciphertext))
+        if source_prompt is not None:
+            return row, source_prompt
+    raise AppError(
+        422,
+        "IMAGE_GENERATION_SOURCE_INVALID",
+        "只能根据明确的医学配图请求或已完成的医疗回答生成科普配图",
+    )
 
 
 async def _enforce_limits(db: AsyncSession, user_id: UUID, now: datetime) -> None:
@@ -209,10 +215,15 @@ async def create(
     )
     if active is not None:
         raise AppError(409, "IMAGE_GENERATION_ACTIVE", "已有一张图片正在生成")
-    await _owned_source(db, user_id, consultation_id, payload.source_message_id)
+    _, source_prompt = await _owned_source(
+        db,
+        user_id,
+        consultation_id,
+        payload.source_message_id,
+    )
     now = datetime.now(UTC)
     await _enforce_limits(db, user_id, now)
-    prompt = _safe_prompt(payload.prompt, payload.style)
+    prompt = _safe_prompt(source_prompt or payload.prompt, payload.style)
     settings = get_settings()
     row = GeneratedImage(
         user_id=user_id,
