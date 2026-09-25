@@ -225,6 +225,44 @@ describe('首次使用的一次性协议', () => {
       .toContain('生成次数已达上限')
     expect(consultationsApi.stream).not.toHaveBeenCalled()
   })
+it('取消协议弹窗：不发创建请求、不记协议版本、给出取消提示，再说一次会重新弹窗', async () => {
+    const { wrapper } = await setup()
+    await sendMessage(wrapper, '帮我生成一张关于人体结构的图片')
+    expect(document.querySelector('.image-generation-dialog')).not.toBeNull()
+
+    const cancel = Array.from(document.querySelectorAll<HTMLButtonElement>('.image-generation-dialog button'))
+      .find(button => button.textContent?.includes('取消'))
+    expect(cancel, '协议弹窗应有「取消」按钮').toBeTruthy()
+    cancel?.click()
+    await flushPromises()
+    await flushPromises()
+
+    // 方案 §8.2：用户取消不发请求；没有协议确认就不该落版本、更不该产生费用。
+    expect(imageGenerationsApi.create).not.toHaveBeenCalled()
+    expect(localStorage.getItem(IMAGE_GENERATION_NOTICE_STORAGE_KEY)).toBeNull()
+    expect(document.querySelector('.generation-cancel-notice')?.textContent)
+      .toContain('没有创建任务，也不会产生费用')
+
+    // 再说一次同一句话：仍然先弹协议（没有被静默记住），且任务卡不会被留下。
+    await sendMessage(wrapper, '帮我生成一张关于人体结构的图片')
+    expect(document.querySelector('.image-generation-dialog')).not.toBeNull()
+    expect(imageGenerationsApi.create).not.toHaveBeenCalled()
+  })
+
+  it('重复点击「同意并生成」只产生一次创建请求', async () => {
+    const { wrapper } = await setup()
+    await sendMessage(wrapper, '帮我生成一张关于人体结构的图片')
+    agreeDialog()
+    await flushPromises()
+
+    const confirm = dialogConfirmButton()
+    confirm?.click()
+    confirm?.click()
+    await flushPromises()
+
+    // 收费保护：同一次确认即便被点两下，也只有一个请求（composable 内有 submitting 兜底）。
+    expect(imageGenerationsApi.create).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('任务卡与历史恢复', () => {

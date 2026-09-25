@@ -47,6 +47,11 @@ export interface ImageGenerationRequest {
 /** 任务（契约 §4.1 响应 / §4.2 查询）。 */
 export interface ImageGeneration {
   id: string
+  /**
+   * 生成内容的编号（服务端写入的**隐式标识**载体）。可追溯用，前端只读展示口径待定，
+   * 不参与任何判断——`errorCode` 缺失时也不要伪造。
+   */
+  contentId?: string | null
   sourceMessageId: string
   status: ImageGenerationStatus
   style: ImageGenerationStyle
@@ -56,6 +61,11 @@ export interface ImageGeneration {
   /** 成品是否可读；为 false 时不要请求内容接口（会拿到 409）。 */
   imageAvailable: boolean
   imageExpiresAt: string | null
+  /**
+   * 失败时的**受控错误码**（服务端只回码，不回供应商正文）。
+   * 刷新恢复时用它把「生成失败」还原成一句人能读的原因（见 `composables/useImageGeneration.ts`）。
+   */
+  errorCode?: string | null
   createdAt: string
   updatedAt: string
 }

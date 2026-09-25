@@ -94,6 +94,8 @@ const {
 
 const generationDialogVisible = ref(false)
 const generationDialogError = ref('')
+/** 取消协议后的短提示：说明没有建任务、不会扣费，以及怎么再来一次。 */
+const generationCancelNotice = ref('')
 /** 待提交的来源：命中意图的用户消息（id + 原文，原文只在内存里做契约占位）。 */
 const generationSource = ref<{ id: string; prompt: string } | null>(null)
 const VOICE_TIP_AUTO_HIDE_MS = 8_000
@@ -667,6 +669,7 @@ function stopGeneration() {
 function startGeneration(source: Message) {
   generationSource.value = { id: source.id, prompt: source.content }
   generationDialogError.value = ''
+  generationCancelNotice.value = ''
   if (readImageGenerationNoticeVersion() === IMAGE_GENERATION_NOTICE_VERSION) {
     void runGeneration()
     return
@@ -691,6 +694,30 @@ async function runGeneration() {
   if (generationDialogVisible.value) generationDialogError.value = message
   else error.value = message
 }
+
+/**
+ * 关闭协议弹窗却没生成（点「取消」、右上角 × 或 Esc）＝用户取消了这次生成：
+ * **不发任何请求、不记协议版本、不产生费用**（方案 §8.2「用户取消不发请求」）。
+ * 这里清空待提交来源并回一句可读提示，告诉用户怎么再来一次——
+ * 注意**不能补一个触发按钮**（方案 §7.1：不得新增替代入口），只能靠用户再说一次那句话。
+ */
+function onGenerationDialogClosed() {
+  if (!generationSource.value) return
+  generationSource.value = null
+  generationDialogError.value = ''
+  generationCancelNotice.value =
+    '已取消生成：没有创建任务，也不会产生费用。需要时请再发一次「帮我生成一张……的图片」，'
+    + '确认协议后即可生成。'
+}
+
+/**
+ * 用 `watch` 而不是 `el-dialog` 的 `close` 事件：`v-model` 被外部置 false 时（点我自己 footer 的
+ * 「取消」）Element Plus 不保证发 `close`，而 watcher 对「取消」「右上角 ×」「Esc」三种关闭都成立。
+ * 生成成功那条路径会先把 `generationSource` 置空，所以不会误报取消。
+ */
+watch(generationDialogVisible, (open) => {
+  if (!open) onGenerationDialogClosed()
+})
 
 /**
  * 任务卡上的「重新生成」：来源仍是同一条用户消息，同样要过协议门（首次）或直接提交。
@@ -900,6 +927,8 @@ onBeforeRouteUpdate(canLeave)
     <div class="composer-area">
       <form class="composer" :class="{ dragging }" @submit.prevent="send"
         @dragover.prevent="dragging = true" @dragleave="dragging = false" @drop.prevent="onDrop">
+        <el-alert v-if="generationCancelNotice" class="generation-cancel-notice" type="info" show-icon
+          :title="generationCancelNotice" @close="generationCancelNotice = ''" />
         <el-alert v-if="modelsError" class="model-error" :title="modelsError" type="warning" :closable="false" />
         <el-alert v-if="!voiceTipSeen" class="voice-tip" type="info" show-icon
           title="可用输入法上的麦克风语音输入（如豆包输入法），也可以点发送键左侧的麦克风按钮直接录音。语音识别可能出错，发送前请核对文字；请不要在对话中提供姓名、身份证号、住院号或手机号。"

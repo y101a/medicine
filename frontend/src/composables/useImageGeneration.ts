@@ -75,7 +75,10 @@ export function useImageGeneration(consultationId: Ref<string | null>) {
   let delay = POLL_START_MS
   let disposed = false
 
-  /** 按回答分组：`sourceMessageId` → 该回答下的任务（契约 §4.2 的历史恢复方式）。 */
+  /**
+   * 按来源消息分组：`sourceMessageId` → 该消息下的任务（契约 §4.2 的历史恢复方式）。
+   * 2026-09-25 起来源是命中意图的**用户**消息；旧数据里以回答为来源的任务仍按回答挂回。
+   */
   const tasksByMessage = computed<Record<string, ImageGeneration[]>>(() => {
     const grouped: Record<string, ImageGeneration[]> = {}
     for (const task of tasks.value) {
@@ -196,7 +199,15 @@ export function useImageGeneration(consultationId: Ref<string | null>) {
       if (disposed) return
       tasks.value = items
       for (const task of items) {
-        if (task.status === 'completed') await loadImage(task)
+        if (task.status === 'completed') {
+          await loadImage(task)
+          continue
+        }
+        // 刷新后失败的旧任务只带回受控 `errorCode`（没有 prompt、没有供应商正文）：
+        // 用同一张受控文案表还原一句人能读的原因，别让卡片只剩「生成失败」四个字。
+        if (task.status === 'failed' && task.errorCode && ERROR_MESSAGES[task.errorCode]) {
+          setNotice(task.id, ERROR_MESSAGES[task.errorCode])
+        }
       }
       scheduleNextPoll()
     } catch (cause) {
