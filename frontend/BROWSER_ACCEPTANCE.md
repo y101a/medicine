@@ -100,3 +100,18 @@ npm run e2e
 
 以上只证明本次开发环境链路可用；真实设备权限、网络和高德服务仍可能失败，前端继续保留
 城市/区县自动降级。
+
+## 五、2026-09-26 模拟短信真实链路记录
+
+Codex 的后端（迁移 `20260926_0023`）落地后，用真实 HTTP（本机 8000，`APP_ENVIRONMENT=development`、
+`SMS_PROVIDER` 默认 `fake`）实跑了一遍，**没有改任何代码**：
+
+- 发码返回 `202 {challengeId, expiresInSeconds:300, resendAfterSeconds:60}`，字段名与前端完全一致。
+- 同一号码立刻重发返回 `429 SMS_RATE_LIMITED`，`details.retryAfterSeconds` 从 60 实测递减到 18 —— 限流窗口是真的，前端倒计时口径正确。
+- **不存在的手机号**走找回密码同样返回 202 同形状，且**后端终端不打印验证码**（诱饵分支生效，没有账户枚举线索）。
+- 校验返回 `200 {verificationToken, expiresInSeconds:600}`；注册返回 `201` 且 `phoneVerified: true`。
+- 重置密码返回 `204`，之后**旧密码 401、新密码 200**，而**重置前那个会话用旧 Cookie 访问 `/users/me` 得到 `401 SESSION_EXPIRED`**（`auth_version` 提升，旧会话立即失效）。
+- 老账号（把 `phone_verified_at` 置空模拟迁移前的用户）在设置页场景下：`phoneVerified: false` → 补验证发码 `202`（请求体为空，手机号由服务端解密）→ 确认 `204` → `/users/me` 变 `true`。
+
+**这一轮只到 HTTP 层**：真人浏览器点一遍（第三节第 13、14 条）仍未做；验证码 5 分钟过期、
+错码与 5 次尝试上限也没有真实复现（等 5 分钟或连错 5 次才有意义）。

@@ -219,6 +219,7 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 执行者 | 任务 | 正在改的文件 | 迁移编号 | 占用数据库 | 开始时间 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
+| DSH | **模拟短信真实链路联调**（本机起 8000 后端，走 HTTP 验注册验证/限流/找回/补验证；探针账号 `dshsmsa`/`dshsmsb`） | 无（不改代码） | 是（只新增测试账号与挑战记录；**不跑迁移、不跑后端测试**，不碰 Codex 的串行项） | 2026-09-26 | 已释放（无代码改动，结论见 7.2；只改了 `COORDINATION.md` 与 `frontend/BROWSER_ACCEPTANCE.md`） |
 | DSH | **模拟短信与手机号验证前端**（用户 2026-09-26 要求；契约见 `SMS_VERIFICATION_PLAN.md` 第 5、6、11–13 节，§6 第 175 行已交接）：注册页手机号验证（获取验证码 / 60s 倒计时 / 改号即清验证 / 验过才能提交）、忘记密码页分步（手机号→验证码→新密码，统一文案不泄露账户存在性）、设置页 `phoneVerified=false` 补验证、`phoneVerified` 贯穿 mock/Pinia/注册结果/`/users/me`、验证码与 token 不落浏览器存储；补单测 + Playwright + `BROWSER_ACCEPTANCE.md` | `frontend/src/types/auth.ts`、`frontend/src/api/auth.ts`、`frontend/src/api/mockAuth.ts`、`frontend/src/stores/auth.ts`、`frontend/src/views/{RegisterView,LoginView,SettingsView}.vue`、`frontend/src/views/ForgotPasswordView.vue`（新增）、`frontend/src/router/index.ts`、`frontend/src/views/auth-views.test.ts`、`frontend/e2e/auth-phone-verification.spec.ts`（新增）、`frontend/BROWSER_ACCEPTANCE.md` | 无 | 否（接口桩，不占数据库） | 2026-09-26 | 已释放（提交 `fa6cb86`；`npm run build` exit 0、`npx vitest run` **196 passed / 18 files**、`npx playwright test` **65 passed**（新增 e2e 8 项）。**全部走 `page.route` 桩，未连后端**——真实联调等 Codex 接口落地后做；契约期待见 §6） |
 | DSH | **清除本机计划任务 + 把「禁止后台自启动」写入 AGENTS.md**（用户 2026-09-25 要求；**补记**——本轮先排查后动手，按「漏登记要补记」如实补一行）：删除 `MedicalAssistant-ImageGenerationWorker` 计划任务、全机复查残留、在 `AGENTS.md` 新增禁令章节、向 Codex 提文档整改 | `AGENTS.md`、`COORDINATION.md` | 无（不动数据库；计划任务属机器级操作，已获用户明确要求） | 否 | 2026-09-25 | 已释放（计划任务已删除并验证无残留；禁令已入 `AGENTS.md`；§6 已提整改请求。**本轮无代码改动，未跑测试**） |
 | DSH | **AI 配图 e2e + 首次协议取消场景**（用户 2026-09-25 指定为当前最重要的前端任务；规格见 `IMAGE_GENERATION_PLAN.md` §7.2/§8.2 与 `COORDINATION.md` 第 178/179 行）：新增 `frontend/e2e/image-generation.spec.ts`——命中意图→**不请求 `/stream`**→首次自动弹协议→确认后建任务（断言请求体）→任务卡在该用户消息下→成品与固定下载名；**取消协议：不发任何创建请求、不记协议版本、清空待提交来源并给可读短提示、再说一次重新弹**；非命中无任何生成入口；375px 弹窗几何、`aria-live`、降低动态效果、桩失败文案、刷新恢复。另按 Codex 第 6 节请求补 `contentId`/`errorCode` 可选类型与失败原因展示 | `frontend/src/types/imageGenerations.ts`、`frontend/src/composables/useImageGeneration.ts`、`frontend/src/components/ImageGenerationDialog.vue`、`frontend/src/views/HomeView.vue`、`frontend/src/views/imageGeneration.test.ts`、`frontend/e2e/image-generation.spec.ts`（新增）、`frontend/BROWSER_ACCEPTANCE.md` | 无 | 否（e2e 只起 Vite，接口全部由 `page.route` 拦截） | 2026-09-25 | 已释放（提交 `6527997`；`npm run build` exit 0、`npx vitest run` **181 passed / 18 files**、`npx playwright test` **57 passed**（新增 7 项）；首轮全量 e2e 曾 56 passed + 1 failed 且**未捕获失败用例名**，复跑全绿，按既有判据归为满负载抖动。**取消场景**用 `watch` 收尾——`el-dialog` 的 `close` 在 `v-model` 被外部置 false 时不触发，已在单测实测） |
@@ -278,6 +279,13 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 >
 > 本节按**写入时间**倒序（新条目插到最上）；条目标题里的时间戳是**工作发生时间**，两者不一定
 > 单调——例如 Codex 的 23:47 条目实际写在 DSH 的 23:58 条目之后。看到"乱序"不是错误，别去重排。
+
+### 2026-09-26 DSH 模拟短信真实链路联调（无代码改动）
+
+- 改动：**没有改任何代码**。本机起 8000 真实后端（`APP_ENVIRONMENT=development`、`SMS_PROVIDER` 未设置即默认 `fake`，迁移已是 `20260926_0023 (head)`），用真实 HTTP 把模拟短信链路完整走了一遍；探针账号 `dshsmsa`（139****0001）、`dshsmsb`（139****0002）。为验「老账号补验证」，把一个探针账号的 `phone_verified_at` 置空以模拟迁移前老用户（这正是 0023 对既有行的处理结果）。
+- 验证：①发码 **202** `{challengeId,expiresInSeconds:300,resendAfterSeconds:60}`；同号立刻重发 **429 `SMS_RATE_LIMITED` + `details.retryAfterSeconds`**（实测 60 → 18 递减，窗口真实生效、前端倒计时口径正确）；**不存在的号码**找回同样 **202 同形状**，且终端**不打印任何验证码**（诱饵生效、无枚举线索）。②校验 **200** `{verificationToken,expiresInSeconds:600}`。③注册 **201** 且 `phoneVerified:true`（同一身份证二次注册 409 `ID_CARD_EXISTS`）。④登录与 `GET /users/me` 都返回 `phoneVerified`（§6 第①条期待在线上确认）。⑤重置 **204** → 旧密码 **401**、新密码 **200**、**重置前那个会话拿旧 Cookie 访问 `/users/me` 得 401 `SESSION_EXPIRED`**（`auth_version` 提升真实生效、旧会话立即失效）。⑥老账号 `phoneVerified:false` → `POST /users/me/phone-verification/code`（**请求体为空**，手机号由服务端解密取得）**202** → `confirm` **204** → `/users/me` 变 `true`。本轮未动前端代码，`build`/`196`/`65` 基线不受影响。
+- 未验证：验证码 5 分钟过期、错误验证码、5 次尝试上限**没有**在真实链路复现（要等 5 分钟或连续错 5 次；由 Codex 后端专项测试与前端桩测试覆盖）；**真人浏览器点一遍还没做**（`BROWSER_ACCEPTANCE.md` 人工第 13、14 条），本轮只到 HTTP 层。探针账号仍留在开发库里。
+- 下一步：把 8000 与 5173 两个前台进程交给用户自己在终端起（这样才能直接看到 `[DEV SMS]` 验证码），按人工第 13、14 条做一次人眼验收；探针账号若要清理，走界面里的删除账号流程。
 
 ### 2026-09-26 Codex 完成模拟短信与手机号验证后端
 
