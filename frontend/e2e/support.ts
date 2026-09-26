@@ -20,6 +20,7 @@ export const MOCK_USER = {
   realName: '端到端测试',
   gender: 'private',
   role: 'user',
+  phoneVerified: true,
   registeredAt: '2026-09-01T00:00:00Z',
 } as const
 

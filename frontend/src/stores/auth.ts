@@ -3,7 +3,13 @@ import { defineStore } from 'pinia'
 import { authApi } from '../api/auth'
 import { usersApi } from '../api/users'
 import type { UpdateProfileRequest } from '../types/auth'
-import type { AuthUser, LoginRequest, RegisterRequest } from '../types/auth'
+import type {
+  AuthUser,
+  LoginRequest,
+  PasswordResetRequest,
+  PhoneVerificationVerifyRequest,
+  RegisterRequest,
+} from '../types/auth'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<AuthUser | null>(null)
@@ -79,6 +85,32 @@ export const useAuthStore = defineStore('auth', () => {
     clearSession()
   }
 
+  /**
+   * 已有用户补验证：验证码由后端发给「当前账户已加密保存的手机号」，前端不传手机号。
+   *
+   * 成功后只改本地这一处 `phoneVerified`，不再多打一次 `/users/me`——接口是 204，
+   * 没有响应体可读，而服务端语义就是「现在已验证」。
+   */
+  async function requestCurrentPhoneCode() {
+    return await authApi.requestCurrentPhoneCode()
+  }
+
+  async function confirmCurrentPhone(payload: PhoneVerificationVerifyRequest) {
+    await authApi.confirmCurrentPhone(payload)
+    if (user.value) user.value = { ...user.value, phoneVerified: true }
+  }
+
+  /**
+   * 短信找回密码。
+   *
+   * 成功后必须清掉本地会话：5.4 要求后端撤销该用户全部刷新会话并提升认证版本，
+   * 已经签发出去的旧访问令牌也随之下线，前端留着登录态只会不断撞 401。
+   */
+  async function resetPassword(payload: PasswordResetRequest) {
+    await authApi.resetPassword(payload)
+    clearSession()
+  }
+
   return {
     user,
     initialized,
@@ -93,5 +125,8 @@ export const useAuthStore = defineStore('auth', () => {
     updateProfile,
     uploadAvatar,
     deleteAccount,
+    requestCurrentPhoneCode,
+    confirmCurrentPhone,
+    resetPassword,
   }
 })

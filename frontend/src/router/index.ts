@@ -18,6 +18,13 @@ const router = createRouter({
       meta: { guestOnly: true },
     },
     {
+      // 短信找回密码：只在登录页给入口，不占侧边栏（方案第 11 节）。
+      path: '/forgot-password',
+      name: 'forgot-password',
+      component: () => import('../views/ForgotPasswordView.vue'),
+      meta: { guestOnly: true },
+    },
+    {
       path: '/app',
       component: () => import('../layouts/WorkspaceLayout.vue'),
       meta: { requiresAuth: true },

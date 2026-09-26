@@ -22,6 +22,7 @@ async function setup() {
   store.user = {
     id: 'user-a', username: 'tester', realName: '张三', gender: 'private',
     role: 'user', phoneMasked: '138****8000', idCardMasked: '110105********002X',
+    phoneVerified: true,
     registeredAt: '2026-09-01T00:00:00Z',
   }
   const router = createRouter({

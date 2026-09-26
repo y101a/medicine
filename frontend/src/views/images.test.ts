@@ -70,7 +70,7 @@ async function setup(path = '/app/chat') {
   const pinia = createPinia()
   setActivePinia(pinia)
   const auth = useAuthStore()
-  auth.user = { id: 'u1', username: 'tester', realName: '测试', gender: 'private', role: 'user', registeredAt: '2026-09-06' }
+  auth.user = { id: 'u1', username: 'tester', realName: '测试', gender: 'private', role: 'user', phoneVerified: true, registeredAt: '2026-09-06' }
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [

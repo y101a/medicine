@@ -50,10 +50,12 @@ async function handleLogin() {
 
 onMounted(() => {
   if (route.query.reason === 'expired') ElMessage.warning('登录状态已失效，请重新登录')
+  // 找回密码成功后回到这里：后端已撤销全部刷新会话，提示里必须说清要用新密码登录。
+  if (route.query.reason === 'password-reset') ElMessage.success('密码已重置，请使用新密码登录')
 })
 
-function showForgotPasswordTip() {
-  ElMessage.info('忘记密码功能暂未开放')
+function goToForgotPassword() {
+  router.push('/forgot-password')
 }
 
 function goToRegister() {
@@ -110,7 +112,7 @@ function goToRegister() {
         </el-form-item>
 
         <div class="form-actions">
-          <button type="button" class="text-button" @click="showForgotPasswordTip">
+          <button type="button" class="text-button" @click="goToForgotPassword">
             忘记密码？
           </button>
         </div>

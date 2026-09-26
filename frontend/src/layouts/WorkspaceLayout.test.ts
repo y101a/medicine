@@ -56,6 +56,7 @@ async function setup() {
     realName: '测试',
     gender: 'private',
     role: 'user',
+    phoneVerified: true,
     registeredAt: '2026-09-06',
   }
   const router = createRouter({

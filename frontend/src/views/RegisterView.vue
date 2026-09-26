@@ -1,16 +1,18 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, CreditCard, Iphone, Lock, User } from '@element-plus/icons-vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { useAuthStore } from '../stores/auth'
-import { getApiErrorMessage } from '../api/http'
+import { authApi, getPhoneVerificationErrorMessage, getRetryAfterSeconds } from '../api/auth'
+import { ApiError, getApiErrorMessage } from '../api/http'
 import type { Gender } from '../types/auth'
 
 interface RegisterForm {
   username: string
   realName: string
   phone: string
+  smsCode: string
   idCard: string
   gender: '' | Gender
   password: string
@@ -27,6 +29,7 @@ const form = reactive<RegisterForm>({
   username: '',
   realName: '',
   phone: '',
+  smsCode: '',
   idCard: '',
   gender: '',
   password: '',
@@ -119,11 +122,138 @@ const rules: FormRules<RegisterForm> = {
   confirmPassword: [{ validator: validateConfirmPassword, trigger: 'blur' }],
 }
 
+/** 与后端一致的手机号格式：1 开头、第二位 3–9、共 11 位。 */
+const phonePattern = /^1[3-9]\d{9}$/
+const phoneLooksValid = computed(() => phonePattern.test(form.phone))
+
+/**
+ * 验证码状态只放内存，且**刻意**不落 localStorage/sessionStorage。
+ *
+ * 6 节要求验证码与 `verificationToken` 不进浏览器存储；方案第 11 节也允许「刷新页面不恢复
+ * 未完成的验证流程」。所以刷新等于放弃这次验证，用户重新获取即可。
+ */
+const challengeId = ref('')
+const verificationToken = ref('')
+const verifiedPhone = ref('')
+const codeSent = ref(false)
+const countdown = ref(0)
+const sendingCode = ref(false)
+const verifyingCode = ref(false)
+let countdownTimer: number | undefined
+
+/**
+ * 「验证通过」必须连手机号一起判定，而不是只看有没有令牌。
+ *
+ * 用户把号码改成 B、又改回 A 时，内存里的令牌绑定的是 A；只看令牌非空就会误判为已验证。
+ */
+const phoneVerified = computed(
+  () => verificationToken.value !== '' && verifiedPhone.value === form.phone,
+)
+
+/** 格式不对、正在发送、或还在倒计时里，都不该让用户再点一次。 */
+const canRequestCode = computed(
+  () => phoneLooksValid.value && countdown.value === 0 && !sendingCode.value,
+)
+
+function stopCountdown() {
+  if (countdownTimer !== undefined) {
+    window.clearInterval(countdownTimer)
+    countdownTimer = undefined
+  }
+}
+
+/** 倒计时秒数只认服务端给的 `resendAfterSeconds`，前端不自己发明节奏（8 节的限流在后端）。 */
+function startCountdown(seconds: number) {
+  stopCountdown()
+  countdown.value = Math.max(0, Math.ceil(seconds))
+  if (countdown.value === 0) return
+  countdownTimer = window.setInterval(() => {
+    countdown.value -= 1
+    if (countdown.value <= 0) stopCountdown()
+  }, 1000)
+}
+
+onBeforeUnmount(stopCountdown)
+
+/** 改手机号立即作废已验证状态与已发出的挑战：旧验证码对新号码无效（4 节硬约束）。 */
+watch(() => form.phone, () => {
+  verificationToken.value = ''
+  verifiedPhone.value = ''
+  challengeId.value = ''
+  codeSent.value = false
+  form.smsCode = ''
+  stopCountdown()
+  countdown.value = 0
+})
+
+async function requestCode() {
+  if (!phoneLooksValid.value) {
+    ElMessage.warning('请输入有效的中国大陆手机号')
+    return
+  }
+
+  sendingCode.value = true
+  try {
+    const challenge = await authApi.requestPhoneVerificationCode({
+      phone: form.phone,
+      purpose: 'registration',
+    })
+    challengeId.value = challenge.challengeId
+    codeSent.value = true
+    form.smsCode = ''
+    startCountdown(challenge.resendAfterSeconds)
+    ElMessage.success('验证码已发送')
+  } catch (error) {
+    // 限流时服务端会给出还剩多少秒，直接拿来当倒计时，用户不必盲试。
+    const retryAfter = getRetryAfterSeconds(error)
+    if (retryAfter !== undefined) startCountdown(retryAfter)
+    ElMessage.error(getPhoneVerificationErrorMessage(error))
+  } finally {
+    sendingCode.value = false
+  }
+}
+
+async function verifyCode() {
+  if (!challengeId.value) {
+    ElMessage.warning('请先获取验证码')
+    return
+  }
+
+  verifyingCode.value = true
+  try {
+    const grant = await authApi.verifyPhoneVerificationCode({
+      challengeId: challengeId.value,
+      code: form.smsCode,
+    })
+    verificationToken.value = grant.verificationToken
+    verifiedPhone.value = form.phone
+    ElMessage.success('手机号验证成功')
+  } catch (error) {
+    ElMessage.error(getPhoneVerificationErrorMessage(error))
+    // 过期、用尽次数或挑战本身失效后，这个 challenge 已经不能再用了，界面退回「重新获取」。
+    const code = error instanceof ApiError ? error.code : ''
+    if (code === 'SMS_CODE_EXPIRED' || code === 'SMS_ATTEMPTS_EXCEEDED' || code === 'SMS_CHALLENGE_INVALID') {
+      challengeId.value = ''
+      codeSent.value = false
+      form.smsCode = ''
+      stopCountdown()
+      countdown.value = 0
+    }
+  } finally {
+    verifyingCode.value = false
+  }
+}
+
 async function handleRegister() {
   if (!formRef.value) return
 
   const isValid = await formRef.value.validate().catch(() => false)
   if (!isValid) return
+
+  if (!phoneVerified.value) {
+    ElMessage.warning('请先完成手机号验证')
+    return
+  }
 
   try {
     const result = await authStore.register({
@@ -133,6 +263,7 @@ async function handleRegister() {
       idCard: form.idCard,
       gender: form.gender as Gender,
       password: form.password,
+      phoneVerificationToken: verificationToken.value,
     })
     const registeredAt = new Intl.DateTimeFormat('zh-CN', {
       year: 'numeric',
@@ -142,6 +273,11 @@ async function handleRegister() {
       minute: '2-digit',
     }).format(new Date(result.user.registeredAt))
     ElMessage.success(`注册成功，注册时间：${registeredAt}`)
+    // 令牌已被注册消费掉：把内存里的验证状态清干净，别让它留在页面上被再次提交。
+    verificationToken.value = ''
+    verifiedPhone.value = ''
+    challengeId.value = ''
+    codeSent.value = false
     formRef.value?.resetFields()
     window.setTimeout(() => router.push('/login'), 800)
   } catch (error) {
@@ -190,6 +326,7 @@ function goToLogin() {
           <el-form-item label="用户名" prop="username">
             <el-input
               v-model="form.username"
+              class="username-input"
               :prefix-icon="User"
               maxlength="20"
               autocomplete="username"
@@ -201,6 +338,7 @@ function goToLogin() {
           <el-form-item label="姓名" prop="realName">
             <el-input
               v-model.trim="form.realName"
+              class="realname-input"
               :prefix-icon="User"
               maxlength="20"
               autocomplete="name"
@@ -209,29 +347,69 @@ function goToLogin() {
             />
           </el-form-item>
 
-          <el-form-item label="手机号" prop="phone">
-            <el-input
-              v-model.trim="form.phone"
-              :prefix-icon="Iphone"
-              maxlength="11"
-              inputmode="numeric"
-              autocomplete="tel"
-              placeholder="中国大陆手机号"
-              clearable
-            />
+          <el-form-item label="手机号" prop="phone" class="form-item--wide">
+            <div class="phone-field">
+              <el-input
+                v-model.trim="form.phone"
+                class="phone-input"
+                :prefix-icon="Iphone"
+                maxlength="11"
+                inputmode="numeric"
+                autocomplete="tel"
+                placeholder="中国大陆手机号"
+                clearable
+              />
+              <el-button
+                class="send-code-button"
+                :disabled="!canRequestCode"
+                :loading="sendingCode"
+                @click="requestCode"
+              >
+                {{ countdown > 0 ? `${countdown} 秒后可重发` : '获取验证码' }}
+              </el-button>
+            </div>
+          </el-form-item>
+
+          <el-form-item label="短信验证码" prop="smsCode" class="form-item--wide">
+            <div class="code-field">
+              <el-input
+                v-model.trim="form.smsCode"
+                class="code-input"
+                maxlength="6"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                placeholder="6 位数字"
+                :disabled="!codeSent || phoneVerified"
+              />
+              <el-button
+                class="verify-code-button"
+                :disabled="phoneVerified || !codeSent || form.smsCode.length !== 6"
+                :loading="verifyingCode"
+                @click="verifyCode"
+              >
+                {{ phoneVerified ? '已验证' : '验证' }}
+              </el-button>
+            </div>
+            <p v-if="phoneVerified" class="code-hint code-hint--ok" role="status">
+              手机号已通过短信验证，可以创建账户了
+            </p>
+            <p v-else-if="codeSent" class="code-hint">
+              验证码 5 分钟内有效；验证通过后才能创建账户
+            </p>
           </el-form-item>
 
           <el-form-item label="性别" prop="gender">
-            <el-select v-model="form.gender" placeholder="请选择性别" class="full-width">
+            <el-select v-model="form.gender" class="gender-select full-width" placeholder="请选择性别">
               <el-option label="男" value="male" />
               <el-option label="女" value="female" />
               <el-option label="不愿透露" value="private" />
             </el-select>
           </el-form-item>
 
-          <el-form-item label="身份证号码" prop="idCard" class="form-item--wide">
+          <el-form-item label="身份证号码" prop="idCard">
             <el-input
               v-model.trim="form.idCard"
+              class="id-card-input"
               :prefix-icon="CreditCard"
               maxlength="18"
               autocomplete="off"
@@ -243,6 +421,7 @@ function goToLogin() {
           <el-form-item label="密码" prop="password">
             <el-input
               v-model="form.password"
+              class="password-input"
               :prefix-icon="Lock"
               type="password"
               maxlength="32"
@@ -255,6 +434,7 @@ function goToLogin() {
           <el-form-item label="确认密码" prop="confirmPassword">
             <el-input
               v-model="form.confirmPassword"
+              class="confirm-password-input"
               :prefix-icon="Lock"
               type="password"
               maxlength="32"
@@ -269,6 +449,7 @@ function goToLogin() {
           type="primary"
           native-type="submit"
           :loading="authStore.pendingAction === 'register'"
+          :disabled="!phoneVerified"
           class="register-button"
         >
           创建账户
@@ -336,7 +517,7 @@ function goToLogin() {
 .register-card {
   position: relative;
   z-index: 1;
-  width: 650px;
+  width: min(100%, 650px);
   padding: 30px 42px 26px;
   background: rgb(255 255 255 / 97%);
   border: 1px solid rgb(210 228 242 / 90%);
@@ -433,6 +614,38 @@ h1 {
   grid-column: 1 / -1;
 }
 
+.phone-field,
+.code-field {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+}
+
+.phone-field .el-input,
+.code-field .el-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.phone-field .el-button,
+.code-field .el-button {
+  flex: 0 0 auto;
+  min-width: 116px;
+  height: 44px;
+  border-radius: 10px;
+}
+
+.code-hint {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.code-hint--ok {
+  color: #1f7a45;
+}
+
 .register-form :deep(.el-form-item) {
   margin-bottom: 18px;
 }
@@ -503,6 +716,30 @@ h1 {
   text-align: center;
   background: var(--medical-blue-soft);
   border-radius: 9px;
+}
+
+@media (max-width: 640px) {
+  .register-page {
+    padding: 18px 14px;
+  }
+
+  .register-card {
+    padding: 22px 18px;
+  }
+
+  .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .phone-field,
+  .code-field {
+    flex-direction: column;
+  }
+
+  .phone-field .el-button,
+  .code-field .el-button {
+    width: 100%;
+  }
 }
 
 @media (max-height: 790px) {
