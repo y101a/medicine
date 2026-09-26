@@ -21,12 +21,13 @@ def verify_password(password: str, encoded_hash: str) -> bool:
     return password_hash.verify(password, encoded_hash)
 
 
-def create_access_token(user_id: UUID) -> str:
+def create_access_token(user_id: UUID, auth_version: int = 1) -> str:
     settings = get_settings()
     now = datetime.now(UTC)
     payload = {
         "sub": str(user_id),
         "type": "access",
+        "ver": auth_version,
         "iat": now,
         "exp": now + timedelta(minutes=settings.access_token_expire_minutes),
     }
@@ -34,11 +35,19 @@ def create_access_token(user_id: UUID) -> str:
 
 
 def decode_access_token(token: str) -> UUID:
+    user_id, _ = decode_access_token_with_version(token)
+    return user_id
+
+
+def decode_access_token_with_version(token: str) -> tuple[UUID, int]:
     settings = get_settings()
     payload = jwt.decode(token, settings.jwt_secret_key, algorithms=["HS256"])
     if payload.get("type") != "access":
         raise jwt.InvalidTokenError("Unexpected token type")
-    return UUID(payload["sub"])
+    version = payload.get("ver")
+    if not isinstance(version, int) or isinstance(version, bool) or version < 1:
+        raise jwt.InvalidTokenError("Invalid authentication version")
+    return UUID(payload["sub"]), version
 
 
 def generate_refresh_token() -> str:

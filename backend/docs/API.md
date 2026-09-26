@@ -365,6 +365,62 @@ AES-256-GCM 数据密钥加密保存 90 天。任务响应包含 `contentId`；�
 不可逆接收者指纹幂等留痕至少 183 天。前端只读取本项目的鉴权 Blob 接口。稳定错误码见
 `docs/IMAGE_GENERATION.md`。
 
+## 手机号验证与密码找回
+
+第一阶段使用仅限 development/test 的模拟短信 provider，验证码只输出到当前后端启动终端，
+不写入响应、数据库明文、文件、持久日志或审计表。production 配置 fake 时应用拒绝启动。
+
+| 方法与路径 | 用途 |
+| --- | --- |
+| `POST /auth/phone-verifications/code` | 为注册或密码找回创建验证码 challenge |
+| `POST /auth/phone-verifications/verify` | 校验验证码并返回一次性 verification token |
+| `POST /auth/password-reset` | 消费 password_reset token 并设置新密码 |
+| `POST /users/me/phone-verification/code` | 给当前用户已保存的手机号发送补验证验证码 |
+| `POST /users/me/phone-verification/confirm` | 校验并标记当前用户手机号已验证 |
+
+发送请求为 `{"phone":"13800138000","purpose":"registration|password_reset"}`，
+成功返回 202：
+
+```json
+{
+  "challengeId": "uuid",
+  "expiresInSeconds": 300,
+  "resendAfterSeconds": 60
+}
+```
+
+校验请求为 `{"challengeId":"uuid","code":"482731"}`，成功返回 200：
+
+```json
+{
+  "verificationToken": "一次性不透明令牌",
+  "expiresInSeconds": 600
+}
+```
+
+注册请求新增必填 `phoneVerificationToken`；token 必须为 registration 用途并与请求手机号
+一致。注册成功的 `AuthUser` 返回 `phoneVerified=true`。迁移前已有用户返回 false，可登录后
+通过 `/users/me/phone-verification/*` 补验证。
+
+密码重置请求：
+
+```json
+{
+  "phone": "13800138000",
+  "verificationToken": "一次性不透明令牌",
+  "newPassword": "new-password"
+}
+```
+
+成功返回 204，更新 Argon2id 密码哈希、清除登录锁定、撤销全部刷新会话并提升
+`auth_version`；旧访问令牌立即返回 401 `SESSION_EXPIRED`。对于不存在或未验证的手机号，
+发送接口仍返回同形状 202 诱饵 challenge，不发送验证码，避免账户枚举与无效费用。
+
+稳定错误码：`SMS_PHONE_INVALID`、`SMS_RATE_LIMITED`、
+`SMS_CHALLENGE_INVALID`、`SMS_CODE_INVALID`、`SMS_CODE_EXPIRED`、
+`SMS_ATTEMPTS_EXCEEDED`、`PHONE_VERIFICATION_REQUIRED`、
+`PHONE_VERIFICATION_TOKEN_INVALID`、`SMS_PROVIDER_NOT_CONFIGURED`。
+
 ## 删除账号
 
 `DELETE /users/me`，请求为 `{"currentPassword":"当前密码"}`。密码错误返回 422

@@ -11,7 +11,7 @@ AUDIT_OUTCOME_REJECTED = "rejected"
 async def add_audit_log(
     db: AsyncSession,
     *,
-    actor_user_id: UUID,
+    actor_user_id: UUID | None,
     action: str,
     resource_type: str,
     outcome: str,

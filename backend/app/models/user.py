@@ -3,7 +3,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, Integer, String, func
+from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Index, Integer, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -11,6 +11,7 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.auth_session import AuthSession
+    from app.models.phone_verification import PhoneVerificationChallenge
 
 
 def enum_values(enum_class: type[StrEnum]) -> list[str]:
@@ -54,6 +55,10 @@ class User(Base):
         Enum(UserStatus, name="user_status_enum", values_callable=enum_values),
         default=UserStatus.ACTIVE,
     )
+    phone_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    auth_version: Mapped[int] = mapped_column(Integer, default=1)
     registered_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -67,8 +72,14 @@ class User(Base):
     sessions: Mapped[list["AuthSession"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    phone_verification_challenges: Mapped[list["PhoneVerificationChallenge"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
-    __table_args__ = (Index("ix_users_status", "status"),)
+    __table_args__ = (
+        CheckConstraint("auth_version >= 1", name="auth_version_positive"),
+        Index("ix_users_status", "status"),
+    )
 
 
 class UserCredentials(Base):

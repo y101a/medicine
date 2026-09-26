@@ -22,6 +22,10 @@ from app.models.knowledge import (
     KnowledgeSource,
 )
 from app.models.model_credential import UserModelCredential
+from app.models.phone_verification import (
+    PhoneVerificationChallenge,
+    PhoneVerificationPurpose,
+)
 from app.models.user import Gender, User, UserCredentials, UserRole, UserStatus
 
 __all__ = [
@@ -44,6 +48,8 @@ __all__ = [
     "KnowledgeSource",
     "Message",
     "MessageAttachment",
+    "PhoneVerificationChallenge",
+    "PhoneVerificationPurpose",
     "UserModelCredential",
     "Gender",
     "User",

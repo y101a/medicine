@@ -2,12 +2,15 @@
 
 ## users
 
-保存用户主体、用户名、性别、角色、状态和注册时间。
+保存用户主体、用户名、性别、角色、状态、注册时间、手机号验证时间和认证版本。
 
 - 用户名同时保存展示值和 `casefold` 后的唯一匹配值。
 - 姓名、手机号、身份证使用 Fernet 加密后保存。
 - 手机号和身份证另存 keyed HMAC 指纹，仅用于唯一性查询，不能还原原文。
 - 当前角色包含 `user` 和 `admin`，注册接口只能创建 `user`。
+- `phone_verified_at` 为空表示手机号从未完成验证码验证；迁移前已有用户保持为空。
+- `auth_version` 从 1 开始。密码重置时递增，访问令牌中的 `ver` 必须与数据库一致，
+  因而旧访问令牌可以立即失效。
 
 ## user_credentials
 
@@ -20,6 +23,20 @@
 有限的客户端信息。刷新时旧会话立即撤销并创建新会话。
 
 访问令牌和刷新令牌都只通过 HttpOnly Cookie 发送，页面脚本无法读取。
+刷新令牌轮换和密码重置会撤销数据库会话；访问令牌另外通过 `auth_version` 失效。
+
+## phone_verification_challenges
+
+手机号注册验证、已有用户补验证和密码找回的短期 challenge。保存手机号 keyed HMAC 指纹、
+用途、provider、验证码 HMAC 摘要、请求 IP 的不可逆指纹、尝试次数和各生命周期时间；不保存
+明文手机号、验证码、verification token 或原始 IP。
+
+- `purpose` 只允许 `registration`、`password_reset`、`phone_binding`。
+- 验证码默认 5 分钟过期、最多错误 5 次；verification token 默认 10 分钟过期且只能消费一次。
+- 不存在或未验证手机号的密码找回创建 `is_decoy=true` 的诱饵 challenge，不调用 provider。
+- 注册成功后 challenge 关联新用户；账号删除时通过外键级联删除。
+- 手机号和 IP 时间索引用于 PostgreSQL 共享限流，不能被多 worker 绕过。
+- 过期行在后续请求中惰性失效，不在开发机创建计划任务或后台自启动。
 
 ## audit_logs
 

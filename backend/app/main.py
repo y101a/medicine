@@ -97,9 +97,24 @@ async def handle_app_error(_: Request, exc: AppError) -> JSONResponse:
 
 
 @app.exception_handler(RequestValidationError)
-async def handle_validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
+async def handle_validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
+    errors = exc.errors()
+    if (
+        request.url.path.endswith(f"{settings.api_v1_prefix}/auth/register")
+        and len(errors) == 1
+        and errors[0]["type"] == "missing"
+        and tuple(errors[0]["loc"]) == ("body", "phoneVerificationToken")
+    ):
+        return JSONResponse(
+            status_code=422,
+            content={
+                "code": "PHONE_VERIFICATION_REQUIRED",
+                "message": "请先完成手机号验证码验证",
+                "details": None,
+            },
+        )
     details: list[dict[str, Any]] = []
-    for error in exc.errors():
+    for error in errors:
         details.append(
             {
                 "field": ".".join(str(part) for part in error["loc"] if part != "body"),

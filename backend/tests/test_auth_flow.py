@@ -1,4 +1,5 @@
 import asyncio
+from unittest.mock import patch
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -16,6 +17,27 @@ async def remove_test_user(username_normalized: str) -> None:
     await engine.dispose()
 
 
+def verified_registration_payload(client: TestClient, payload: dict[str, str]) -> dict[str, str]:
+    with patch(
+        "app.services.phone_verification.generate_sms_code",
+        return_value="482731",
+    ):
+        requested = client.post(
+            "/api/v1/auth/phone-verifications/code",
+            json={"phone": payload["phone"], "purpose": "registration"},
+        )
+    assert requested.status_code == 202
+    verified = client.post(
+        "/api/v1/auth/phone-verifications/verify",
+        json={"challengeId": requested.json()["challengeId"], "code": "482731"},
+    )
+    assert verified.status_code == 200
+    return {
+        **payload,
+        "phoneVerificationToken": verified.json()["verificationToken"],
+    }
+
+
 def test_complete_auth_flow() -> None:
     username = f"Test{uuid4().hex[:8]}"
     username_normalized = username.casefold()
@@ -30,14 +52,17 @@ def test_complete_auth_flow() -> None:
 
     try:
         with TestClient(app) as client:
+            payload = verified_registration_payload(client, payload)
             register = client.post("/api/v1/auth/register", json=payload)
             assert register.status_code == 201
             assert register.json()["user"]["realName"] == "测试用户"
             assert register.json()["user"]["phoneMasked"] == "138****8000"
+            assert register.json()["user"]["phoneVerified"] is True
             assert "medical_access_token" not in register.cookies
 
             duplicate = client.post("/api/v1/auth/register", json=payload)
-            assert duplicate.status_code == 409
+            assert duplicate.status_code == 422
+            assert duplicate.json()["code"] == "PHONE_VERIFICATION_TOKEN_INVALID"
 
             invalid_login = client.post(
                 "/api/v1/auth/login",

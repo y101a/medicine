@@ -1,8 +1,8 @@
 from functools import lru_cache
-from typing import Annotated
+from typing import Annotated, Self
 from urllib.parse import quote_plus, urlparse
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -33,6 +33,24 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
     cookie_secure: bool = False
+
+    # Development/test can use the local fake provider. Production must use
+    # an explicitly configured real provider and a dedicated code HMAC secret.
+    sms_provider: str = "fake"
+    sms_code_secret: SecretStr | None = None
+    sms_code_expire_seconds: int = Field(default=300, ge=60, le=900)
+    sms_token_expire_seconds: int = Field(default=600, ge=60, le=1800)
+    sms_resend_seconds: int = Field(default=60, ge=30, le=300)
+    sms_max_attempts: int = Field(default=5, ge=1, le=10)
+    sms_limit_phone_hourly: int = Field(default=5, ge=1, le=20)
+    sms_limit_phone_daily: int = Field(default=10, ge=1, le=100)
+    sms_limit_ip_10m: int = Field(default=10, ge=1, le=100)
+    sms_limit_ip_daily: int = Field(default=30, ge=1, le=500)
+    aliyun_pnvs_access_key_id: SecretStr | None = None
+    aliyun_pnvs_access_key_secret: SecretStr | None = None
+    aliyun_pnvs_endpoint: str = "dypnsapi.aliyuncs.com"
+    aliyun_pnvs_sign_name: str | None = None
+    aliyun_pnvs_template_code: str | None = None
 
     # Legacy single-provider configuration; retained until model routing is migrated.
     ai_api_key: SecretStr | None = None
@@ -136,6 +154,24 @@ class Settings(BaseSettings):
         if value is None or not str(value).strip():
             return "https://dashscope.aliyuncs.com/compatible-mode/v1"
         return value
+
+    @model_validator(mode="after")
+    def validate_sms_configuration(self) -> Self:
+        self.sms_provider = self.sms_provider.strip().lower()
+        environment = self.app_environment.strip().lower()
+        if self.sms_provider not in {"fake", "aliyun_pnvs"}:
+            raise ValueError("SMS_PROVIDER 只允许 fake 或 aliyun_pnvs")
+        if self.sms_provider == "fake" and environment not in {"development", "test"}:
+            raise ValueError("非开发测试环境禁止使用模拟短信服务")
+        if environment == "production":
+            if self.sms_code_secret is None:
+                raise ValueError("生产环境必须配置 SMS_CODE_SECRET")
+            if (
+                self.aliyun_pnvs_access_key_id is None
+                or self.aliyun_pnvs_access_key_secret is None
+            ):
+                raise ValueError("生产环境必须配置阿里云短信认证 RAM AccessKey")
+        return self
 
     @field_validator("embedding_dimensions")
     @classmethod

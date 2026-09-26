@@ -14,6 +14,9 @@ class RegisterRequest(BaseModel):
     id_card: str = Field(alias="idCard")
     gender: Gender
     password: str = Field(min_length=6, max_length=32)
+    phone_verification_token: str | None = Field(
+        alias="phoneVerificationToken", min_length=32, max_length=256
+    )
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -61,6 +64,7 @@ class AuthUser(BaseModel):
     gender: Gender
     role: UserRole
     phone_masked: str = Field(serialization_alias="phoneMasked")
+    phone_verified: bool = Field(serialization_alias="phoneVerified")
     id_card_masked: str = Field(serialization_alias="idCardMasked")
     registered_at: datetime = Field(serialization_alias="registeredAt")
 

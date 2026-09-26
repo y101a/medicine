@@ -1,6 +1,6 @@
 # 模拟短信、手机号验证与密码找回实施方案
 
-> 状态：接口契约已冻结，代码尚未实施
+> 状态：前后端均已实现并通过自动化测试；真实浏览器前后端联调待验收
 > 日期：2026-09-26
 > 分工：Codex 负责 backend/；DSH（DeepSeek）负责 frontend/
 > 目标：前后端可依据本文件并行开发，第一阶段不调用真实短信、不产生短信费用
@@ -246,13 +246,15 @@ phone_verified_at timestamptz NULL
 
 迁移时已有用户保持 NULL，不得因为数据库里已有手机号就自动标记为已验证。
 
-### 7.2 user_credentials 增加
+### 7.2 users 增加认证版本
 
 ~~~text
 auth_version integer NOT NULL DEFAULT 1 CHECK (auth_version >= 1)
 ~~~
 
-访问令牌新增 ver claim。认证依赖读取用户凭据并比对版本；密码重置后旧 token 立即失效。
+实际实现将 auth_version 放在 users，而不是 user_credentials。原因是现有测试、管理和未来导入
+可能存在尚未创建凭据关系的用户主体；版本属于整个用户认证状态，放在 users 可保持统一。
+访问令牌新增 ver claim。认证依赖读取用户并比对版本；密码重置后旧 token 立即失效。
 部署升级后不含 ver 的旧访问令牌按会话失效处理，用户重新登录即可。
 
 ### 7.3 新表 phone_verification_challenges

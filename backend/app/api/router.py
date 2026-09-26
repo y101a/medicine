@@ -10,6 +10,7 @@ from app.api.routes import (
     knowledge,
     models,
     navigation,
+    phone_verification,
     users,
     voice,
 )
@@ -19,6 +20,7 @@ api_router.include_router(attachments.router)
 api_router.include_router(images.router)
 api_router.include_router(image_generations.router)
 api_router.include_router(auth.router)
+api_router.include_router(phone_verification.router)
 api_router.include_router(users.router)
 api_router.include_router(consultations.router)
 api_router.include_router(models.router)

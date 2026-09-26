@@ -43,6 +43,7 @@ def to_auth_user(user: User) -> AuthUser:
         gender=user.gender,
         role=user.role,
         phone_masked=mask_phone(phone),
+        phone_verified=user.phone_verified_at is not None,
         id_card_masked=mask_id_card(id_card),
         registered_at=user.registered_at,
     )
@@ -88,6 +89,20 @@ async def register_user(payload: RegisterRequest, db: AsyncSession) -> AuthResul
     phone_fingerprint = sensitive_fingerprint(payload.phone)
     id_card_fingerprint = sensitive_fingerprint(payload.id_card)
 
+    from app.services.phone_verification import consume_registration_token
+
+    if payload.phone_verification_token is None:
+        raise AppError(
+            422,
+            "PHONE_VERIFICATION_REQUIRED",
+            "请先完成手机号验证码验证",
+        )
+    challenge = await consume_registration_token(
+        db,
+        token=payload.phone_verification_token,
+        phone_fingerprint=phone_fingerprint,
+    )
+
     duplicate = await db.execute(
         select(User).where(
             (User.username_normalized == normalized)
@@ -114,10 +129,14 @@ async def register_user(payload: RegisterRequest, db: AsyncSession) -> AuthResul
         id_card_ciphertext=encrypt_sensitive(payload.id_card),
         id_card_fingerprint=id_card_fingerprint,
         gender=payload.gender,
+        phone_verified_at=datetime.now(UTC),
     )
     user.credentials = UserCredentials(password_hash=hash_password(payload.password))
     db.add(user)
     try:
+        await db.flush()
+        challenge.user_id = user.id
+        challenge.consumed_at = datetime.now(UTC)
         await db.commit()
     except IntegrityError:
         await db.rollback()
@@ -174,7 +193,11 @@ async def login_user(
         )
     )
     await db.commit()
-    _set_auth_cookies(response, create_access_token(user.id), refresh_token)
+    _set_auth_cookies(
+        response,
+        create_access_token(user.id, user.auth_version),
+        refresh_token,
+    )
     return AuthResult(user=to_auth_user(user))
 
 
@@ -214,7 +237,11 @@ async def refresh_session(
         )
     )
     await db.commit()
-    _set_auth_cookies(response, create_access_token(session.user_id), new_refresh_token)
+    _set_auth_cookies(
+        response,
+        create_access_token(session.user_id, session.user.auth_version),
+        new_refresh_token,
+    )
     return AuthResult(user=to_auth_user(session.user))
 
 
