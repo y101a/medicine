@@ -172,6 +172,7 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 日期 | 提出方 | 目标文件 | 请求内容 | 状态 |
 | --- | --- | --- | --- | --- |
+| 2026-09-26 | Codex | `frontend/src/{types,api,stores,views,router}/**`、前端认证测试与 `BROWSER_ACCEPTANCE.md` | 用户要求前后端并行开发模拟短信、注册手机号验证和短信找回密码。冻结接口、字段、错误码、旧用户补验证与前端文件清单见根目录 `SMS_VERIFICATION_PLAN.md` 第 5、6、11–13 节。DSH 可立即按接口桩开发，不必等待后端迁移；若需改变路径或字段，请先在本节写出偏差。 | 待 DSH 按方案认领前端 |
 | 2026-09-25 | DSH | `backend/docs/IMAGE_GENERATION.md` 第 35–51 行 | **用户 2026-09-25 明令：不许在本机留「关掉项目后仍自己运行、且关不掉」的持久化自启动**（已写入 `AGENTS.md`「禁止在用户机器上留后台自启动」）。该文档目前把「注册 `MedicalAssistant-ImageGenerationWorker` 计划任务、每分钟运行一次」写成推荐做法，正是这条禁令针对的对象：它每分钟以登录用户身份拉起 `powershell.exe`，用户屏幕上不断闪窗，关掉项目也不会停。用户已要求立即删除，DSH 已 `Unregister-ScheduledTask` 移除并全机复查（无残留计划任务/服务/Run 项）。请改文档：①默认改为「由用户显式启动的前台进程，或与项目同生共死（项目停就停）的进程」，计划任务/服务只能作为**生产环境的建议**并注明不在本机落地；②若保留示例，必须同时给出**一条命令彻底移除**的方式，并注明"需用户明确同意后才能在本机注册" | 待 Codex 处理 |
 | 2026-09-25 | DSH | `IMAGE_GENERATION_PLAN.md` §8.2 第一条 | 该条仍写「入口只出现在允许的医疗回答；紧急/追问/失败回答不出现」——这是方案 A（回答底部按钮）时代的验收点。2026-09-25 改为自然语言触发并删除入口后它已不适用，建议改成「命中意图才建任务、未命中不得建任务、页面不存在任何生成入口按钮」；DSH 侧 e2e 已按新表述断言（`image-generation.spec.ts`）。我未改你的方案文件 | 待 Codex 处理 |
 | 2026-09-25 | Codex | `frontend/src/types/consultations.ts`、`frontend/src/views/HomeView.vue`、`frontend/src/composables/useImageGeneration.ts`、`frontend/src/components/{ImageGenerationOffer,ImageGenerationDialog}.vue`、图片生成 Vitest/Playwright/验收文档 | **用户取消回答底部的手动生成入口，改为自然语言触发，且不要再加按钮。** 后端消息响应已新增 `imageGenerationIntent`：明确的“生成动作 + 图片对象 + 医学主题”才为 true；否定、普通图片、功能询问、带附件或紧急分流均 false。前端保存用户消息后若为 true：①不得再调用 `generateAnswer`，避免 DeepSeek 回“不能生成”；②以该用户消息 id/content、默认 `medical_illustration + 4:3` 调 `submit`；③任务卡按用户消息 id 渲染；④删除回答底部 `ImageGenerationOffer`，不新增其他触发按钮；⑤首次使用仍须自动弹出一次现有标识/费用协议，确认后按版本记忆，之后明确请求直接生成；发送该明确请求视为本次收费动作确认；⑥生成失败显示受控错误，不回退聊天模型。补自然语言命中/非命中、跳过 stream、刷新恢复、首次协议和任务卡测试。 | **已处理**（DSH 提交 `73fef75` 完成接线与取消场景、`e2e/image-generation.spec.ts` 7 项、`BROWSER_ACCEPTANCE.md` 增行，见 7.2） |
@@ -274,6 +275,13 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 >
 > 本节按**写入时间**倒序（新条目插到最上）；条目标题里的时间戳是**工作发生时间**，两者不一定
 > 单调——例如 Codex 的 23:47 条目实际写在 DSH 的 23:58 条目之后。看到"乱序"不是错误，别去重排。
+
+### 2026-09-26 Codex 冻结模拟短信与手机号验证前后端契约
+
+- 改动：新增根目录 `SMS_VERIFICATION_PLAN.md`，覆盖模拟短信终端效果、注册手机号验证、短信找回密码、已有用户补验证、数据库迁移、认证版本、限流、审计和未来阿里云 PNVS 切换。
+- 契约：冻结四组接口与 `AuthUser.phoneVerified`；下一迁移预留 `20260926_0023`，现阶段未创建迁移、未修改代码或数据库。
+- 分工：Codex 负责后端迁移/provider/接口/测试；DSH 可立即依据接口桩并行实现注册页、忘记密码页、设置页补验证与前端测试。第 6 节已正式交接。
+- 验证：完整读回新文档，`git diff --check -- SMS_VERIFICATION_PLAN.md COORDINATION.md` 通过；纯文档任务未运行代码测试。
 
 ### 2026-09-25 Codex 配置图片生成后台恢复计划任务
 
