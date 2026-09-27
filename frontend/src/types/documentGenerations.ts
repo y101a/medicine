@@ -99,6 +99,52 @@ export const DOCUMENT_GENERATION_ACTIVE_STATUSES: DocumentGenerationStatus[] = [
   'rendering',
 ]
 
+/**
+ * 等待态的三个**真实阶段**：与服务端 `status`（契约 §5.2）一一对应，排队 → 整理内容 → 排版文件。
+ *
+ * 这是「走到第几步」这样的事实，不是前端估算的进度：服务端只回这三个状态，**没有百分比、
+ * 也没有预计剩余时间**。所以卡片可以点亮阶段点，但**不能**画进度条或写「还需 2 分钟」——
+ * 那两句都会被用户当成承诺（AGENTS「机制断言必须有代码依据」）。
+ */
+export const DOCUMENT_GENERATION_STAGES: { status: DocumentGenerationStatus; label: string }[] = [
+  { status: 'queued', label: '排队等待处理' },
+  { status: 'generating', label: '整理内容与引用' },
+  { status: 'rendering', label: '排版生成文件' },
+]
+
+/** 当前在第几个阶段；终态返回 -1。 */
+export function documentGenerationStageIndex(status: DocumentGenerationStatus): number {
+  return DOCUMENT_GENERATION_STAGES.findIndex((stage) => stage.status === status)
+}
+
+/** 每个阶段一句人话，只说服务端确实在做的事。 */
+export const DOCUMENT_GENERATION_STAGE_HINTS: Record<'queued' | 'generating' | 'rendering', string> = {
+  queued: '已提交，等待生成服务按顺序领取这个任务。',
+  generating: '正在根据知识库整理内容与引用。',
+  rendering: '内容已定稿，正在排版成可下载的文件。',
+}
+
+/**
+ * 单个任务在服务端的处理上限：`PPT_WORD_PLAN.md` §2.3「单个任务最长处理 5 分钟」，
+ * 与 `backend/app/core/config.py` 的 `document_generation_lease_seconds`（默认 300 秒）一致。
+ *
+ * 卡片只把这条**已知上限**如实讲给用户（等待是有边的），不换算成「还剩多久」。
+ */
+export const DOCUMENT_GENERATION_MAX_WAIT_MINUTES = 5
+
+/**
+ * 「已经等了多久」的文案。**只报告过去，不预测未来**：服务端没有剩余时间这个事实，
+ * 前端也不拿历史耗时去猜（会变成假 ETA）。
+ */
+export function formatDocumentWait(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds))
+  const minutes = Math.floor(total / 60)
+  const rest = total % 60
+  if (minutes === 0) return `${rest} 秒`
+  if (rest === 0) return `${minutes} 分钟`
+  return `${minutes} 分 ${rest} 秒`
+}
+
 /** 成品保留期（方案 §0.6，用户 2026-09-27 已确认：加密保存 30 天，可提前永久删除）。 */
 export const DOCUMENT_GENERATION_RETENTION_DAYS = 30
 

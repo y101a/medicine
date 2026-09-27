@@ -66,8 +66,16 @@ const PENDING_TASK = {
   sourceCount: 0,
   errorCode: null,
   expiresAt: null,
+  // 固定历史日期：下载文件名 `AI医学科普-YYYYMMDD` 就是按 `createdAt` 定的，必须可预期。
+  // 需要「刚提交不久」的等待时长时用 `freshPendingTask()`，不要动这个常量。
   createdAt: '2026-09-27T06:00:00Z',
   updatedAt: '2026-09-27T06:00:00Z',
+}
+
+/** 与 `PENDING_TASK` 同一形状，但 `createdAt` 就在 20 秒前：等待文案才会显示成「已等待 2X 秒」。 */
+function freshPendingTask() {
+  const createdAt = new Date(Date.now() - 20_000).toISOString()
+  return { ...PENDING_TASK, createdAt, updatedAt: createdAt }
 }
 
 /** 一次「PPT + Word」请求完成后仍是**一个**任务、两个下载项（方案 §8.2）。 */
@@ -88,7 +96,7 @@ const COMPLETED_TASK = {
  * 2. `GET /consultations/<id>/attachments` 是 HomeView 装载草稿区时调的。
  * 3. `GET /consultations/<id>/document-generations` 是刷新/切会话时的历史恢复入口。
  */
-function stubs(overrides: StubTable = {}, intent = true, task: unknown = PENDING_TASK): StubTable {
+function stubs(overrides: StubTable = {}, intent = true, task: unknown = freshPendingTask()): StubTable {
   return {
     'POST /consultations': { status: 201, body: CONSULTATION },
     'POST /consultations/*/messages': { status: 201, body: userMessage(SENTENCE, intent) },
@@ -197,6 +205,17 @@ test.describe('自然语言触发的 PPT/Word 生成', () => {
     await expect(pair.locator('.generated-document-card'), '任务卡应在该用户消息下').toHaveCount(1)
     await expect(pair.locator('.generated-document-card__status')).toContainText('已排队')
     await expect(pair.locator('.generated-document-card__meta')).toContainText('PPT 演示文稿')
+
+    // ④b 等待体验：有思考动效、有真实阶段与已等待时长；**没有**编造的进度百分比或预计剩余时间。
+    const card = pair.locator('.generated-document-card')
+    await expect(card.locator('.generated-document-card__thinking'), '等待态应有思考动效').toBeVisible()
+    await expect(card.locator('.generated-document-card__pending-hint')).toContainText('等待生成服务')
+    await expect(card.locator('.generated-document-card__waited')).toContainText(/已等待 \d+ 秒/)
+    await expect(card.locator('.generated-document-card__step'), '三个阶段应全部列出').toHaveCount(3)
+    await expect(card.locator('.generated-document-card__step').first(), '当前阶段应高亮').toHaveClass(/is-active/)
+    await expect(card).toContainText('最长处理约 5 分钟')
+    await expect(card, '不得出现编造的进度百分比').not.toContainText('%')
+    await expect(card, '不得出现预计剩余时间').not.toContainText('剩余')
 
     // ⑤ 页面里不存在任何「点一下生成」的入口：只能靠用户再说那句话（方案 §8.2）。
     await expect(page.getByRole('button', { name: /生成科普文档|生成 PPT|生成 Word|制作文档/ }))
@@ -370,6 +389,35 @@ test.describe('双格式、下载、删除与恢复', () => {
     await expect(notice, '不得透传内部错误原文').not.toContainText('upstream boom')
     await expect(card.locator('.generated-document-card__status'), '前端不得改写服务端状态')
       .toContainText('已排队')
+  })
+
+  test('降低动态效果：等待信息一个不少，只是不动', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.addInitScript(
+      ([key, value]) => window.localStorage.setItem(key, value as string),
+      [NOTICE_KEY, NOTICE_VERSION],
+    )
+    await installApiStubs(page, {
+      extra: stubs({
+        'GET /consultations/*/document-generations': { body: { items: [freshPendingTask()] } },
+        'GET /consultations/*/messages': { body: { items: [userMessage()], hasMore: false } },
+      }),
+    })
+    await page.goto('/app/consultations/c-e2e')
+    await settle(page)
+
+    const card = page.locator('.generated-document-card')
+    await expect(card.locator('.generated-document-card__status')).toBeVisible({ timeout: 15_000 })
+    // 信息不靠动画才读得到：阶段、已等待时长、处理上限照常显示。
+    await expect(card.locator('.generated-document-card__pending-hint')).toContainText('等待生成服务')
+    await expect(card.locator('.generated-document-card__waited')).toContainText(/已等待 \d+ 秒/)
+    await expect(card.locator('.generated-document-card__step')).toHaveCount(3)
+    await expect(card).toContainText('最长处理约 5 分钟')
+    // 动画本身必须真的关掉（三个思考点）。
+    const animations = await card.locator('.generated-document-card__thinking i').evaluateAll(
+      nodes => nodes.map(node => getComputedStyle(node).animationName),
+    )
+    expect(animations, '降低动态效果时三点不应再动').toEqual(['none', 'none', 'none'])
   })
 
   test('375px：说明弹窗完整落在视口内，勾选框与两个按钮可见可点', async ({ page }) => {

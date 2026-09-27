@@ -1,11 +1,16 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { formatAttachmentSize } from '../composables/useAttachments'
 import {
   DOCUMENT_FORMAT_LABELS,
   DOCUMENT_GENERATION_DISCLAIMER,
+  DOCUMENT_GENERATION_MAX_WAIT_MINUTES,
   DOCUMENT_GENERATION_RETENTION_DAYS,
+  DOCUMENT_GENERATION_STAGE_HINTS,
+  DOCUMENT_GENERATION_STAGES,
   DOCUMENT_GENERATION_STATUS_LABELS,
+  documentGenerationStageIndex,
+  formatDocumentWait,
   type DocumentGeneration,
   type DocumentGenerationFile,
 } from '../types/documentGenerations'
@@ -42,6 +47,54 @@ const isPending = computed(() =>
 )
 const isCompleted = computed(() => props.task.status === 'completed')
 
+/**
+ * 等待体验（2026-09-27 用户要求：排队时不知道要等多久）。只显示**真实阶段**与**已经等了多久**：
+ *
+ * - 阶段三档直接来自服务端 `status`（契约 §5.2），所以「走到第几步」是事实；
+ * - 百分比和预计剩余时间**不做**——服务端不返回这两样，编出来就是骗用户；
+ * - 计时每次都用服务端给的 `createdAt` 重算（不是累加），标签页被挂起、回来也不会走偏；
+ * - 终态立即停表，不在已完成的卡片上留一个空转的定时器。
+ */
+const nowMs = ref(Date.now())
+let tickTimer: ReturnType<typeof setInterval> | undefined
+
+function startTicking() {
+  if (tickTimer === undefined) {
+    tickTimer = setInterval(() => { nowMs.value = Date.now() }, 1_000)
+  }
+}
+function stopTicking() {
+  if (tickTimer !== undefined) {
+    clearInterval(tickTimer)
+    tickTimer = undefined
+  }
+}
+
+onMounted(() => { if (isPending.value) startTicking() })
+watch(isPending, (pending) => {
+  if (pending) startTicking()
+  else stopTicking()
+})
+onBeforeUnmount(stopTicking)
+
+const stageIndex = computed(() => documentGenerationStageIndex(props.task.status))
+const stageHint = computed(() => {
+  const status = props.task.status
+  if (status === 'queued' || status === 'generating' || status === 'rendering') {
+    return DOCUMENT_GENERATION_STAGE_HINTS[status]
+  }
+  return ''
+})
+/** 已等待秒数；`createdAt` 解析不出来时为 null，这时界面干脆不显示这一行。 */
+const waitedSeconds = computed(() => {
+  const created = new Date(props.task.createdAt).getTime()
+  if (Number.isNaN(created)) return null
+  return Math.max(0, Math.floor((nowMs.value - created) / 1_000))
+})
+const waitedText = computed(() => (
+  waitedSeconds.value === null ? '' : formatDocumentWait(waitedSeconds.value)
+))
+
 const formatText = computed(() => props.task.formats.map((item) => DOCUMENT_FORMAT_LABELS[item]).join(' + '))
 
 const expiresText = computed(() => {
@@ -76,7 +129,28 @@ function fileMeta(file: DocumentGenerationFile): string {
     <p v-if="isCompleted && task.title" class="generated-document-card__title">{{ task.title }}</p>
 
     <div v-if="isPending" class="generated-document-card__pending">
-      <span>正在生成，可以先继续聊天；离开页面不会取消这次生成。</span>
+      <span class="generated-document-card__thinking" aria-hidden="true"><i /><i /><i /></span>
+      <div class="generated-document-card__pending-body">
+        <p class="generated-document-card__pending-line">
+          <span class="generated-document-card__pending-hint">{{ stageHint }}</span>
+          <span v-if="waitedText" class="generated-document-card__waited">已等待 {{ waitedText }}</span>
+        </p>
+        <ol class="generated-document-card__steps">
+          <li
+            v-for="(stage, index) in DOCUMENT_GENERATION_STAGES"
+            :key="stage.status"
+            class="generated-document-card__step"
+            :class="{ 'is-done': index < stageIndex, 'is-active': index === stageIndex }"
+          >
+            <span class="generated-document-card__step-dot" aria-hidden="true" />
+            <span class="generated-document-card__step-label">{{ stage.label }}</span>
+          </li>
+        </ol>
+        <p class="generated-document-card__pending-note">
+          可以先继续聊天，离开页面不会取消这次生成；完成后这里会出现下载项。
+          单个任务服务端最长处理约 {{ DOCUMENT_GENERATION_MAX_WAIT_MINUTES }} 分钟。
+        </p>
+      </div>
     </div>
 
     <template v-else-if="isCompleted">
@@ -127,7 +201,37 @@ function fileMeta(file: DocumentGenerationFile): string {
 .generated-document-card__status { color: #2f5876; font-size: 13px; font-weight: 600; }
 .generated-document-card__meta { color: #7d8fa0; font-size: 12px; }
 .generated-document-card__title { margin: 8px 0 0; color: #40566b; font-size: 13px; font-weight: 600; }
-.generated-document-card__pending { display: flex; align-items: center; gap: 8px; margin-top: 10px; color: #6b8095; font-size: 12px; }
+.generated-document-card__pending { display: flex; align-items: flex-start; gap: 10px; margin-top: 10px; }
+/* 「正在思考」的三点：只做动效装饰，信息本身在文字里，所以整块 aria-hidden。 */
+.generated-document-card__thinking { display: inline-flex; align-items: center; gap: 3px; height: 18px; flex: none; }
+.generated-document-card__thinking i {
+  width: 5px; height: 5px; border-radius: 50%; background: #86b6dc;
+  animation: gdc-think 1.2s ease-in-out infinite;
+}
+.generated-document-card__thinking i:nth-child(2) { animation-delay: .16s; }
+.generated-document-card__thinking i:nth-child(3) { animation-delay: .32s; }
+@keyframes gdc-think {
+  0%, 60%, 100% { opacity: .35; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-3px); }
+}
+.generated-document-card__pending-body { min-width: 0; }
+.generated-document-card__pending-line { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 0; }
+.generated-document-card__pending-hint { color: #6b8095; font-size: 12px; animation: gdc-breathe 2.6s ease-in-out infinite; }
+@keyframes gdc-breathe { 0%, 100% { opacity: 1; } 50% { opacity: .62; } }
+/* 已等待时长：等宽数字，避免每秒跳动时整行抖动。 */
+.generated-document-card__waited { color: #2f5876; font-size: 12px; font-variant-numeric: tabular-nums; }
+.generated-document-card__steps { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 7px 0 0; padding: 0; list-style: none; }
+.generated-document-card__step { display: inline-flex; align-items: center; gap: 6px; color: #a0b1c0; font-size: 12px; }
+.generated-document-card__step-dot { width: 7px; height: 7px; border-radius: 50%; background: #d7e3ee; flex: none; }
+.generated-document-card__step.is-done { color: #7d8fa0; }
+.generated-document-card__step.is-done .generated-document-card__step-dot { background: #9dc3a0; }
+.generated-document-card__step.is-active { color: #2f5876; font-weight: 600; }
+.generated-document-card__step.is-active .generated-document-card__step-dot { background: #5b9bd5; animation: gdc-pulse 1.8s ease-in-out infinite; }
+@keyframes gdc-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(91, 155, 213, .45); }
+  50% { box-shadow: 0 0 0 4px rgba(91, 155, 213, 0); }
+}
+.generated-document-card__pending-note { margin: 7px 0 0; color: #8a9cab; font-size: 12px; line-height: 1.7; }
 .generated-document-card__pending-text { margin: 10px 0 0; color: #6b8095; font-size: 12px; }
 .generated-document-card__files { margin: 10px 0 0; padding: 0; list-style: none; }
 .generated-document-card__file { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 0; border-top: 1px dashed #e6eef6; }
@@ -139,6 +243,12 @@ function fileMeta(file: DocumentGenerationFile): string {
 .generated-document-card__ended { margin: 10px 0 0; color: #6b8095; font-size: 12px; }
 .generated-document-card__notice { margin-top: 10px; }
 .generated-document-card__actions { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+/* 降低动态效果时只关动画，文字信息一个都不少（不靠动画才读得到）。 */
+@media (prefers-reduced-motion: reduce) {
+  .generated-document-card__thinking i,
+  .generated-document-card__pending-hint,
+  .generated-document-card__step.is-active .generated-document-card__step-dot { animation: none; }
+}
 @media (max-width: 480px) {
   .generated-document-card__file { align-items: flex-start; }
   .generated-document-card__file-meta { width: 100%; margin-right: 0; }

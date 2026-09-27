@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
+import { nextTick } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import ElementPlus from 'element-plus'
@@ -15,7 +16,11 @@ import { ApiError } from '../api/http'
 import { DOCUMENT_GENERATION_NOTICE_STORAGE_KEY } from '../stores/composerHints'
 import {
   DOCUMENT_GENERATION_DISCLAIMER,
+  DOCUMENT_GENERATION_STAGE_HINTS,
+  DOCUMENT_GENERATION_STAGES,
   DOCUMENT_GENERATION_STATUS_LABELS,
+  documentGenerationStageIndex,
+  formatDocumentWait,
   type DocumentGeneration,
   type DocumentGenerationFile,
   type DocumentGenerationStatus,
@@ -509,5 +514,125 @@ describe('任务卡：状态、双格式、下载与删除', () => {
     // 没有预览：完成的卡片只给下载与说明，没有 img/iframe。
     expect(document.querySelector('.generated-document-card img')).toBeNull()
     expect(document.querySelector('.generated-document-card iframe')).toBeNull()
+  })
+})
+
+/**
+ * 等待体验（用户 2026-09-27 要求：生成后要排队，但界面不告诉他要等多久）。
+ *
+ * 这里守两条线：①「走到第几步」只能来自服务端状态（`queued`/`generating`/`rendering` 的 1:1 映射），
+ * ②**只报已经等了多久，不预测还要多久**——服务端没有剩余时间这个事实，编出来就是假承诺。
+ * 计时用假时钟 + 固定 `createdAt`，文案因此是确定的，不依赖真实时间流逝。
+ */
+describe('等待体验：真实阶段 + 已等待时长（不编进度）', () => {
+  const BASE_TIME = new Date('2026-09-27T10:00:00Z').getTime()
+
+  function mountCard(task: DocumentGeneration) {
+    return mount(GeneratedDocumentCard, {
+      props: { task },
+      global: { plugins: [ElementPlus] },
+    })
+  }
+
+  /** 已经等了 `secondsWaited` 秒的任务：`createdAt` 由服务端给，前端只用它算差值。 */
+  function pendingTask(secondsWaited: number, status: DocumentGenerationStatus = 'queued'): DocumentGeneration {
+    return {
+      ...queuedTask,
+      status,
+      createdAt: new Date(BASE_TIME - secondsWaited * 1_000).toISOString(),
+    }
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(BASE_TIME)
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('排队中：有思考动效，显示真实阶段与「已等待」时长，并如实给出处理上限', () => {
+    const wrapper = mountCard(pendingTask(83))
+
+    expect(wrapper.find('.generated-document-card__thinking').exists(), '等待态应有思考动效').toBe(true)
+    expect(wrapper.find('.generated-document-card__pending-hint').text())
+      .toBe(DOCUMENT_GENERATION_STAGE_HINTS.queued)
+    expect(wrapper.find('.generated-document-card__waited').text()).toBe('已等待 1 分 23 秒')
+    // 三个阶段全部列出、当前这个高亮：这是服务端状态的 1:1 映射，不是前端估的进度。
+    const steps = wrapper.findAll('.generated-document-card__step')
+    expect(steps.map(step => step.text())).toEqual(DOCUMENT_GENERATION_STAGES.map(stage => stage.label))
+    expect(steps[0].classes()).toContain('is-active')
+    expect(steps[1].classes()).not.toContain('is-active')
+    expect(wrapper.text()).toContain('最长处理约 5 分钟')
+    wrapper.unmount()
+  })
+
+  it('阶段随服务端状态推进，走过的阶段标成已完成', async () => {
+    const wrapper = mountCard(pendingTask(10, 'generating'))
+
+    let steps = wrapper.findAll('.generated-document-card__step')
+    expect(steps[0].classes()).toContain('is-done')
+    expect(steps[1].classes()).toContain('is-active')
+    expect(wrapper.find('.generated-document-card__pending-hint').text())
+      .toBe(DOCUMENT_GENERATION_STAGE_HINTS.generating)
+
+    await wrapper.setProps({ task: pendingTask(20, 'rendering') })
+    steps = wrapper.findAll('.generated-document-card__step')
+    expect(steps[0].classes()).toContain('is-done')
+    expect(steps[1].classes()).toContain('is-done')
+    expect(steps[2].classes()).toContain('is-active')
+    expect(wrapper.find('.generated-document-card__status').text()).toBe('正在排版文件')
+    wrapper.unmount()
+  })
+
+  it('已等待时长每秒刷新，且按服务的 createdAt 重算（标签页挂起回来不走偏）', async () => {
+    const wrapper = mountCard(pendingTask(5))
+    expect(wrapper.find('.generated-document-card__waited').text()).toBe('已等待 5 秒')
+
+    vi.advanceTimersByTime(3_000)
+    await nextTick()
+    expect(wrapper.find('.generated-document-card__waited').text()).toBe('已等待 8 秒')
+
+    // 时钟往前跳 62 秒、随后只 tick 一秒（合计 63 秒）：必须重算，而不是每次 +1。
+    vi.setSystemTime(BASE_TIME + 62_000)
+    vi.advanceTimersByTime(1_000)
+    await nextTick()
+    expect(wrapper.find('.generated-document-card__waited').text()).toBe('已等待 1 分 8 秒')
+    wrapper.unmount()
+  })
+
+  it('进入终态后不再显示等待区，并停掉计时器', async () => {
+    const wrapper = mountCard(pendingTask(5))
+    expect(vi.getTimerCount(), '等待态应挂着计时器').toBeGreaterThan(0)
+
+    await wrapper.setProps({ task: { ...completedTask } })
+    expect(wrapper.find('.generated-document-card__pending').exists()).toBe(false)
+    expect(wrapper.find('.generated-document-card__waited').exists()).toBe(false)
+    expect(vi.getTimerCount(), '终态不能留空转的定时器').toBe(0)
+    wrapper.unmount()
+  })
+
+  it('卡片上不出现任何编造的进度百分比或预计剩余时间', () => {
+    const wrapper = mountCard(pendingTask(30, 'rendering'))
+    const text = wrapper.text()
+
+    expect(text).not.toContain('%')
+    expect(text).not.toMatch(/剩余|还需|预计/)
+    wrapper.unmount()
+  })
+
+  it('formatDocumentWait 只报已经过去的时长', () => {
+    expect(formatDocumentWait(0)).toBe('0 秒')
+    expect(formatDocumentWait(59)).toBe('59 秒')
+    expect(formatDocumentWait(60)).toBe('1 分钟')
+    expect(formatDocumentWait(83)).toBe('1 分 23 秒')
+    expect(formatDocumentWait(-5)).toBe('0 秒')
+  })
+
+  it('documentGenerationStageIndex 只认三个等待态，终态返回 -1', () => {
+    expect(documentGenerationStageIndex('queued')).toBe(0)
+    expect(documentGenerationStageIndex('generating')).toBe(1)
+    expect(documentGenerationStageIndex('rendering')).toBe(2)
+    expect(documentGenerationStageIndex('completed')).toBe(-1)
   })
 })
