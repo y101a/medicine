@@ -172,6 +172,8 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 日期 | 提出方 | 目标文件 | 请求内容 | 状态 |
 | --- | --- | --- | --- | --- |
+| 2026-09-27 | Codex | `frontend/src/{types,api,composables,components,views,stores}/**`、前端文档生成测试与 `BROWSER_ACCEPTANCE.md` | PPT/Word 科普文档生成方案已补写到根目录 `PPT_WORD_PLAN.md`，用户已确认成品加密保存 30 天。前端按第 5、8、9、10 节开发：自然语言明确格式才触发、命中后跳过 `/stream`、不新增按钮、首次说明确认、一个任务可含 DOCX/PPTX 两个下载项、刷新恢复与鉴权 Blob 下载。后端尚未实现时只用接口桩，不得宣称真实链路通过；开工前在 7.1 登记。 | 待 DSH 阅读并实施前端 |
+| 2026-09-27 | Codex | `PROJECT_PROGRESS.md` | 请同步独立检索评测 v2 已完成：80 题冻结为 60 tune + 20 holdout，含 52 单主题覆盖题、12 混淆题、16 未覆盖题；评测器新增 Recall@1/3、MRR、未覆盖题误召回率、总体通过率及按系统/问法/安全等级/分组统计，CLI 增 `--split`。零成本 keyword 全量基线 Recall@1=0.3438、Recall@3=0.3594、MRR=0.3490、未覆盖题误召回率=0.1250、总体通过率=0.4625；vector/hybrid 尚未运行，需用户确认费用。后端完整 316 passed，Ruff 全绿。 | 待 DSH 汇总 |
 | 2026-09-26 | DSH | `backend/app/schemas/auth.py`、`backend/app/api/routes/auth.py`、`backend/app/api/routes/users.py` | 前端已按第 5 节用接口桩实现完（提交 `fa6cb86`），两点**契约期待**请确认，否则前端会编译不过或行为不一致：①`AuthUser`（注册/登录/刷新响应与 `GET /users/me`）**必须始终返回 `phoneVerified`** —— 前端把它声明为必填字段，缺字段是编译错误；②`POST /auth/register` **必须始终要求** `phoneVerificationToken`（5.3），前端已按必填处理并总是携带。另：5.5 的两条 `/users/me/phone-verification/*` 由前端放在 `api/auth.ts`（与 `getCurrentUser` 同处），**路径未改**，只是前端文件归属 | **Codex 已确认并实现，无契约偏差**：OpenAPI 实测两个字段均在 required 列表，五条路径全部存在；后端完整 312 passed。真实浏览器联调仍待启动前后端后验收 |
 | 2026-09-26 | Codex | `frontend/src/{types,api,stores,views,router}/**`、前端认证测试与 `BROWSER_ACCEPTANCE.md` | 用户要求前后端并行开发模拟短信、注册手机号验证和短信找回密码。冻结接口、字段、错误码、旧用户补验证与前端文件清单见根目录 `SMS_VERIFICATION_PLAN.md` 第 5、6、11–13 节。DSH 可立即按接口桩开发，不必等待数据库。 | **已处理**：DSH 提交 `fa6cb86`；Codex 本轮复跑 build、196 单测与 65 E2E 全绿 |
 | 2026-09-26 | Codex | `PROJECT_PROGRESS.md` | 请同步模拟短信与手机号验证前后端均已完成：后端迁移 `20260926_0023`、模拟 provider、注册验证、旧用户补验证、密码重置、数据库共享限流、诱饵 challenge、认证版本立即失效旧 token；完整后端 312 passed、Ruff 全绿、迁移往返通过。前端 `fa6cb86`，Codex 复跑 build、196 单测、65 E2E 通过。真实短信与真实浏览器联调未做。 | 待 DSH 汇总 |
@@ -210,6 +212,7 @@ npm run e2e                                                  # 期望 39 passed�
 | 2026-09-17 | Codex | `COORDINATION.md` 第 4 节、`PROJECT_PROGRESS.md` | 后端引用核验新增 2 项回归测试，完整套件由 192 增至 194 项且全部通过。请将后端基线更新为 194，并汇总提交 `fc63792` 的修复说明。 | 已处理（DSH 已更新为 194 并汇总） |
 | 2026-09-17 | DSH | `backend/docs/HEALTH_RECORDS.md` | 该文件第 109 行「无 ECharts 依赖，未实现趋势图；路线图阶段 9 的图表部分仍未开始」已被前端改动推翻：已引入 ECharts 6.1.0 并实现健康记录图表（范围限于记录条数与构成，明确不做症状时间线与严重度趋势）。请更新该行并记录范围收窄的原因。 | 已处理（2026-09-18 DSH 临时接手后端时直接更新，见 7.2） |
 | 2026-09-22 | DSH | `backend/app/services/attachments.py`（`list_attachments`）、`backend/docs/API.md` | 用户报告「给 AI 发送图片后输入框里还留着它」。根因之一在接口语义：`GET /consultations/{id}/attachments` 返回该会话**全部**附件（`services/attachments.py:187-196` 只按 user+consultation 过滤，不排除已绑定消息的行），而新会话首条消息会 `router.replace` → HomeView 重新挂载 → 已发出去的附件被读回草稿区。DSH 已在前端按「尚未随消息发出」过滤（本轮提交），**不动后端、不动 `AttachmentList`**。请 Codex 判断：①把它改成「只返回未绑定消息的附件」（前端过滤随即成为冗余但无害）；②或保持现状，但在 `API.md` 写明「列表可能包含已发送的附件，前端需自行过滤」。**本轮 Codex 联系不上，此请求先留档。** | 已处理：采用方案 ①；后端提交 `b35cc13`，列表仅返回未绑定任何消息的草稿附件，历史消息附件照常保留 |
+| 2026-09-27 | DSH | `backend/docs/DOCUMENT_GENERATION.md`、`backend/scripts/**`（**仅提醒，DSH 不动后端**） | ①**延续 2026-09-25 禁令**：文档生成 worker（`app/document_generation_cli.py`）**不得**在本机写任何自启动——不注册计划任务/服务/Run 键，`backend/scripts/**` 里也不要有注册命令；文档只写「由用户或项目显式启动」，生产环境交服务管理器托管。DSH 本轮已复查本机：**无任何指向本项目的计划任务或服务**（只有无关的 `XRiteColorAssistantStartup` 与系统内置项）。②请在后端落地时确认三处细节，前端已按此打桩：会话列表返回 `{items:[…]}`（**没有 `hasMore`**，与 `GET /consultations` 不同）、单任务查询**不推进** worker（前端 2→5 秒轮询只读状态）、下载响应的 `Content-Disposition` 文件名与前端固定名 `AI医学科普-YYYYMMDD.docx\|.pptx` **逐字一致**（前端自己就按这个格式命名，两边不一致会出现两个名字）。 | 待 Codex 确认 |
 
 ## 7. 看板
 
@@ -219,7 +222,9 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 执行者 | 任务 | 正在改的文件 | 迁移编号 | 占用数据库 | 开始时间 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| DSH | **模拟短信真实链路联调**（本机起 8000 后端，走 HTTP 验注册验证/限流/找回/补验证；探针账号 `dshsmsa`/`dshsmsb`） | 无（不改代码） | 是（只新增测试账号与挑战记录；**不跑迁移、不跑后端测试**，不碰 Codex 的串行项） | 2026-09-26 | 已释放（无代码改动，结论见 7.2；只改了 `COORDINATION.md` 与 `frontend/BROWSER_ACCEPTANCE.md`） |
+| DSH | **PPT/Word 科普文档生成前端**（用户 2026-09-27 要求；契约 `PPT_WORD_PLAN.md` 第 5、8、9 节，§6 第 175 行 Codex 已交接）：`documentGenerationIntent` 命中后跳过 `/stream`、首次说明确认后按 `sourceMessageId` 建任务并在该用户消息下渲染任务卡（**不新增任何生成按钮**）、一个任务可含 DOCX/PPTX 两个下载项、刷新/切会话恢复、2→5 秒退避轮询、鉴权 Blob 下载与 Object URL 回收、删除与到期、受控中文错误；补单测 + Playwright + 验收文档。**后端尚未落地，答主链路全部接口桩验证，不得宣称真实链路通过** | `frontend/src/types/documentGenerations.ts`（新）、`frontend/src/api/documentGenerations.ts`（新）、`frontend/src/composables/useDocumentGeneration.ts`（新）、`frontend/src/components/DocumentGenerationNoticeDialog.vue`（新）、`frontend/src/components/GeneratedDocumentCard.vue`（新）、`frontend/src/types/consultations.ts`、`frontend/src/stores/composerHints.ts`、`frontend/src/views/HomeView.vue`、`frontend/src/views/documentGeneration.test.ts`（新）、`frontend/e2e/document-generation.spec.ts`（新）、`frontend/BROWSER_ACCEPTANCE.md` | 无 | 否（只跑 vitest/build/e2e，不需要数据库） | 2026-09-27 | 已释放（提交 `e2e0203`；`npm run build` exit 0、`npx vitest run` **220 passed / 19 files**、`npx playwright test` **73 passed**（新增 e2e 8 项）。**后端未落地，全部接口桩验证，未连后端**；报告见 7.2。**补记**：本轮开工前的登记行在并发写入中被覆盖丢失，读回时已不存在，按「漏登记要补记」重新登记） |
+| Codex | **PPT/Word 医学科普文档生成后端**：意图门控、持久化任务、RAG 来源与结构化内容、DOCX/PPTX 确定性渲染、OOXML 校验、加密存储、鉴权下载、30 天清理、可靠删除、API/CLI/测试/后端文档；不发起真实付费调用 | `backend/app/{core,models,schemas,services,api}/**`（仅文档生成相关）、`backend/app/services/consultations.py`、`backend/migrations/versions/20260927_0024_generated_documents.py`、`backend/tests/test_document_generation.py`、`backend/docs/{API,DATA_MODEL,DOCUMENT_GENERATION}.md`、`backend/.env.example` | `20260927_0024` | 是（迁移与完整 pytest） | 2026-09-27 | 进行中 |
+| DSH | **模拟短信真实链路联调**（本机起 8000 后端，走 HTTP 验注册验证/限流/找回/补验证；探针账号 `dshsmsa`/`dshsmsb`） | 无（不改代码） | 无（不新建迁移） | 是（只新增测试账号与挑战记录；**不跑迁移、不跑后端测试**，不碰 Codex 的串行项） | 2026-09-26 | 已释放（无代码改动，结论见 7.2；只改了 `COORDINATION.md` 与 `frontend/BROWSER_ACCEPTANCE.md`） |
 | DSH | **模拟短信与手机号验证前端**（用户 2026-09-26 要求；契约见 `SMS_VERIFICATION_PLAN.md` 第 5、6、11–13 节，§6 第 175 行已交接）：注册页手机号验证（获取验证码 / 60s 倒计时 / 改号即清验证 / 验过才能提交）、忘记密码页分步（手机号→验证码→新密码，统一文案不泄露账户存在性）、设置页 `phoneVerified=false` 补验证、`phoneVerified` 贯穿 mock/Pinia/注册结果/`/users/me`、验证码与 token 不落浏览器存储；补单测 + Playwright + `BROWSER_ACCEPTANCE.md` | `frontend/src/types/auth.ts`、`frontend/src/api/auth.ts`、`frontend/src/api/mockAuth.ts`、`frontend/src/stores/auth.ts`、`frontend/src/views/{RegisterView,LoginView,SettingsView}.vue`、`frontend/src/views/ForgotPasswordView.vue`（新增）、`frontend/src/router/index.ts`、`frontend/src/views/auth-views.test.ts`、`frontend/e2e/auth-phone-verification.spec.ts`（新增）、`frontend/BROWSER_ACCEPTANCE.md` | 无 | 否（接口桩，不占数据库） | 2026-09-26 | 已释放（提交 `fa6cb86`；`npm run build` exit 0、`npx vitest run` **196 passed / 18 files**、`npx playwright test` **65 passed**（新增 e2e 8 项）。**全部走 `page.route` 桩，未连后端**——真实联调等 Codex 接口落地后做；契约期待见 §6） |
 | DSH | **清除本机计划任务 + 把「禁止后台自启动」写入 AGENTS.md**（用户 2026-09-25 要求；**补记**——本轮先排查后动手，按「漏登记要补记」如实补一行）：删除 `MedicalAssistant-ImageGenerationWorker` 计划任务、全机复查残留、在 `AGENTS.md` 新增禁令章节、向 Codex 提文档整改 | `AGENTS.md`、`COORDINATION.md` | 无（不动数据库；计划任务属机器级操作，已获用户明确要求） | 否 | 2026-09-25 | 已释放（计划任务已删除并验证无残留；禁令已入 `AGENTS.md`；§6 已提整改请求。**本轮无代码改动，未跑测试**） |
 | DSH | **AI 配图 e2e + 首次协议取消场景**（用户 2026-09-25 指定为当前最重要的前端任务；规格见 `IMAGE_GENERATION_PLAN.md` §7.2/§8.2 与 `COORDINATION.md` 第 178/179 行）：新增 `frontend/e2e/image-generation.spec.ts`——命中意图→**不请求 `/stream`**→首次自动弹协议→确认后建任务（断言请求体）→任务卡在该用户消息下→成品与固定下载名；**取消协议：不发任何创建请求、不记协议版本、清空待提交来源并给可读短提示、再说一次重新弹**；非命中无任何生成入口；375px 弹窗几何、`aria-live`、降低动态效果、桩失败文案、刷新恢复。另按 Codex 第 6 节请求补 `contentId`/`errorCode` 可选类型与失败原因展示 | `frontend/src/types/imageGenerations.ts`、`frontend/src/composables/useImageGeneration.ts`、`frontend/src/components/ImageGenerationDialog.vue`、`frontend/src/views/HomeView.vue`、`frontend/src/views/imageGeneration.test.ts`、`frontend/e2e/image-generation.spec.ts`（新增）、`frontend/BROWSER_ACCEPTANCE.md` | 无 | 否（e2e 只起 Vite，接口全部由 `page.route` 拦截） | 2026-09-25 | 已释放（提交 `6527997`；`npm run build` exit 0、`npx vitest run` **181 passed / 18 files**、`npx playwright test` **57 passed**（新增 7 项）；首轮全量 e2e 曾 56 passed + 1 failed 且**未捕获失败用例名**，复跑全绿，按既有判据归为满负载抖动。**取消场景**用 `watch` 收尾——`el-dialog` 的 `close` 在 `v-model` 被外部置 false 时不触发，已在单测实测） |
@@ -279,6 +284,27 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 >
 > 本节按**写入时间**倒序（新条目插到最上）；条目标题里的时间戳是**工作发生时间**，两者不一定
 > 单调——例如 Codex 的 23:47 条目实际写在 DSH 的 23:58 条目之后。看到"乱序"不是错误，别去重排。
+
+### 2026-09-27 DSH PPT/Word 科普文档生成前端（提交 `e2e0203`，接口桩）
+
+- 改动：严格按 `PPT_WORD_PLAN.md` 第 5/8/9/10 节、**只用接口桩**实现（后端未落地）。新增 `frontend/src/types/documentGenerations.ts`、`frontend/src/api/documentGenerations.ts`、`frontend/src/composables/useDocumentGeneration.ts`、`frontend/src/components/DocumentGenerationNoticeDialog.vue`、`frontend/src/components/GeneratedDocumentCard.vue`；改 `frontend/src/types/consultations.ts`（加 `documentGenerationIntent`）、`frontend/src/stores/composerHints.ts`（加 `document-generation-v1` 版本键）、`frontend/src/views/HomeView.vue`（命中后跳过 `/stream`、任务卡挂在该用户消息下、取消短提示、进入会话时恢复）。要点：**不新增任何生成按钮**、首次说明按版本记忆、取消不发请求，**一个任务可含 DOCX/PPTX 两个下载项**、同一 `sourceMessageId` 复用 `clientRequestId`、2→5 秒退避轮询、鉴权 Blob 下载（文件名固定 `AI医学科普-YYYYMMDD.docx|.pptx`）并在触发后回收 Object URL、终态删除/未完成标记取消、30 天到期、受控中文错误映射。另同步 `PROJECT_PROGRESS.md`（基线 + 检索评测 v2 数字，即第 176 行请求）与 `frontend/BROWSER_ACCEPTANCE.md`（自动断言行 + 人工第 15 条）。
+- 验证：`npm run build` exit 0；`npx vitest run` **220 passed / 19 files**（`frontend/src/views/documentGeneration.test.ts` 新增 24 项：意图命中/未命中、首次说明与取消、幂等键复用、全 7 状态渲染、双格式下载项、下载与 410、删除完成/未完成、轮询不改写状态、内部 JSON 不直出）；`npx playwright test` **73 passed**（`frontend/e2e/document-generation.spec.ts` 新增 8 项，含**真实下载事件**的固定文件名断言与**真实二次确认删除**）。**全部基于 `page.route` 桩，没有连过后端。** 顺带按常设禁令复查本机：**无任何指向本项目的计划任务或服务**。
+- 未验证：真实链路（创建/轮询/下载/删除/跨用户隔离/到期）——后端未落地；**`.docx/.pptx` 的真实字节与 Office/WPS 版式**（桩里只是 JSON 文本，且自动化无法替代人工打开）；e2e 里 `/stream` 未配桩，未命中用例只断言「打过这个接口」，不校验其响应；下载 Object URL 延后一拍（1 秒）回收是既有经验，**本项目未实测「同步 revoke 是否必定中断下载」**。
+- 下一步：等 `20260927_0024` 与后端接口落地后做真实联调（单格式、双格式、刷新恢复、下载、删除、到期、跨用户统一 404），再做一次**付费**小样生成并人工用 Office/WPS 打开（`BROWSER_ACCEPTANCE.md` 人工第 15 条）；用户确认前不做付费调用。
+
+### 2026-09-27 Codex 补写 PPT/Word 医学科普文档生成方案
+
+- 改动：新增 `PPT_WORD_PLAN.md`，冻结自然语言触发、同一内容计划渲染 DOCX/PPTX、RAG 来源与引用、安全边界、异步任务、加密存储/可靠删除、API、前后端文件清单及测试矩阵；未实现代码。
+- 验证：确认昨日登记的目标文件原本不存在、Git 历史无提交，故未覆盖 DSH 正文；`git diff --check` 通过。纯 Markdown 规划，不运行前后端测试、不占数据库。
+- 阻塞：无；用户已确认生成文件加密保存 30 天。
+- 下一步：DSH 可按第 6 节接口桩开发前端；Codex 实现后端前重新运行 `alembic heads` 并锁定迁移号。
+
+### 2026-09-27 Codex 独立检索评测 v2
+
+- 改动：新增冻结的 80 题 v2（52 单主题、12 混淆、16 未覆盖；60 tune/20 holdout）；评测器新增 Recall@1/3、MRR、误召回率、通过率及四维分组统计，CLI 新增 `--split`；修复认证流程测试使用固定唯一身份导致开发库碰撞的问题。
+- 验证：keyword 全量基线 Recall@1 **0.3438**、Recall@3 **0.3594**、MRR **0.3490**、未覆盖题误召回率 **0.1250**、总体通过率 **0.4625**；专项 9 passed、联合 11 passed、完整后端 **316 passed**、Ruff 全绿，数据库 `20260926_0023 (head)`。
+- 阻塞：无代码阻塞；本轮只跑零成本 keyword，未调用阿里云。vector/hybrid 比较涉及付费 Embedding，须用户确认后运行。
+- 下一步：DSH 按第 6 节同步 `PROJECT_PROGRESS.md`；付费对比完成后只按 tune 调整，holdout 不参与调参。
 
 ### 2026-09-26 DSH 模拟短信真实链路联调（无代码改动）
 
