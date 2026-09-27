@@ -25,6 +25,15 @@ export interface Message {
    * 命中时前端**不再调用 `/stream`**，直接以这条用户消息为来源创建科普配图任务。
    */
   imageGenerationIntent?: boolean
+  /**
+   * 服务端本地意图判定：用户消息里同时出现「生成动作 + 明确格式（PPT/演示文稿/幻灯片 或
+   * Word/DOCX/文档）+ 医学主题」才为 true（否定请求、仅询问功能、非医学主题、缺格式、
+   * 带附件或紧急分流都为 false，见 `backend/app/services/document_generation_intent.py`）。
+   *
+   * 命中时前端**不再调用 `/stream`**，直接以这条用户消息为来源创建文档生成任务；
+   * 缺格式时故意不命中——由普通聊天先问清格式，避免意外产生费用（方案 §3）。
+   */
+  documentGenerationIntent?: boolean
   followUp?: FollowUpCard | null
   triage?: TriageResult | null
   citations?: MessageCitation[]

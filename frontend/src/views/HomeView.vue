@@ -23,6 +23,7 @@ import {
   readVoiceTipSeen, rememberVoiceTipSeen, readVoiceConsentSeen, rememberVoiceConsentSeen,
   readDocumentNoticeSeen, rememberDocumentNoticeSeen, readImageConsentSeen, rememberImageConsentSeen,
   readImageGenerationNoticeVersion, rememberImageGenerationNoticeVersion,
+  readDocumentGenerationNoticeVersion, rememberDocumentGenerationNoticeVersion,
 } from '../stores/composerHints'
 import { useVoiceRecorder } from '../composables/useVoiceRecorder'
 import { useAttachments, formatAttachmentSize, ATTACHMENT_LIMIT } from '../composables/useAttachments'
@@ -36,6 +37,10 @@ import GeneratedImageCard from '../components/GeneratedImageCard.vue'
 import { useImageGeneration } from '../composables/useImageGeneration'
 import type { ImageGeneration } from '../types/imageGenerations'
 import { IMAGE_GENERATION_NOTICE_VERSION } from '../api/imageGenerations'
+import DocumentGenerationNoticeDialog from '../components/DocumentGenerationNoticeDialog.vue'
+import GeneratedDocumentCard from '../components/GeneratedDocumentCard.vue'
+import { useDocumentGeneration } from '../composables/useDocumentGeneration'
+import { DOCUMENT_GENERATION_NOTICE_VERSION } from '../api/documentGenerations'
 import { voiceApi } from '../api/voice'
 
 const route = useRoute()
@@ -91,6 +96,29 @@ const {
   submit: submitGeneration,
   remove: removeGeneration,
 } = useImageGeneration(generationCid)
+
+// ── PPT/Word 科普文档生成（方案 `PPT_WORD_PLAN.md` §8）────────────────────────────
+/**
+ * 与配图共用同一个 `generationCid` 镜像：两条链路的作用域都是「当前会话」。
+ * 文档 v1 没有预览，所以这里不管理常驻 Object URL——下载时才取字节并即时回收。
+ */
+const {
+  tasksByMessage: documentTasksByMessage,
+  submitting: documentSubmitting,
+  notices: documentNotices,
+  downloadingFiles: documentDownloading,
+  loadHistory: loadDocumentHistory,
+  submit: submitDocument,
+  download: downloadDocument,
+  remove: removeDocument,
+} = useDocumentGeneration(generationCid)
+
+const documentDialogVisible = ref(false)
+const documentDialogError = ref('')
+/** 取消首次说明后的短提示：说明没有建任务、不会扣费，以及怎么再来一次。 */
+const documentCancelNotice = ref('')
+/** 待提交的来源：命中文档意图的用户消息（只留 id，主题原文不落前端状态）。 */
+const documentSource = ref<{ id: string } | null>(null)
 
 const generationDialogVisible = ref(false)
 const generationDialogError = ref('')
@@ -437,8 +465,9 @@ async function load(older = false) {
     if (!older) retrievalNotice.value = readRetrievalNotice(auth.user?.id, cid)
     title.value = conversation.title
     if (!older) void loadDraftAttachments(cid)
-    // 生成任务只在进入会话时恢复一次；与消息并行加载，不互相阻塞。
+    // 两类生成任务（配图 / 文档）都只在进入会话时恢复一次；与消息并行加载，不互相阻塞。
     if (!older) void loadGenerationHistory()
+    if (!older) void loadDocumentHistory()
     messages.value = older ? [...page.items, ...messages.value] : page.items
     hasOlder.value = page.hasMore
     ready.value = true
@@ -629,6 +658,12 @@ async function sendContent(content: string, clearDraft = false) {
       startGeneration(message)
       return
     }
+    // 命中「明确要求生成 PPT/Word 科普文档」：同样跳过文字回答（方案 §8.2）。
+    // 也不能回退 generateAnswer——模型只会回一句「我无法生成文件」。
+    if (message.documentGenerationIntent === true) {
+      startDocumentGeneration(message)
+      return
+    }
     if (message.triage?.level === 'emergency') {
       if (route.params.id !== cid) {
         await router.replace({ name: 'consultation', params: { id: cid } })
@@ -731,6 +766,63 @@ function retryGeneration(task: ImageGeneration) {
   }
   startGeneration(source)
 }
+
+/**
+ * 命中服务端意图判定（`documentGenerationIntent`）后的落点（方案 §8.1）：
+ * **不再请求文字回答**，直接以这条用户消息为来源创建 PPT/Word 生成任务。
+ * 首次使用必须先过一遍说明；确认后按版本记忆，之后明确请求直接生成。
+ */
+function startDocumentGeneration(source: Message) {
+  documentSource.value = { id: source.id }
+  documentDialogError.value = ''
+  documentCancelNotice.value = ''
+  if (readDocumentGenerationNoticeVersion() === DOCUMENT_GENERATION_NOTICE_VERSION) {
+    void runDocumentGeneration()
+    return
+  }
+  documentDialogVisible.value = true
+}
+
+/**
+ * 真正提交。失败只显示受控原因，**不回退聊天模型**。
+ * 幂等键由组合式按 `sourceMessageId` 复用，前端重复点击不会重复计费。
+ */
+async function runDocumentGeneration() {
+  const pending = documentSource.value
+  if (!pending) return
+  const result = await submitDocument(pending.id)
+  if (result.ok) {
+    rememberDocumentGenerationNoticeVersion(DOCUMENT_GENERATION_NOTICE_VERSION)
+    documentDialogError.value = ''
+    documentSource.value = null
+    documentDialogVisible.value = false
+    return
+  }
+  const message = result.message || '生成请求没有提交成功，请稍后重试'
+  // 说明弹窗开着就显示在弹窗里，否则走页面提示；两种情况都不改走文字回答。
+  if (documentDialogVisible.value) documentDialogError.value = message
+  else error.value = message
+}
+
+/**
+ * 关闭说明弹窗却没生成（点「取消」、右上角 × 或 Esc）＝用户取消了这次生成：
+ * **不发任何请求、不记版本、不产生费用**，也不伪造一条助手回答（方案 §8.2）。
+ * 只回一句可关闭的提示，告诉用户怎么再来一次——同样**不新增触发按钮**。
+ */
+function onDocumentDialogClosed() {
+  if (!documentSource.value) return
+  documentSource.value = null
+  documentDialogError.value = ''
+  documentCancelNotice.value =
+    '已取消生成：没有创建任务，也不会产生费用。需要时请再发一次「帮我生成一份……的 PPT」或'
+    + '「……的 Word 文档」，确认说明后即可生成。'
+}
+
+// 与配图弹窗同理：`v-model` 被外部置 false 时 Element Plus 不保证发 `close`，
+// 用 watcher 覆盖「取消」「右上角 ×」「Esc」三种关闭路径；成功那条路径已先清空来源，不会误报取消。
+watch(documentDialogVisible, (open) => {
+  if (!open) onDocumentDialogClosed()
+})
 
 function canOfferPathologyCard(message: Message) {
   return message.role === 'assistant'
@@ -873,6 +965,16 @@ onBeforeRouteUpdate(canLeave)
               <MessageAttachments :items="message.attachments" />
             </div>
             <EmergencyTriageCard v-if="message.triage" :triage="message.triage" />
+            <!-- 命中的文档生成任务挂在这条用户消息下；服务端也按 sourceMessageId 恢复（方案 §8.1）。 -->
+            <GeneratedDocumentCard
+              v-for="task in documentTasksByMessage[message.id] || []"
+              :key="task.id"
+              :task="task"
+              :notice="documentNotices[task.id]"
+              :downloading="documentDownloading"
+              @download="downloadDocument(task, $event)"
+              @remove="removeDocument(task)"
+            />
             <!-- 命中的配图任务挂在这条用户消息下；服务端也按 sourceMessageId 恢复（方案 §7.1）。 -->
             <GeneratedImageCard
               v-for="task in generationTasks[message.id] || []"
@@ -929,6 +1031,8 @@ onBeforeRouteUpdate(canLeave)
         @dragover.prevent="dragging = true" @dragleave="dragging = false" @drop.prevent="onDrop">
         <el-alert v-if="generationCancelNotice" class="generation-cancel-notice" type="info" show-icon
           :title="generationCancelNotice" @close="generationCancelNotice = ''" />
+        <el-alert v-if="documentCancelNotice" class="generation-cancel-notice" type="info" show-icon
+          :title="documentCancelNotice" @close="documentCancelNotice = ''" />
         <el-alert v-if="modelsError" class="model-error" :title="modelsError" type="warning" :closable="false" />
         <el-alert v-if="!voiceTipSeen" class="voice-tip" type="info" show-icon
           title="可用输入法上的麦克风语音输入（如豆包输入法），也可以点发送键左侧的麦克风按钮直接录音。语音识别可能出错，发送前请核对文字；请不要在对话中提供姓名、身份证号、住院号或手机号。"
@@ -1025,6 +1129,12 @@ onBeforeRouteUpdate(canLeave)
       :submitting="generationSubmitting"
       :error="generationDialogError"
       @confirm="runGeneration"
+    />
+    <DocumentGenerationNoticeDialog
+      v-model="documentDialogVisible"
+      :submitting="documentSubmitting"
+      :error="documentDialogError"
+      @confirm="runDocumentGeneration"
     />
   </main>
 </template>

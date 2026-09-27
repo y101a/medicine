@@ -11,6 +11,11 @@ export const IMAGE_CONSENT_STORAGE_KEY = 'medical-assistant:image-consent-seen'
  * （而不是 true）：协议升版后要重新确认一次（方案第 7.1 节「确认后按协议版本记忆」）。
  */
 export const IMAGE_GENERATION_NOTICE_STORAGE_KEY = 'medical-assistant:image-generation-notice-version'
+/**
+ * PPT/Word 科普文档生成的首次说明版本。与配图同理记「已确认的协议版本」而不是 true：
+ * 说明升版要重新确认一次；**用户取消时不写这个键**（方案 §8.2「取消不记版本」）。
+ */
+export const DOCUMENT_GENERATION_NOTICE_STORAGE_KEY = 'medical-assistant:document-generation-notice-version'
 
 function readFlag(key: string): boolean {
   try {
@@ -74,6 +79,24 @@ export function readImageGenerationNoticeVersion(): string {
 export function rememberImageGenerationNoticeVersion(version: string): void {
   try {
     window.localStorage.setItem(IMAGE_GENERATION_NOTICE_STORAGE_KEY, version)
+  } catch {
+    // 同上：写不进去也不影响本次会话内已经确认的效果。
+  }
+}
+
+/** 已确认过的文档生成说明版本；与当前版本不一致时需要重新确认一次。 */
+export function readDocumentGenerationNoticeVersion(): string {
+  try {
+    return window.localStorage.getItem(DOCUMENT_GENERATION_NOTICE_STORAGE_KEY) || ''
+  } catch {
+    // 隐私模式等场景：当作「没确认过」，只是多弹一次说明，不影响使用。
+    return ''
+  }
+}
+
+export function rememberDocumentGenerationNoticeVersion(version: string): void {
+  try {
+    window.localStorage.setItem(DOCUMENT_GENERATION_NOTICE_STORAGE_KEY, version)
   } catch {
     // 同上：写不进去也不影响本次会话内已经确认的效果。
   }
