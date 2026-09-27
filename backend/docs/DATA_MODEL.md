@@ -40,7 +40,8 @@
 
 ## audit_logs
 
-保存敏感数据操作的最小化审计事件。当前记录头像、病历文档和医学图片的同意、上传、识别、拒绝、删除与到期清理事件。
+保存敏感数据操作的最小化审计事件。当前记录头像、病历文档、医学图片和 AI 科普文档的同意、
+上传、生成、识别、拒绝、删除与到期清理事件。
 
 - `actor_user_id` 只能来自服务端认证上下文，用户删除后通过外键 `SET NULL`，审计事件仍保留。
 - `action`、`resource_type`、`outcome` 和 `reason_code` 只保存受控代码；可选 `resource_id`
@@ -118,3 +119,37 @@ AI 医学科普配图的异步任务与加密成品。`user_id`、`consultation_
 `source_consultation_id`、`delivered_at` 和至少 183 天后的 `retain_until`；不保存用户名、
 姓名或其他明文身份信息。该表不设用户、会话或成品外键，避免用户删除业务数据时提前删除法定
 留痕；`(content_id, recipient_fingerprint)` 唯一，使同一用户重复读取同一成品不会重复写入。
+
+## generated_documents
+
+AI 医学科普 Word/PPT 的异步任务。`user_id`、`consultation_id`、`source_message_id` 均为
+数据库外键，账号、会话或来源消息删除时级联删除任务；应用服务在级联前将仍存在的随机存储键
+写入 `generated_document_deletion_jobs`。
+
+- `(user_id, client_request_id)` 唯一，保障创建幂等；部分唯一索引保证每个用户同时最多一个
+  `queued/generating/rendering` 任务。
+- `(user_id, source_message_id)` 唯一，换用新的幂等键重放同一消息也不会再次触发收费任务。
+- `requested_formats` 只允许 `docx`、`pptx` 的无重复非空数组；来源主题从已保存消息重新判定，
+  不信任客户端另传主题。
+- 状态约束为 `queued/generating/rendering/completed/failed/cancelled/expired`，失败仅保存受控错误码。
+- 内容计划由服务端固定模型依据知识库检索证据生成，不保存模型原始响应、用户密钥、附件正文、
+  健康记录或医疗诊断结论。
+- 成品默认保留 30 天；到期或用户删除时清除文件引用并进入持久化物理删除队列。
+
+## generated_document_files
+
+一个文档任务下的加密输出文件，每种格式至多一份。保存格式、受控下载名、MIME、字节数、
+SHA-256、页/幻灯片数、随机存储键、包裹数据密钥、创建与到期时间。
+
+- 文件使用独立 AAD 和每文件随机 AES-256-GCM 数据密钥；数据密钥再由字段主密钥包裹。
+- DOCX 的 `page_count` 为空，因为分页取决于 Word 渲染环境；PPTX 保存准确幻灯片数。
+- OOXML 写入前会限制 ZIP 条目、解压体积与压缩比，并拒绝宏、ActiveX、OLE、嵌入对象和外部关系。
+- 下载必须同时满足当前用户所有权、任务完成且未过期，并在解密后校验 SHA-256。
+
+## generated_document_deletion_jobs
+
+生成文档密文的持久化物理删除任务。只保存随机 `storage_key`、受控原因、状态、尝试次数、
+下次尝试时间、受控错误类型和完成时间，不保存用户外键、正文、文件名或解密密钥。任务与业务
+删除在同一事务创建，提交后由幂等处理器删除磁盘对象；临时错误按指数退避，非法越界路径进入
+终止失败状态。多个显式前台 worker 可使用 `FOR UPDATE SKIP LOCKED` 安全竞争。worker 还会
+对账超过 24 小时安全宽限、但不再被文件表引用的 `.bin`/`.tmp`，并为其补建删除任务。

@@ -365,6 +365,57 @@ AES-256-GCM 数据密钥加密保存 90 天。任务响应包含 `contentId`；�
 不可逆接收者指纹幂等留痕至少 183 天。前端只读取本项目的鉴权 Blob 接口。稳定错误码见
 `docs/IMAGE_GENERATION.md`。
 
+## AI 医学科普 Word/PPT
+
+文档生成与用户上传附件是两条独立链路。全部接口要求登录；任务只能关联当前用户、当前会话内
+已保存的普通用户消息：
+
+| 方法与路径 | 用途 |
+| --- | --- |
+| `POST /consultations/{consultation_id}/document-generations` | 创建 Word/PPT 生成任务 |
+| `GET /document-generations/{id}` | 查询任务状态与输出文件元数据 |
+| `GET /consultations/{consultation_id}/document-generations` | 恢复会话内任务列表 |
+| `GET /document-generations/{id}/files/{file_id}/content` | 鉴权下载生成文件 |
+| `DELETE /document-generations/{id}` | 取消未完成任务或永久删除结果 |
+
+`POST /consultations/{id}/messages` 对明确的医学科普 Word/PPT 制作请求返回
+`documentGenerationIntent=true`；未命中时为 `false`。实际格式和规范化主题由服务端再次从
+来源消息解析，不接受客户端覆盖。
+判定要求用户同时表达制作动作、明确格式和医学科普主题；否定请求、仅询问能力、非医学主题、
+病历/诊断证明/处方等受限医疗文件均不触发。命中后前端应跳过普通聊天模型，使用已保存的
+用户消息创建任务。
+
+创建请求示例：
+
+```json
+{
+  "clientRequestId": "前端生成的UUID",
+  "sourceMessageId": "本会话用户消息UUID",
+  "noticeAccepted": true,
+  "noticeVersion": "document-generation-v1"
+}
+```
+
+相同用户与 `clientRequestId` 幂等。状态为
+`queued|generating|rendering|completed|failed|cancelled|expired`。每个任务至多生成一份
+DOCX 和一份 PPTX；DOCX 的 `pageCount` 固定返回 `null`（Office 分页依赖渲染环境），PPTX
+返回精确幻灯片数。响应和日志均不返回模型密钥、供应商原始响应、检索正文或用户健康记录。
+
+内容只使用服务端医学知识库的检索证据，生成自编摘要、少量引用和原始 URL；不读取用户上传
+附件、健康记录或图片。服务端固定模型生成结构化内容计划，再由本地 `python-docx`、
+`python-pptx` 确定性渲染并校验 OOXML。成品使用每文件随机 AES-256-GCM 数据密钥加密保存
+30 天；删除任务、会话或账号会创建持久化物理删除任务。
+
+开发环境不会自动启动 worker。迁移完成后，在单独前台终端显式运行：
+
+```powershell
+.venv\Scripts\python.exe -m app.document_generation_cli --watch
+```
+
+`--watch` 仅在当前终端持续轮询，按 Ctrl+C 即停止；单次处理可使用 `--once`（也是默认模式）。
+当前功能属于医学科普原型，文件内会显示“AI 生成，未经医学专业审核”等固定提示。稳定错误码、
+限额和运维说明见 `docs/DOCUMENT_GENERATION.md`。
+
 ## 手机号验证与密码找回
 
 第一阶段使用仅限 development/test 的模拟短信 provider，验证码只输出到当前后端启动终端，

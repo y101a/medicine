@@ -7,6 +7,11 @@ from app.models.attachment import (
 from app.models.audit_log import AuditLog
 from app.models.auth_session import AuthSession
 from app.models.consultation import Consultation, Message
+from app.models.generated_document import (
+    GeneratedDocument,
+    GeneratedDocumentDeletionJob,
+    GeneratedDocumentFile,
+)
 from app.models.generated_image import GeneratedImage, GeneratedImageDeliveryLog
 from app.models.health_record import (
     HealthRecord,
@@ -41,6 +46,9 @@ __all__ = [
     "HealthRecordSource",
     "GeneratedImage",
     "GeneratedImageDeliveryLog",
+    "GeneratedDocument",
+    "GeneratedDocumentDeletionJob",
+    "GeneratedDocumentFile",
     "ImageDeletionJob",
     "IngestionJob",
     "KnowledgeChunk",

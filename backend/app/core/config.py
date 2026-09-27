@@ -111,6 +111,22 @@ class Settings(BaseSettings):
     image_generation_limit_10m: int = Field(default=3, ge=1, le=20)
     image_generation_limit_daily: int = Field(default=10, ge=1, le=100)
 
+    # Server-controlled DOCX/PPTX educational document generation. Content is
+    # generated once as strict JSON and rendered locally into both formats.
+    document_generation_api_key: SecretStr | None = None
+    document_generation_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    document_generation_model: str = "qwen3.8-flash"
+    document_generation_timeout_seconds: float = Field(default=60, ge=10, le=120)
+    document_generation_retention_days: int = Field(default=30, ge=1, le=365)
+    document_generation_storage_dir: str = "data/generated_documents"
+    document_generation_max_bytes: int = Field(
+        default=10 * 1024 * 1024, ge=1024 * 1024, le=30 * 1024 * 1024
+    )
+    document_generation_limit_10m: int = Field(default=3, ge=1, le=20)
+    document_generation_limit_daily: int = Field(default=10, ge=1, le=100)
+    document_generation_lease_seconds: int = Field(default=300, ge=60, le=900)
+    document_generation_orphan_hours: int = Field(default=24, ge=1, le=168)
+
     # Consultation document extraction stays local until the user sends a question.
     # 2026-09-21（用户确认的方案 B）把这三项放宽：手机扫描的多页 PDF 经常同时撞体积与页数上限。
     # 代价是解析内存与单次 CPU 时间上升——multipart 与解析子进程都是整份进内存，
@@ -288,6 +304,36 @@ class Settings(BaseSettings):
         ):
             raise ValueError("IMAGE_GENERATION_PROVIDER_CODE 必须是 1-64 位安全 ASCII 标识")
         return normalized
+
+    @field_validator("document_generation_base_url")
+    @classmethod
+    def validate_document_generation_base_url(cls, value: str) -> str:
+        normalized = value.strip().rstrip("/")
+        parsed = urlparse(normalized)
+        hostname = (parsed.hostname or "").lower()
+        allowed_host = hostname in {
+            "dashscope.aliyuncs.com",
+            "dashscope-intl.aliyuncs.com",
+        } or hostname.endswith(".maas.aliyuncs.com")
+        if (
+            parsed.scheme != "https"
+            or not allowed_host
+            or parsed.username
+            or parsed.password
+            or parsed.port not in {None, 443}
+            or parsed.query
+            or parsed.fragment
+            or parsed.path != "/compatible-mode/v1"
+        ):
+            raise ValueError("DOCUMENT_GENERATION_BASE_URL 必须是阿里云百炼 HTTPS 兼容接口地址")
+        return normalized
+
+    @field_validator("document_generation_model")
+    @classmethod
+    def validate_document_generation_model(cls, value: str) -> str:
+        if value.strip() != "qwen3.8-flash":
+            raise ValueError("当前只允许 qwen3.8-flash 文档生成模型")
+        return value.strip()
 
     @field_validator("external_tool_timeout_seconds")
     @classmethod

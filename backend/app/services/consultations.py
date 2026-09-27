@@ -24,7 +24,13 @@ from app.schemas.consultations import (
     TriageResult,
 )
 from app.services import attachments as attachment_service
+from app.services import document_generations as document_generation_service
 from app.services import image_generations as image_generation_service
+from app.services.document_generation_intent import medical_document_generation_request
+from app.services.generated_document_deletion import (
+    enqueue_document_deletions,
+    process_document_deletion_jobs_best_effort,
+)
 from app.services.image_deletion import (
     enqueue_image_deletions,
     process_image_deletion_jobs_best_effort,
@@ -54,6 +60,11 @@ def message_out(
     citations = deserialize_citations(
         decrypt_sensitive(row.citations_ciphertext) if row.citations_ciphertext else None
     )
+    document_request = (
+        medical_document_generation_request(stored_content)
+        if row.role == "user" and triage is None and not attachments
+        else None
+    )
     return MessageOut(
         id=row.id,
         role=row.role,
@@ -69,8 +80,10 @@ def message_out(
             row.role == "user"
             and triage is None
             and not attachments
+            and document_request is None
             and medical_image_generation_prompt(stored_content)
         ),
+        document_generation_intent=document_request is not None,
         source_message_id=row.source_message_id,
         follow_up=follow_up,
         triage=triage,
@@ -398,9 +411,17 @@ async def remove(db: AsyncSession, user_id: UUID, cid: UUID):
     image_keys.extend(
         await image_generation_service.storage_keys_for_consultation(db, user_id, cid)
     )
+    document_keys = await document_generation_service.storage_keys_for_consultation(
+        db, user_id, cid
+    )
     await enqueue_image_deletions(
         db,
         image_keys,
+        "CONSULTATION_DELETED",
+    )
+    await enqueue_document_deletions(
+        db,
+        document_keys,
         "CONSULTATION_DELETED",
     )
     await db.execute(
@@ -413,4 +434,8 @@ async def remove(db: AsyncSession, user_id: UUID, cid: UUID):
     await process_image_deletion_jobs_best_effort(
         db,
         storage_keys=image_keys,
+    )
+    await process_document_deletion_jobs_best_effort(
+        db,
+        storage_keys=document_keys,
     )

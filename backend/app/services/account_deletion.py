@@ -8,6 +8,7 @@ from app.core.errors import AppError
 from app.core.security import verify_password
 from app.models import User
 from app.services import attachments as attachment_service
+from app.services import document_generations as document_generation_service
 from app.services import image_generations as image_generation_service
 from app.services.audit_logs import (
     AUDIT_OUTCOME_REJECTED,
@@ -15,6 +16,10 @@ from app.services.audit_logs import (
     add_audit_log,
 )
 from app.services.avatars import delete_avatar
+from app.services.generated_document_deletion import (
+    enqueue_document_deletions,
+    process_document_deletion_jobs_best_effort,
+)
 from app.services.image_deletion import (
     enqueue_image_deletions,
     process_image_deletion_jobs_best_effort,
@@ -49,9 +54,15 @@ async def delete_account(
     # Capture encrypted blob keys before the database cascade removes attachment rows.
     image_keys = await attachment_service.image_storage_keys_for_user(db, user_id)
     image_keys.extend(await image_generation_service.storage_keys_for_user(db, user_id))
+    document_keys = await document_generation_service.storage_keys_for_user(db, user_id)
     await enqueue_image_deletions(
         db,
         image_keys,
+        "ACCOUNT_DELETED",
+    )
+    await enqueue_document_deletions(
+        db,
+        document_keys,
         "ACCOUNT_DELETED",
     )
     # Filesystem data cannot participate in the database transaction. Remove the
@@ -69,4 +80,8 @@ async def delete_account(
     await process_image_deletion_jobs_best_effort(
         db,
         storage_keys=image_keys,
+    )
+    await process_document_deletion_jobs_best_effort(
+        db,
+        storage_keys=document_keys,
     )
