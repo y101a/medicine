@@ -57,6 +57,7 @@
 .\.venv\Scripts\python.exe -m app.rag.cli seed-prototype
 .\.venv\Scripts\python.exe -m app.rag.cli embed-prototype
 .\.venv\Scripts\python.exe -m app.rag.cli evaluate-prototype --top-k 3
+.\.venv\Scripts\python.exe -m app.rag.cli evaluate-prototype --dataset docs/medical_retrieval_evaluation_v2.json --mode keyword --top-k 3 --split tune
 ~~~
 
 导入和向量化命令具有幂等性。当前阿里云兼容接口实测批量返回的 `index` 均为 0，
@@ -112,6 +113,30 @@
   90/10 也做了同题复测（15/15、Top-1 13/15），平均首位相似度为 0.639861，略低于
   85/15，因此没有保留。该小样本仍未证明 hybrid 优于 vector，不能外推为普遍结论。
 - 本评测只判断「期望文档有没有进 top-k」，不评估回答质量，也不评估引用是否被正确标注。
+
+## 独立题集 v2（2026-09-27）
+
+`medical_retrieval_evaluation_v2.json` 冻结为 80 题：52 道单主题已覆盖题、12 道跨文档
+混淆题、16 道当前知识库未覆盖题。题集按 `split` 固定分为 60 道 `tune` 与 20 道
+`holdout`；日常调参只能运行 `tune`，方案冻结后才可运行 `holdout`。现有 13 篇原型
+文档均至少有四道单主题题覆盖。
+
+评测器保持旧题集兼容，并新增 Recall@1、Recall@3、MRR、总体通过率、未覆盖题误召回率，
+以及按人体系统、问法、安全等级和分组统计。`unsupported` 题没有期望文档：检索返回任意
+知识条目都记为误召回，用来区分「检索错误」和「知识库没有覆盖」。该规则评估的是检索层，
+不代表聊天模型最终一定会引用召回结果。
+
+**2026-09-27 零成本关键词基线（`top-k=3`）：**
+
+| 分组 | 总题数 | 已覆盖题 | 未覆盖题 | Recall@1 | Recall@3 | MRR | 未覆盖题误召回率 | 总体通过率 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `tune` | 60 | 48 | 12 | 0.3750 | 0.3958 | 0.3819 | 0.1667 | 0.4833 |
+| `holdout` | 20 | 16 | 4 | 0.2500 | 0.2500 | 0.2500 | 0.0000 | 0.4000 |
+| 全部 | 80 | 64 | 16 | 0.3438 | 0.3594 | 0.3490 | 0.1250 | 0.4625 |
+
+本轮只运行 `keyword`，不调用阿里云、不产生向量费用，也没有据此调权重。结果说明精确
+关键词可作为补充，但对口语化表达召回明显不足；后续需在用户确认费用后，用冻结的同一题集
+依次运行 `vector` 与 `hybrid`。三模式对比前不得根据 `holdout` 逐题结果改语料、阈值或权重。
 
 ## 后续升级
 

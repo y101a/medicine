@@ -9,6 +9,23 @@ from app.db.session import SessionLocal, engine
 from app.main import app
 from app.models import User
 
+_ID_CARD_WEIGHTS = (7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2)
+_ID_CARD_CHECK_CODES = "10X98765432"
+
+
+def unique_test_identity() -> tuple[str, str]:
+    unique_number = uuid4().int
+    phone = f"139{unique_number % 100_000_000:08d}"
+    id_card_stem = f"11010519900101{unique_number % 1_000:03d}"
+    checksum = _ID_CARD_CHECK_CODES[
+        sum(
+            int(digit) * weight
+            for digit, weight in zip(id_card_stem, _ID_CARD_WEIGHTS, strict=True)
+        )
+        % 11
+    ]
+    return phone, f"{id_card_stem}{checksum}"
+
 
 async def remove_test_user(username_normalized: str) -> None:
     async with SessionLocal() as db:
@@ -41,11 +58,12 @@ def verified_registration_payload(client: TestClient, payload: dict[str, str]) -
 def test_complete_auth_flow() -> None:
     username = f"Test{uuid4().hex[:8]}"
     username_normalized = username.casefold()
+    phone, id_card = unique_test_identity()
     payload = {
         "username": username,
         "realName": "测试用户",
-        "phone": "13800138000",
-        "idCard": "11010519491231002X",
+        "phone": phone,
+        "idCard": id_card,
         "gender": "private",
         "password": "123456",
     }
@@ -56,7 +74,7 @@ def test_complete_auth_flow() -> None:
             register = client.post("/api/v1/auth/register", json=payload)
             assert register.status_code == 201
             assert register.json()["user"]["realName"] == "测试用户"
-            assert register.json()["user"]["phoneMasked"] == "138****8000"
+            assert register.json()["user"]["phoneMasked"] == f"{phone[:3]}****{phone[-4:]}"
             assert register.json()["user"]["phoneVerified"] is True
             assert "medical_access_token" not in register.cookies
 

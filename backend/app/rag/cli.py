@@ -57,6 +57,12 @@ def build_parser() -> argparse.ArgumentParser:
     evaluation_parser.add_argument("--dataset", type=Path, default=None)
     evaluation_parser.add_argument("--top-k", type=int, default=3, choices=range(1, 11))
     evaluation_parser.add_argument(
+        "--split",
+        choices=("all", "tune", "holdout"),
+        default="all",
+        help="题集分组：日常调参用 tune；方案冻结后才运行 holdout；旧题集使用 all",
+    )
+    evaluation_parser.add_argument(
         "--mode",
         choices=RETRIEVAL_MODES,
         default="hybrid",
@@ -112,6 +118,7 @@ async def run_command(args: argparse.Namespace) -> int:
                     args.dataset,
                     top_k=args.top_k,
                     mode=args.mode,
+                    split=args.split,
                 )
             await db.commit()
         except (
