@@ -56,3 +56,18 @@ class PasswordResetRequest(BaseModel):
         alias="verificationToken", min_length=32, max_length=256
     )
     new_password: str = Field(alias="newPassword", min_length=6, max_length=32)
+
+
+class PhoneChangeCodeRequest(BaseModel):
+    """换绑新手机号的第一步：验当前密码后给新号码发验证码。"""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    phone: str
+    current_password: str = Field(alias="currentPassword", min_length=6, max_length=32)
+
+
+class PhoneChangeRequest(PhoneCodeVerifyRequest):
+    """换绑第二步：带上新号码本身，服务端才加密存得下这串明文。"""
+
+    phone: str

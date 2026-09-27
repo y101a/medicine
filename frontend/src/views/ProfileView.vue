@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { User } from '@element-plus/icons-vue'
 import { useAuthStore } from '../stores/auth'
-import { getApiErrorMessage } from '../api/http'
+import { getApiErrorMessage, ApiError } from '../api/http'
+import { getPhoneVerificationErrorMessage, getRetryAfterSeconds } from '../api/auth'
 import type { Gender, UpdateProfileRequest } from '../types/auth'
 
 const store = useAuthStore()
@@ -16,9 +17,14 @@ const uploadingAvatar = ref(false)
 const avatarFailed = ref(false)
 const avatarInput = ref<HTMLInputElement>()
 const errorMessage = ref('')
-const form = reactive<{ realName: string; gender: Gender }>({ realName: '', gender: 'private' })
+const form = reactive<{ username: string; realName: string; gender: Gender; currentPassword: string }>({
+  username: '', realName: '', gender: 'private', currentPassword: '',
+})
+const usernameDirty = computed(() => !!store.user && form.username.trim() !== store.user.username)
 const dirty = computed(() => !!store.user && (
-  form.realName.trim() !== store.user.realName || form.gender !== store.user.gender
+  usernameDirty.value
+  || form.realName.trim() !== store.user.realName
+  || form.gender !== store.user.gender
 ))
 const registeredAt = computed(() => {
   const date = new Date(store.user?.registeredAt || '')
@@ -27,8 +33,10 @@ const registeredAt = computed(() => {
 
 function resetForm() {
   if (!store.user) return
+  form.username = store.user.username
   form.realName = store.user.realName
   form.gender = store.user.gender
+  form.currentPassword = ''
   errorMessage.value = ''
   formRef.value?.clearValidate()
 }
@@ -66,6 +74,16 @@ async function changeAvatar(event: Event) {
 }
 
 const rules: FormRules = {
+  username: [{
+    validator: (_rule, value: string, callback) => {
+      const name = value.trim()
+      if (name.length < 4 || name.length > 20) {
+        return callback(new Error('用户名长度应为 4–20 个字符'))
+      }
+      callback()
+    },
+    trigger: 'blur',
+  }],
   realName: [{
     validator: (_rule, value: string, callback) => {
       const name = value.trim()
@@ -78,6 +96,14 @@ const rules: FormRules = {
     trigger: 'blur',
   }],
   gender: [{ required: true, message: '请选择性别', trigger: 'change' }],
+  currentPassword: [{
+    validator: (_rule, value: string, callback) => {
+      if (!usernameDirty.value) return callback()
+      if (!value || value.length < 6) return callback(new Error('请输入至少 6 位的当前密码'))
+      callback()
+    },
+    trigger: 'blur',
+  }],
 }
 
 async function save() {
@@ -91,19 +117,155 @@ async function save() {
     errorMessage.value = '姓名仅支持中文、英文字母和间隔符 ·'
     return
   }
+  if (usernameDirty.value) {
+    const username = form.username.trim()
+    if (username.length < 4 || username.length > 20) {
+      errorMessage.value = '用户名长度应为 4–20 个字符'
+      return
+    }
+    if (form.currentPassword.length < 6) {
+      errorMessage.value = '修改用户名需要输入至少 6 位的当前密码'
+      return
+    }
+  }
   if (!await formRef.value?.validate().catch(() => false)) return
   const payload: UpdateProfileRequest = {}
+  if (usernameDirty.value) {
+    payload.username = form.username.trim()
+    payload.currentPassword = form.currentPassword
+  }
   if (form.realName.trim() !== store.user.realName) payload.realName = form.realName.trim()
   if (form.gender !== store.user.gender) payload.gender = form.gender
   saving.value = true
   errorMessage.value = ''
+  // 必须在请求前取：成功后 store.user 会被换成新用户名，usernameDirty 立刻变回 false，
+  // 提示语就会错误地退回「个人资料已保存」。
+  const usernameChanged = usernameDirty.value
   try {
     await store.updateProfile(payload)
-    ElMessage.success('个人资料已保存')
+    form.currentPassword = ''
+    formRef.value?.clearValidate()
+    ElMessage.success(usernameChanged ? '用户名已更新，下次请用新用户名登录' : '个人资料已保存')
   } catch (error) {
+    // 密码错（422 ACCOUNT_PASSWORD_INVALID）或用户名被占用（409 USERNAME_EXISTS）都留在这里显示，
+    // 不改变已保存的资料，密码框也保留让用户直接改。
     errorMessage.value = getApiErrorMessage(error)
   } finally {
     saving.value = false
+  }
+}
+
+/**
+ * 换绑手机号（用户 2026-09-27 要求：仍用现在这套模拟验证码）。
+ *
+ * 三步：① 输当前密码 + 新号码 → 后端验密码后把验证码发给**新号码**；
+ * ② 输 6 位验证码确认；③ 成功后本地用户整体换成响应里的对象（掩码与验证状态都变了）。
+ * 「改号即清验证」沿用注册页口径：验证码只对发出时那个号码有效，改号或清空即作废。
+ */
+const phoneChangeOpened = ref(false)
+const phoneChangeForm = reactive({ phone: '', currentPassword: '', code: '' })
+const phoneChangeChallengeId = ref('')
+const phoneChangeSent = ref(false)
+const phoneChangeCountdown = ref(0)
+const phoneChangeRequesting = ref(false)
+const phoneChangeSubmitting = ref(false)
+const phoneChangeError = ref('')
+let phoneChangeTimer: number | undefined
+
+const phoneChangePhoneValid = computed(() => /^1[3-9]\d{9}$/.test(phoneChangeForm.phone))
+
+function stopPhoneChangeCountdown() {
+  if (phoneChangeTimer !== undefined) {
+    window.clearInterval(phoneChangeTimer)
+    phoneChangeTimer = undefined
+  }
+}
+
+function startPhoneChangeCountdown(seconds: number) {
+  stopPhoneChangeCountdown()
+  phoneChangeCountdown.value = Math.max(0, Math.ceil(seconds))
+  if (phoneChangeCountdown.value === 0) return
+  phoneChangeTimer = window.setInterval(() => {
+    phoneChangeCountdown.value -= 1
+    if (phoneChangeCountdown.value <= 0) stopPhoneChangeCountdown()
+  }, 1000)
+}
+
+onBeforeUnmount(stopPhoneChangeCountdown)
+
+function resetPhoneChangeChallenge() {
+  stopPhoneChangeCountdown()
+  phoneChangeCountdown.value = 0
+  phoneChangeChallengeId.value = ''
+  phoneChangeForm.code = ''
+  phoneChangeSent.value = false
+}
+
+function togglePhoneChange() {
+  phoneChangeOpened.value = !phoneChangeOpened.value
+  phoneChangeError.value = ''
+}
+
+function onPhoneChangeInput() {
+  if (phoneChangeSent.value || phoneChangeChallengeId.value) resetPhoneChangeChallenge()
+  phoneChangeError.value = ''
+}
+
+async function requestPhoneChangeCode() {
+  if (phoneChangeRequesting.value || phoneChangeCountdown.value > 0) return
+  if (!phoneChangePhoneValid.value) {
+    phoneChangeError.value = '请输入有效的中国大陆手机号'
+    return
+  }
+  if (phoneChangeForm.currentPassword.length < 6) {
+    phoneChangeError.value = '请输入至少 6 位的当前密码'
+    return
+  }
+  phoneChangeRequesting.value = true
+  phoneChangeError.value = ''
+  try {
+    const challenge = await store.requestPhoneChangeCode({
+      phone: phoneChangeForm.phone,
+      currentPassword: phoneChangeForm.currentPassword,
+    })
+    phoneChangeChallengeId.value = challenge.challengeId
+    phoneChangeForm.code = ''
+    phoneChangeSent.value = true
+    startPhoneChangeCountdown(challenge.resendAfterSeconds)
+    ElMessage.success('验证码已发送到新手机号')
+  } catch (error) {
+    // 限流时服务端会给出还能重发的秒数，直接切倒计时，用户不用自己猜。
+    const retryAfter = getRetryAfterSeconds(error)
+    if (retryAfter !== undefined) startPhoneChangeCountdown(retryAfter)
+    phoneChangeError.value = getPhoneVerificationErrorMessage(error)
+  } finally {
+    phoneChangeRequesting.value = false
+  }
+}
+
+async function applyPhoneChange() {
+  if (phoneChangeSubmitting.value || !phoneChangeSent.value) return
+  phoneChangeSubmitting.value = true
+  phoneChangeError.value = ''
+  try {
+    await store.changePhone({
+      phone: phoneChangeForm.phone,
+      challengeId: phoneChangeChallengeId.value,
+      code: phoneChangeForm.code,
+    })
+    ElMessage.success('手机号已更换，找回密码现在使用新号码')
+    resetPhoneChangeChallenge()
+    phoneChangeForm.phone = ''
+    phoneChangeForm.currentPassword = ''
+    phoneChangeOpened.value = false
+  } catch (error) {
+    phoneChangeError.value = getPhoneVerificationErrorMessage(error)
+    const code = error instanceof ApiError ? error.code : ''
+    if (code === 'SMS_CODE_EXPIRED' || code === 'SMS_ATTEMPTS_EXCEEDED' || code === 'SMS_CHALLENGE_INVALID') {
+      resetPhoneChangeChallenge()
+    }
+  } finally {
+    phoneChangeSubmitting.value = false
   }
 }
 
@@ -173,24 +335,81 @@ onBeforeRouteLeave(async () => {
         <div>
           <p class="caption">病理诊断科普助手</p>
           <h1 id="profile-title">账户信息</h1>
-          <p class="subtitle">查看账户信息，更新头像、姓名与性别</p>
+          <p class="subtitle">更新头像、用户名、姓名与性别，或更换绑定的手机号</p>
         </div>
       </header>
 
       <section class="account-info" aria-label="账户信息">
         <dl>
-          <div><dt>用户名</dt><dd>{{ store.user?.username }}</dd></div>
           <div><dt>账户角色</dt><dd>{{ store.user?.role === 'admin' ? '管理员' : '普通用户' }}</dd></div>
-          <div><dt>手机号</dt><dd>{{ store.user?.phoneMasked || '—' }}</dd></div>
+          <div>
+            <dt>手机号</dt>
+            <dd>
+              {{ store.user?.phoneMasked || '—' }}
+              <button type="button" class="phone-change__toggle" :aria-expanded="phoneChangeOpened"
+                aria-controls="phone-change-panel" @click="togglePhoneChange">
+                {{ phoneChangeOpened ? '收起' : '更换' }}
+              </button>
+            </dd>
+          </div>
           <div><dt>身份证号码</dt><dd>{{ store.user?.idCardMasked || '—' }}</dd></div>
           <div class="wide"><dt>注册时间</dt><dd>{{ registeredAt }}</dd></div>
         </dl>
-        <p class="readonly-note">以上信息暂不支持修改。</p>
+        <p class="readonly-note">账户角色、身份证号码与注册时间不支持修改；实名信息如需变更请联系管理员。</p>
+      </section>
+
+      <section v-if="phoneChangeOpened" id="phone-change-panel" class="phone-change"
+        aria-labelledby="phone-change-title">
+        <h2 id="phone-change-title" class="phone-change__title">更换绑定手机号</h2>
+        <p class="phone-change__intro">
+          验证码会发送到<strong>新手机号</strong>；换绑成功后旧号码立即失效，找回密码也改用新号码。
+          换号需要先验证当前密码。开发环境里这条短信不会真的发出，验证码打印在后端终端的
+          <code>[DEV SMS]</code> 一行。
+        </p>
+        <div class="phone-change__fields">
+          <label class="phone-change__field">
+            <span>新手机号</span>
+            <el-input v-model.trim="phoneChangeForm.phone" maxlength="11" inputmode="numeric"
+              autocomplete="tel" placeholder="请输入 11 位手机号" @input="onPhoneChangeInput" />
+          </label>
+          <label class="phone-change__field">
+            <span>当前密码</span>
+            <el-input v-model="phoneChangeForm.currentPassword" type="password" show-password
+              autocomplete="current-password" placeholder="用于确认是你本人" />
+          </label>
+        </div>
+        <div class="phone-change__row">
+          <el-input v-model.trim="phoneChangeForm.code" class="phone-change__code" maxlength="6"
+            inputmode="numeric" autocomplete="one-time-code" placeholder="6 位验证码"
+            :disabled="!phoneChangeSent" />
+          <el-button class="phone-change__request" :loading="phoneChangeRequesting"
+            :disabled="phoneChangeCountdown > 0 || phoneChangeRequesting" @click="requestPhoneChangeCode">
+            {{
+              phoneChangeCountdown > 0
+                ? `${phoneChangeCountdown} 秒后可重发`
+                : (phoneChangeSent ? '重新获取验证码' : '获取验证码')
+            }}
+          </el-button>
+          <el-button type="primary" class="phone-change__confirm" :loading="phoneChangeSubmitting"
+            :disabled="!phoneChangeSent || phoneChangeForm.code.length !== 6" @click="applyPhoneChange">
+            确认更换
+          </el-button>
+        </div>
+        <p v-if="phoneChangeSent" class="phone-change__hint">
+          验证码只对上面这个号码有效：改号或刷新页面后需要重新获取。
+        </p>
+        <el-alert v-if="phoneChangeError" :title="phoneChangeError" type="error" show-icon
+          :closable="false" class="phone-change__error" />
       </section>
 
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top"
         size="large" :disabled="saving" @submit.prevent="save">
         <div class="editable-fields">
+          <el-form-item label="用户名" prop="username" class="wide-field">
+            <el-input v-model="form.username" maxlength="20" autocomplete="username"
+              placeholder="登录用的用户名，4–20 个字符" />
+            <p class="field-hint">用户名就是登录名。改完旧用户名立即失效，下次登录请用新的。</p>
+          </el-form-item>
           <el-form-item label="姓名" prop="realName">
             <el-input v-model="form.realName" maxlength="20" autocomplete="name"
               placeholder="请输入姓名" :prefix-icon="User" />
@@ -201,6 +420,10 @@ onBeforeRouteLeave(async () => {
               <el-option label="女" value="female" />
               <el-option label="不愿透露" value="private" />
             </el-select>
+          </el-form-item>
+          <el-form-item v-if="usernameDirty" label="当前密码" prop="currentPassword" class="wide-field">
+            <el-input v-model="form.currentPassword" type="password" show-password
+              autocomplete="current-password" placeholder="修改用户名需要输入当前密码" />
           </el-form-item>
         </div>
         <el-alert v-if="errorMessage" :title="errorMessage" type="error" show-icon
@@ -246,7 +469,25 @@ dt { color: var(--text-secondary); font-size: 13px; margin-bottom: 6px; }
 dd { color: var(--text-main); font-size: 15px; margin: 0; overflow-wrap: anywhere; }
 .wide { grid-column: 1 / -1; }
 .readonly-note { color: #71869a; font-size: 12px; margin: 20px 0 0; }
+.phone-change { margin: 0 0 22px; padding: 18px 20px; background: #f7fbff;
+  border: 1px solid #e1edf7; border-radius: 14px; }
+.phone-change__toggle { padding: 0 0 0 8px; border: 0; background: transparent;
+  color: var(--medical-blue); font-size: 13px; cursor: pointer; text-decoration: underline; }
+.phone-change__title { margin: 0 0 8px; font-size: 16px; color: var(--text-main); }
+.phone-change__intro { margin: 0 0 14px; max-width: 720px; color: var(--text-secondary);
+  font-size: 13px; line-height: 1.7; }
+.phone-change__intro code { padding: 1px 5px; border-radius: 5px; background: #eaf2fa;
+  font-size: 12px; }
+.phone-change__fields { display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
+  margin-bottom: 14px; }
+.phone-change__field { display: grid; gap: 6px; color: var(--text-secondary); font-size: 13px; }
+.phone-change__row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.phone-change__code { width: 180px; }
+.phone-change__hint { margin: 10px 0 0; color: var(--text-secondary); font-size: 12px; }
+.phone-change__error { margin-top: 12px; }
 .editable-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.wide-field { grid-column: 1 / -1; }
+.field-hint { margin: 6px 0 0; color: var(--text-secondary); font-size: 12px; line-height: 1.6; }
 .actions { display: flex; align-items: center; border-top: 1px solid #e7eff6;
   margin-top: 8px; padding-top: 24px; }
 .save-hint { margin-right: auto; color: var(--text-secondary); font-size: 13px; }

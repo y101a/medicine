@@ -8,10 +8,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app.core.config import get_settings
-from app.core.security import create_access_token, decrypt_sensitive, encrypt_sensitive
+from app.core.security import (
+    create_access_token,
+    decrypt_sensitive,
+    encrypt_sensitive,
+    hash_password,
+)
 from app.db.session import get_db
 from app.main import app
-from app.models import AuditLog, Gender, User
+from app.models import AuditLog, Gender, User, UserCredentials
 from app.services import upload_limits
 from app.services.auth import ACCESS_COOKIE
 
@@ -259,3 +264,79 @@ async def test_avatar_upload_is_rate_limited_per_user(
     ).all()
     assert len(events) == 2
     assert all(event.outcome == "success" for event in events)
+
+
+async def test_username_can_be_changed_with_current_password(profile_context):
+    client, db, (first, second) = profile_context
+    original_username = first.username
+    first.credentials = UserCredentials(password_hash=hash_password("old-password"))
+    await db.flush()
+    client.cookies.set(ACCESS_COOKIE, create_access_token(first.id))
+    endpoint = "/api/v1/users/me"
+
+    wrong_password = await client.patch(
+        endpoint, json={"username": "NewName", "currentPassword": "wrong-password"}
+    )
+    assert wrong_password.status_code == 422
+    assert wrong_password.json()["code"] == "ACCOUNT_PASSWORD_INVALID"
+
+    taken_by_other = await client.patch(
+        endpoint, json={"username": second.username, "currentPassword": "old-password"}
+    )
+    assert taken_by_other.status_code == 409
+    assert taken_by_other.json()["code"] == "USERNAME_EXISTS"
+
+    # 只给用户名不给当前密码：整体 422，一个字段都不动。
+    missing_password = await client.patch(endpoint, json={"username": "NewName"})
+    assert missing_password.status_code == 422
+    assert missing_password.json()["code"] == "VALIDATION_ERROR"
+    await db.refresh(first)
+    assert first.username == original_username
+
+    changed = await client.patch(
+        endpoint,
+        json={
+            "username": "  NewName  ",
+            "currentPassword": "old-password",
+            "gender": "female",
+        },
+    )
+    assert changed.status_code == 200
+    assert changed.json()["username"] == "NewName"
+    assert changed.json()["gender"] == "female"
+    await db.refresh(first)
+    assert first.username == "NewName"
+    assert first.username_normalized == "newname"
+
+    # 只改大小写：规范化后仍等于自己，不受唯一约束影响。
+    recased = await client.patch(
+        endpoint, json={"username": "newname", "currentPassword": "old-password"}
+    )
+    assert recased.status_code == 200
+    assert recased.json()["username"] == "newname"
+
+    events = (
+        await db.scalars(
+            select(AuditLog).where(
+                AuditLog.actor_user_id == first.id,
+                AuditLog.resource_type == "username",
+            )
+        )
+    ).all()
+    assert sum(event.outcome == "success" for event in events) == 2
+    assert [event.reason_code for event in events if event.outcome == "rejected"] == [
+        "ACCOUNT_PASSWORD_INVALID"
+    ]
+
+    # 改名以后旧登录名立即失效，新登录名可登录。
+    client.cookies.clear()
+    new_login = await client.post(
+        "/api/v1/auth/login", json={"username": "newname", "password": "old-password"}
+    )
+    assert new_login.status_code == 200
+    client.cookies.clear()
+    stale_login = await client.post(
+        "/api/v1/auth/login",
+        json={"username": original_username, "password": "old-password"},
+    )
+    assert stale_login.status_code == 401

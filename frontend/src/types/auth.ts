@@ -42,9 +42,17 @@ export interface AuthResult {
 export interface UpdateProfileRequest {
   realName?: string
   gender?: Gender
+  /** 改登录名（用户名）时必须同时给当前密码，后端要用它验一次身份。 */
+  username?: string
+  currentPassword?: string
 }
 
-/** 验证码用途。后端只接受这两个值（数据库里还有 phone_binding，本期不做）。 */
+/**
+ * 公开验证码用途。只接受这两个值。
+ *
+ * 已登录用户的补验证与换绑手机号共用后端的 `phone_binding` 用途，但那两个接口
+ * 不走公开的 `purpose` 字段，所以这里不列它。
+ */
 export type PhoneVerificationPurpose = 'registration' | 'password_reset'
 
 export interface PhoneVerificationCodeRequest {
@@ -60,6 +68,19 @@ export interface PhoneVerificationChallenge {
 }
 
 export interface PhoneVerificationVerifyRequest {
+  challengeId: string
+  code: string
+}
+
+/** 换绑手机号第一步：当前密码 + 新号码；后端验密码后把验证码发给**新号码**。 */
+export interface PhoneChangeCodeRequest {
+  phone: string
+  currentPassword: string
+}
+
+/** 换绑第二步：新号码要再传一次，服务端才能把这串明文加密存下来。 */
+export interface PhoneChangeRequest {
+  phone: string
   challengeId: string
   code: string
 }

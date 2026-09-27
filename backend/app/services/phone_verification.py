@@ -6,12 +6,19 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy import delete, func, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import get_settings
 from app.core.errors import AppError
-from app.core.security import decrypt_sensitive, hash_password, sensitive_fingerprint
+from app.core.security import (
+    decrypt_sensitive,
+    encrypt_sensitive,
+    hash_password,
+    sensitive_fingerprint,
+    verify_password,
+)
 from app.models import (
     AuthSession,
     PhoneVerificationChallenge,
@@ -21,6 +28,7 @@ from app.models import (
 from app.schemas.phone_verification import (
     PhoneChallengeOut,
     PhoneVerificationTokenOut,
+    normalize_mainland_phone,
 )
 from app.services.audit_logs import (
     AUDIT_OUTCOME_REJECTED,
@@ -555,3 +563,185 @@ async def confirm_current_phone(
         outcome=AUDIT_OUTCOME_SUCCESS,
     )
     await db.commit()
+
+
+def _normalized_new_phone(value: str) -> str:
+    try:
+        return normalize_mainland_phone(value)
+    except ValueError:
+        raise AppError(422, "SMS_PHONE_INVALID", "请输入有效的中国大陆手机号") from None
+
+
+async def _locked_user_with_credentials(db: AsyncSession, user_id: UUID) -> User | None:
+    return await db.scalar(
+        select(User)
+        .options(selectinload(User.credentials))
+        .where(User.id == user_id)
+        .with_for_update()
+    )
+
+
+async def _ensure_phone_not_taken(db: AsyncSession, fingerprint: str, *, user_id: UUID) -> None:
+    owner = await db.scalar(
+        select(User.id).where(
+            User.phone_fingerprint == fingerprint,
+            User.id != user_id,
+        )
+    )
+    if owner is not None:
+        raise AppError(409, "PHONE_EXISTS", "该手机号已被注册")
+
+
+async def request_phone_change_code(
+    db: AsyncSession,
+    *,
+    user: User,
+    new_phone: str,
+    current_password: str,
+    ip_address: str | None,
+) -> PhoneChallengeOut:
+    """换绑新手机号第一步：验当前密码 → 查重 → 给**新号码**发验证码。
+
+    没有新增 `purpose` 值：`phone_verification_challenges` 上有
+    `purpose IN ('registration','password_reset','phone_binding')` 的 CHECK 约束，
+    加值就得写迁移。这里复用 `phone_binding`，靠 `phone_fingerprint` 区分两件事——
+    指纹等于账户当前号的是「补验证」（`request_current_phone_code`），等于新号的
+    才是换绑，所以下面这个挑战记的是新号码的指纹。
+    """
+    normalized_phone = _normalized_new_phone(new_phone)
+    now = datetime.now(UTC)
+    settings = get_settings()
+    account = await _locked_user_with_credentials(db, user.id)
+    if account is None or account.credentials is None:
+        raise AppError(401, "UNAUTHORIZED", "当前未登录")
+    if not verify_password(current_password, account.credentials.password_hash):
+        await add_audit_log(
+            db,
+            actor_user_id=account.id,
+            action="phone_change",
+            resource_type="account",
+            resource_id=account.id,
+            outcome=AUDIT_OUTCOME_REJECTED,
+            reason_code="ACCOUNT_PASSWORD_INVALID",
+        )
+        await db.commit()
+        raise AppError(422, "ACCOUNT_PASSWORD_INVALID", "当前密码不正确")
+
+    new_fingerprint = sensitive_fingerprint(normalized_phone)
+    if new_fingerprint == account.phone_fingerprint:
+        raise AppError(422, "PHONE_UNCHANGED", "新手机号与当前绑定的手机号相同")
+    await _ensure_phone_not_taken(db, new_fingerprint, user_id=account.id)
+
+    purpose = PhoneVerificationPurpose.PHONE_BINDING.value
+    ip_fingerprint = _ip_fingerprint(ip_address)
+    await _delete_expired_challenges(db, now)
+    await _enforce_send_limits(
+        db,
+        phone_fingerprint=new_fingerprint,
+        ip_fingerprint=ip_fingerprint,
+        purpose=purpose,
+        now=now,
+    )
+    await _invalidate_previous_challenges(
+        db,
+        phone_fingerprint=new_fingerprint,
+        purpose=purpose,
+        now=now,
+    )
+    challenge_id = UUID(secrets.token_hex(16))
+    code = generate_sms_code()
+    provider = get_sms_provider()
+    challenge = PhoneVerificationChallenge(
+        id=challenge_id,
+        user_id=account.id,
+        phone_fingerprint=new_fingerprint,
+        purpose=purpose,
+        provider=provider.name,
+        code_digest=_code_digest(challenge_id, code),
+        request_ip_fingerprint=ip_fingerprint,
+        max_attempts=settings.sms_max_attempts,
+        expires_at=now + timedelta(seconds=settings.sms_code_expire_seconds),
+        resend_available_at=now + timedelta(seconds=settings.sms_resend_seconds),
+    )
+    db.add(challenge)
+    await db.flush()
+    challenge.provider_reference = await provider.send_code(
+        phone=normalized_phone,
+        code=code,
+        purpose=purpose,
+        expires_in_seconds=settings.sms_code_expire_seconds,
+    )
+    await add_audit_log(
+        db,
+        actor_user_id=account.id,
+        action="sms_code_requested",
+        resource_type="phone_verification",
+        resource_id=challenge_id,
+        outcome=AUDIT_OUTCOME_SUCCESS,
+        reason_code="PHONE_CHANGE",
+    )
+    await db.commit()
+    return PhoneChallengeOut(
+        challenge_id=challenge_id,
+        expires_in_seconds=settings.sms_code_expire_seconds,
+        resend_after_seconds=settings.sms_resend_seconds,
+    )
+
+
+async def confirm_phone_change(
+    db: AsyncSession,
+    *,
+    user: User,
+    new_phone: str,
+    challenge_id: UUID,
+    code: str,
+) -> User:
+    """换绑第二步：校验新号码的验证码，然后把密文与指纹一起换掉。
+
+    校验里必须带上 `new_fingerprint == user.phone_fingerprint` 的反向判断：否则
+    用户可以把「当前号补验证」的挑战拿来当换绑用（两者共用 `phone_binding`）。
+    """
+    normalized_phone = _normalized_new_phone(new_phone)
+    new_fingerprint = sensitive_fingerprint(normalized_phone)
+    challenge = await _locked_challenge(db, challenge_id)
+    if (
+        challenge is None
+        or challenge.user_id != user.id
+        or challenge.purpose != PhoneVerificationPurpose.PHONE_BINDING.value
+        or challenge.phone_fingerprint != new_fingerprint
+        or new_fingerprint == user.phone_fingerprint
+    ):
+        raise AppError(422, "SMS_CHALLENGE_INVALID", "验证码请求无效，请重新获取")
+    now = datetime.now(UTC)
+    if challenge.consumed_at is not None:
+        raise AppError(422, "SMS_CHALLENGE_INVALID", "验证码请求无效，请重新获取")
+    if challenge.expires_at <= now:
+        challenge.consumed_at = now
+        await db.commit()
+        raise AppError(422, "SMS_CODE_EXPIRED", "验证码已过期，请重新获取")
+    if not hmac.compare_digest(_code_digest(challenge.id, code), challenge.code_digest):
+        await _reject_code(db, challenge, code="SMS_CODE_INVALID")
+
+    # 发码到确认之间号码可能已被别人注册，这里再查一次，并靠唯一约束兜底。
+    await _ensure_phone_not_taken(db, new_fingerprint, user_id=user.id)
+    user.phone_ciphertext = encrypt_sensitive(normalized_phone)
+    user.phone_fingerprint = new_fingerprint
+    user.phone_verified_at = now
+    challenge.verified_at = now
+    challenge.consumed_at = now
+    await add_audit_log(
+        db,
+        actor_user_id=user.id,
+        action="phone_changed",
+        resource_type="account",
+        resource_id=user.id,
+        outcome=AUDIT_OUTCOME_SUCCESS,
+        reason_code="PHONE_CHANGE",
+    )
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise AppError(409, "PHONE_EXISTS", "该手机号已被注册") from None
+    await db.refresh(user)
+    return user

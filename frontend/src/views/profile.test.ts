@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import ElementPlus, { ElMessageBox } from 'element-plus'
@@ -12,6 +12,8 @@ vi.mock('../api/users', () => ({ usersApi: {
   updateProfile: vi.fn(),
   uploadAvatar: vi.fn(),
   deleteAccount: vi.fn(),
+  requestPhoneChangeCode: vi.fn(),
+  changePhone: vi.fn(),
   avatarUrl: vi.fn((version: number) => `/api/v1/users/me/avatar?v=${version}`),
 } }))
 
@@ -152,6 +154,166 @@ describe('删除账号', () => {
     await flushPromises()
     expect(usersApi.deleteAccount).not.toHaveBeenCalled()
     expect(store.isAuthenticated).toBe(true)
+    wrapper.unmount()
+  })
+})
+
+describe('修改用户名', () => {
+  beforeEach(() => vi.clearAllMocks())
+  afterEach(() => document.body.replaceChildren())
+
+  it('改用户名必须带当前密码，成功后同步登录名', async () => {
+    const { wrapper, store } = await setup()
+    expect(
+      wrapper.find('input[autocomplete="current-password"]').exists(),
+      '用户名没变时不显示密码框',
+    ).toBe(false)
+    vi.mocked(usersApi.updateProfile).mockResolvedValue({ ...store.user!, username: 'newtester' })
+    await wrapper.get('input[autocomplete="username"]').setValue('newtester')
+    await flushPromises()
+    expect(wrapper.find('input[autocomplete="current-password"]').exists()).toBe(true)
+    await wrapper.get('input[autocomplete="current-password"]').setValue('secret123')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(usersApi.updateProfile).toHaveBeenCalledWith({
+      username: 'newtester',
+      currentPassword: 'secret123',
+    })
+    expect(store.user?.username).toBe('newtester')
+    expect(document.body.textContent).toContain('用户名已更新')
+    wrapper.unmount()
+  })
+
+  it('密码少于 6 位不提交请求', async () => {
+    const { wrapper } = await setup()
+    await wrapper.get('input[autocomplete="username"]').setValue('newtester')
+    await wrapper.get('input[autocomplete="current-password"]').setValue('123')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(usersApi.updateProfile).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('修改用户名需要输入至少 6 位的当前密码')
+    wrapper.unmount()
+  })
+
+  it('用户名被占用时保留输入并显示服务端文案', async () => {
+    const { wrapper, store } = await setup()
+    vi.mocked(usersApi.updateProfile).mockRejectedValue(
+      new ApiError('该用户名已被使用', 'USERNAME_EXISTS', 409),
+    )
+    await wrapper.get('input[autocomplete="username"]').setValue('taken')
+    await wrapper.get('input[autocomplete="current-password"]').setValue('secret123')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(store.user?.username, '失败不能改动已保存的登录名').toBe('tester')
+    expect(wrapper.text()).toContain('该用户名已被使用')
+    wrapper.unmount()
+  })
+})
+
+describe('换绑手机号', () => {
+  beforeEach(() => vi.clearAllMocks())
+  afterEach(() => document.body.replaceChildren())
+
+  const challenge = { challengeId: 'challenge-1', expiresInSeconds: 300, resendAfterSeconds: 60 }
+
+  async function openPanel(wrapper: VueWrapper) {
+    await wrapper.get('.phone-change__toggle').trigger('click')
+    await flushPromises()
+  }
+
+  it('验证码发给新号码，确认后同步手机号掩码', async () => {
+    const { wrapper, store } = await setup()
+    vi.mocked(usersApi.requestPhoneChangeCode).mockResolvedValue(challenge)
+    vi.mocked(usersApi.changePhone).mockResolvedValue({ ...store.user!, phoneMasked: '139****9001' })
+    await openPanel(wrapper)
+    await wrapper.get('input[autocomplete="tel"]').setValue('13900139001')
+    await wrapper.get('input[autocomplete="current-password"]').setValue('secret123')
+    await wrapper.get('.phone-change__request').trigger('click')
+    await flushPromises()
+    expect(usersApi.requestPhoneChangeCode).toHaveBeenCalledWith({
+      phone: '13900139001',
+      currentPassword: 'secret123',
+    })
+    expect(wrapper.text()).toContain('秒后可重发')
+
+    await wrapper.get('input[autocomplete="one-time-code"]').setValue('482731')
+    await wrapper.get('.phone-change__confirm').trigger('click')
+    await flushPromises()
+    expect(usersApi.changePhone).toHaveBeenCalledWith({
+      phone: '13900139001',
+      challengeId: 'challenge-1',
+      code: '482731',
+    })
+    expect(store.user?.phoneMasked).toBe('139****9001')
+    wrapper.unmount()
+  })
+
+  it('改号即清验证：换号码后必须重新获取验证码', async () => {
+    const { wrapper } = await setup()
+    vi.mocked(usersApi.requestPhoneChangeCode).mockResolvedValue(challenge)
+    await openPanel(wrapper)
+    const phoneInput = wrapper.get('input[autocomplete="tel"]')
+    await phoneInput.setValue('13900139001')
+    await wrapper.get('input[autocomplete="current-password"]').setValue('secret123')
+    await wrapper.get('.phone-change__request').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('验证码只对上面这个号码有效')
+
+    await phoneInput.setValue('13900139002')
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('验证码只对上面这个号码有效')
+    expect(wrapper.get('input[autocomplete="one-time-code"]').attributes('disabled')).toBeDefined()
+    await wrapper.get('.phone-change__confirm').trigger('click')
+    await flushPromises()
+    expect(usersApi.changePhone).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('号码非法或密码太短都不发验证码', async () => {
+    const { wrapper } = await setup()
+    await openPanel(wrapper)
+    await wrapper.get('input[autocomplete="tel"]').setValue('12345')
+    await wrapper.get('input[autocomplete="current-password"]').setValue('secret123')
+    await wrapper.get('.phone-change__request').trigger('click')
+    await flushPromises()
+    expect(usersApi.requestPhoneChangeCode).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('请输入有效的中国大陆手机号')
+
+    await wrapper.get('input[autocomplete="tel"]').setValue('13900139001')
+    await wrapper.get('input[autocomplete="current-password"]').setValue('123')
+    await wrapper.get('.phone-change__request').trigger('click')
+    await flushPromises()
+    expect(usersApi.requestPhoneChangeCode).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('请输入至少 6 位的当前密码')
+    wrapper.unmount()
+  })
+
+  it('当前密码不正确时显示服务端文案', async () => {
+    const { wrapper } = await setup()
+    vi.mocked(usersApi.requestPhoneChangeCode).mockRejectedValue(
+      new ApiError('当前密码不正确', 'ACCOUNT_PASSWORD_INVALID', 422),
+    )
+    await openPanel(wrapper)
+    await wrapper.get('input[autocomplete="tel"]').setValue('13900139001')
+    await wrapper.get('input[autocomplete="current-password"]').setValue('wrong123')
+    await wrapper.get('.phone-change__request').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('当前密码不正确')
+    wrapper.unmount()
+  })
+
+  it('被限流时按服务端给的秒数切倒计时', async () => {
+    const { wrapper } = await setup()
+    vi.mocked(usersApi.requestPhoneChangeCode).mockRejectedValue(
+      new ApiError('发送过于频繁，请稍后再试', 'SMS_RATE_LIMITED', 429, { retryAfterSeconds: 42 }),
+    )
+    await openPanel(wrapper)
+    await wrapper.get('input[autocomplete="tel"]').setValue('13900139001')
+    await wrapper.get('input[autocomplete="current-password"]').setValue('secret123')
+    await wrapper.get('.phone-change__request').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('发送过于频繁，请 42 秒后重试')
+    expect(wrapper.text()).toContain('42 秒后可重发')
     wrapper.unmount()
   })
 })

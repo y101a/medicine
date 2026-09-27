@@ -7,6 +7,8 @@ import type {
   AuthUser,
   LoginRequest,
   PasswordResetRequest,
+  PhoneChangeCodeRequest,
+  PhoneChangeRequest,
   PhoneVerificationVerifyRequest,
   RegisterRequest,
 } from '../types/auth'
@@ -100,6 +102,18 @@ export const useAuthStore = defineStore('auth', () => {
     if (user.value) user.value = { ...user.value, phoneVerified: true }
   }
 
+  /** 换绑第一步：只换验证码挑战，本地用户先不动（后端验当前密码后发给新号码）。 */
+  async function requestPhoneChangeCode(payload: PhoneChangeCodeRequest) {
+    return await usersApi.requestPhoneChangeCode(payload)
+  }
+
+  /** 换绑第二步：成功后整体替换本地用户——手机号掩码与 `phoneVerified` 都变了。 */
+  async function changePhone(payload: PhoneChangeRequest) {
+    const updated = await usersApi.changePhone(payload)
+    if (user.value?.id === updated.id) user.value = updated
+    return updated
+  }
+
   /**
    * 短信找回密码。
    *
@@ -127,6 +141,8 @@ export const useAuthStore = defineStore('auth', () => {
     deleteAccount,
     requestCurrentPhoneCode,
     confirmCurrentPhone,
+    requestPhoneChangeCode,
+    changePhone,
     resetPassword,
   }
 })
