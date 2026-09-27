@@ -50,6 +50,11 @@
 - 后端（**DSH 实跑**）：碰 `/users/me` 的 6 个测试文件 **79 项通过**、Ruff 全绿。**未跑完整套件、未跑迁移**——`COORDINATION.md` 7.1 里 Codex 正声明占用数据库与完整 pytest（其配图升级迁移为 `20260927_0025`）。
 - 新产品能力：设置页账户分栏可以改**用户名**（就是登录名：需当前密码，占用冲突 409 `USERNAME_EXISTS`，改完旧名立即失效）和**换绑手机号**（需当前密码 + 新号码收到的模拟验证码；复用 `phone_binding` 用途靠指纹区分新旧号，**无新迁移**）。身份证与实名信息仍不可改。**真实前后端联调与人工验收未做**，见 `frontend/BROWSER_ACCEPTANCE.md` 第三节第 16 条。
 
+**2026-09-27 追加（DSH 实跑；生成任务卡等待体验，提交 `fc2a504`）**：
+
+- 前端：`npm run build` exit 0、`npx vitest run` **239 项 / 20 文件**、`npx playwright test` **78 项中 77 通过**。**这两个数字含他人未提交的改动**：`src/utils/modelPreference.test.ts` 4 项与 `HomeView`/`consultations.test.ts` 的修改（Codex `COORDINATION.md` §7.2 的 2026-09-28 条目、用户直接授权）——本项自己只加 **7 项单测 + 1 项 e2e**；唯一失败的 `layout.spec.ts` 旧路径重定向**隔离复跑 13 passed**，与 2026-09-22 记录过的全量跑抖动同现象。
+- 新产品行为：生成 PPT/Word 的**等待期现在有据可读**——三点呼吸动效、三个真实阶段（排队等待处理 / 整理内容与引用 / 排版生成文件，对应服务端 `queued`/`generating`/`rendering`）、「已等待 N 分 N 秒」（按服务端 `createdAt` 每秒重算）与「单个任务服务端最长处理约 5 分钟」。**没有进度百分比，也没有预计剩余时间**：后端不返回这两个事实，前端不编——用户问的是「还要等多久」，这里给的是「已经等了多久 + 有上限」，而不是假 ETA。`prefers-reduced-motion` 下只关动画，文字信息全保留。**观感与真实链路都未由人/真后端验证**，人工项见 `frontend/BROWSER_ACCEPTANCE.md` 第三节第 15 条。
+
 **上一次核对（2026-09-15，未经本轮复核，仅作历史参考）**：Docker Desktop Linux Engine
 可连接，`medical-assistant-postgres` 容器为 `healthy` 并映射 `127.0.0.1:5432`；
 库中共 2 个原型来源、15 篇文档、43 个文本块、43 个有向量的文本块，其中
