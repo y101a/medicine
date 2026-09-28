@@ -138,6 +138,100 @@
 关键词可作为补充，但对口语化表达召回明显不足；后续需在用户确认费用后，用冻结的同一题集
 依次运行 `vector` 与 `hybrid`。三模式对比前不得根据 `holdout` 逐题结果改语料、阈值或权重。
 
+### 2026-09-28 三模式真实对比
+
+用户确认后，使用当前开发库快照（5 个来源、15 篇文档、43 块、43 个当前模型向量）和
+`qwen3.7-text-embedding-flash` 完成三模式全量评测。详细机器可读报告见
+`medical_retrieval_evaluation_v2_results.json`。
+
+| 模式 | Recall@1 | Recall@3 | MRR | 未覆盖题误召回率 | 总体通过率 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `keyword` | 0.3438 | 0.3594 | 0.3490 | 0.1250 | 0.4625 |
+| `vector` | 0.9375 | 0.9844 | 0.9609 | 1.0000 | 0.7875 |
+| `hybrid` | 0.9219 | 0.9844 | 0.9531 | 1.0000 | 0.7875 |
+
+结论不是“纯向量最好”。向量与混合模式显著改善口语问法召回，但在没有最低相关度门槛时，
+会给 16 道当前未覆盖题全部返回资料。只用 `tune` 选择查询级近似阈值 0.55，再冻结到
+`holdout`，得到 Recall@3 0.9375、未覆盖题误召回率 0、总体通过率 0.95。该分析只依据
+每题首位相似度，尚不是线上实现；正式改阈值前要做逐候选过滤并重跑相同题集。
+
+评测期间阿里云连接发生多次临时超时/不可用。CLI 现支持单题有限重试和原子断点，避免长任务
+在第 N 题失败后重复前 N-1 题的费用：
+
+```powershell
+.\.venv\Scripts\python.exe -m app.rag.cli evaluate-prototype `
+  --dataset docs/medical_retrieval_evaluation_v2.json `
+  --mode hybrid --top-k 3 --split all --max-retries 2 `
+  --checkpoint data/retrieval_evaluation_checkpoints/hybrid_v2_all.json
+```
+
+`data/` 下断点是本机运行数据，默认不入 Git。断点绑定题集内容哈希、模式、`top-k`、分组和
+**相关度门槛（profile + 全部阈值）**；参数、题集或门槛变化时会拒绝复用，防止把不同实验的
+结果混在一起。
+
+### 2026-09-28 逐候选相关度门槛（机制已统一，线上未启用）
+
+上表说明：没有最低相关度门槛时，16 道未覆盖题全部被返回（误召回率 1.0）。0.55 那组数字
+只用了每题**首位**相似度，属于离线近似，不能直接上线。本轮把它做成逐候选实现：
+
+1. 新增唯一门槛模块 `app/rag/relevance.py`。三种 profile：`none`（不过滤，评测基线）、
+   `current-consultation`（精确复刻咨询图原有 0.72 / 网页来源 0.60 / 关键词 0.2）、
+   `candidate-threshold`（待调门槛）。分数语义被写死：有 `vector_similarity` 时只与向量分
+   比较；没有当前向量的候选走单独的关键词规则（避免误杀精确关键词命中）；`rerank_score`
+   只排序、永不单独充当证据；只有 `similarity` 的 legacy 证据走兼容路径并单独记 reason。
+2. 咨询图改为调用这同一份门槛，**行为逐位不变**（检索/图/联网 52 项测试全绿，网页来源
+   0.60 那条继续成立）。数字只有一份，不再散落在业务代码里。
+3. 评测器新增逐候选分数（`EvaluationCandidateScore`）、`filtered_count` 与过滤原因统计；
+   断点身份包含门槛；并新增 `regate_case` / `sweep_gates` / `select_gate` 与 CLI
+   `sweep-relevance-gate`，可以在**已保存的真实召回**上离线换门槛——扫参不再重复付费。
+   `--split holdout` 必须同时给出冻结阈值，否则直接报错。
+
+**本轮唯一一次真实 hybrid 复评（`top-k=3`，80 题，真实重试 4 次）：** 结果与 2026-09-28
+三模式基线逐位一致（Recall@1 0.9219、Recall@3 0.9844、MRR 0.9531、误召回率 1.0、通过率
+0.7875），说明语料与检索层没有漂移。机器可读结果见
+`medical_retrieval_evaluation_v3_results.json`（含每题每个候选的分数与保留/否决原因，
+但不含题目原文）。旧的 `medical_retrieval_evaluation_v2_results.json` 保留不覆盖。
+
+**选参与冻结：** 只用 `tune`（60 题）扫 663 套门槛（向量 0.30–0.80 步长 0.01 ×
+关键词 0.20–0.80 步长 0.05；「无向量关键词」档固定 0.2，这是**产品约束**而不是调参维度，
+用来保证精确关键词命中不被误杀）。选择规则：未覆盖误召回率必须为 0 → 最大化总体通过率
+→ Recall@3 不得低于 0.90；同分时取阈值更高（更保守）的一套。26 套达标，冻结为
+**向量 0.56 / 关键词 0.2 / 无向量关键词 0.2 / 网页来源 0.60**。
+
+| 分组 | 题数 | 误召回率 | Recall@3 | 总体通过率 | 结论 |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `tune`（选参用） | 60 | 0.0000 | 0.9375 | 0.9500 | 达标 |
+| `holdout`（冻结后只算一次） | 20 | 0.0000 | **0.8750** | 0.9000 | **未达标（Recall@3 < 0.90）** |
+| 全部（仅记录） | 80 | 0.0000 | 0.9219 | 0.9375 | — |
+
+holdout 的两处漏召回都发生在门槛边缘：`medicine_stop_early_holdout` 的 `medicine-use`
+向量分 0.5539、关键词分 0.1667；`confusable_thyroid_or_diabetes_holdout` 的
+`thyroid-conditions` 0.5497、`diabetes` 0.5315。前者正是下面要优先修的 `medicine-use`
+（“家中剩药能否继续吃”）语料/表达缺口；且 0.55 与 0.56 在 `tune` 上指标完全相同，
+差别落在 holdout 的这几分之内。
+
+**线上状态：未启用。** 三条消费方（咨询图本地检索、`POST /api/v1/knowledge/search`、
+PPT/Word 文档生成的知识检索）都保持现状；咨询链路继续使用原有 0.72/0.60/0.2，只是数字
+已集中到同一模块。之所以不能“按现状数值统一”：把现有 0.72 门槛套到同一份召回上，
+全部 80 题的 Recall@3 只有 0.25（`tune` 0.2917）——直接应用会造成严重漏召回，
+所以正确资料在 0.5–0.65 区间、0.72 会把它全部丢掉。
+
+复现扫参（不联网、不调用向量服务）：
+
+```powershell
+.\.venv\Scripts\python.exe -m app.rag.cli sweep-relevance-gate `
+  docs/medical_retrieval_evaluation_v3_results.json --split tune
+# holdout 只允许在冻结后复算：
+.\.venv\Scripts\python.exe -m app.rag.cli sweep-relevance-gate `
+  docs/medical_retrieval_evaluation_v3_results.json --split holdout `
+  --frozen-vector-threshold 0.56 --frozen-keyword-threshold 0.2
+```
+
+下一步先验证逐候选拒答门槛，再补知识。现有知识唯一完全漏召回题为“家中剩药能否继续吃”，
+应先增强 `medicine-use` 的同义表达或排序，不重复造文档。新增知识的顺序为：① 头痛/头晕、
+血尿/尿路感染、儿童发热、荨麻疹/湿疹；② 腰痛、颈肩痛、腕扭伤、痛风；③ 结膜炎、
+中耳炎、牙痛、痛经、失眠。新增正式资料仍必须逐篇完成来源许可与医学审核。
+
 ## 后续升级
 
 正式使用前应把真实来源逐篇走受控导入流程，保留发布机构、原始 URL、版本、版权依据

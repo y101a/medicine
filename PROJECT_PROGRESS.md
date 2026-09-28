@@ -63,6 +63,14 @@
 - **未提交的部分**：`frontend/src/views/HomeView.vue` 里本项有 4 个 hunk（短版标记、`@confirm` 透传模板文件、每次都弹、`:already-accepted`），但同一文件内还有 **Codex 未提交的 modelPreference 改动**（另外 4 个 hunk）。按 `COORDINATION.md` §1 与 2026-09-21 先例**不做逐块暂存**：本项只提交其余文件，`HomeView.vue` 留在工作树（工作树里功能已生效），已在 §6 询问 Codex 何时释放该文件。
 - **模板的真实版式未验证**：e2e 里的 `.pptx` 是假字节，Office/WPS 视觉验收必须人工做。用户计划用 WPS/PowerPoint 自建两页模板（封面 + 正文、两页各设不同背景、各放标题与正文文字框）做第一轮实测，步骤与逐条检查见 `frontend/BROWSER_ACCEPTANCE.md` 第三节第 15 条。**模板后端本轮是 Codex 未提交的在途改动**（含迁移 `20260928_0026`，已应用到本地库），真实联调前需先确认它已提交。
 
+**2026-09-28 追加（DSH 实跑；检索相关度门槛：机制已统一、线上未启用。同步 Codex 请求的 v2 三模式数字）**：
+
+- **v2 三模式真实结果同步**（Codex 请求见 `COORDINATION.md` §6 第 176 行）：评测集 80 题冻结（60 `tune` / 20 `holdout`），当前库 5 来源 / 15 文档 / 43 块 / 43 向量。keyword R@1/R@3/MRR/未覆盖题误召回率/通过率 = **0.3438 / 0.3594 / 0.3490 / 0.1250 / 0.4625**；vector = **0.9375 / 0.9844 / 0.9609 / 1.0000 / 0.7875**；hybrid = **0.9219 / 0.9844 / 0.9531 / 1.0000 / 0.7875**。机器可读见 `backend/docs/medical_retrieval_evaluation_v2_results.json`。
+- **后端（DSH 实跑，非转述）**：完整套件 **384 项通过**、Ruff 全绿；基线为 353 项，本轮新增 31 项（门槛单元 15、评测器逐候选与换门槛/选参/断点 12、咨询链路空证据 3、结果文件参数回读 1）。**本轮唯一一次真实 hybrid 复评**（80 题、`top-k=3`、真实重试 4 次）与 v2 hybrid 逐位一致，说明语料与检索层没有漂移。
+- **机制统一**：新增唯一门槛模块 `backend/app/rag/relevance.py`，三种 profile（`none` / `current-consultation` / `candidate-threshold`），并把分数语义写死——有向量时只与向量分比较、没有当前向量的候选走独立关键词规则、`rerank_score` 只排序不充当证据、只有 `similarity` 的 legacy 证据走兼容路径并单独记 reason。咨询图改为调用同一份门槛且**行为逐位不变**（网页来源 0.60 那条回归继续成立）。评测器新增逐候选分数与过滤原因、断点身份纳入门槛，并新增 `sweep-relevance-gate` CLI 在已保存的真实召回上离线换门槛（`--split holdout` 必须给出冻结阈值，结构上禁止偷看留出集），扫参不再重复付费。
+- **线上未启用**：只用 `tune` 扫 663 套门槛（「无向量关键词」档固定 0.2 属产品约束、不参与调参），冻结为向量 **0.56** / 关键词 0.2 / 无向量关键词 0.2 / 网页来源 0.60。`tune` 达标（误召回 0、R@3 0.9375、通过率 0.95），**`holdout` 只算一次：误召回 0、R@3 0.8750、通过率 0.90 → 未达上线线（R@3 < 0.90）**，因此三条消费方（咨询图、`POST /api/v1/knowledge/search`、PPT/Word 文档生成）**保持现状**，且**未据 holdout 结果回调参数**。两处漏召回：`medicine_stop_early_holdout`（`medicine-use` 向量分 0.5539、关键词 0.1667）与 `confusable_thyroid_or_diabetes_holdout`（0.5497 / 0.5315）。
+- **附带证据（回答“能不能按现状数值统一”）**：把现有咨询门槛 `0.72` 套到同一份召回上，80 题 Recall@3 只有 **0.25**（`tune` 0.2917）——正确资料分数多在 0.5–0.65，直接套用会把知识 API 与文档生成打到严重漏召回。细节、选参方法与复现命令见 `backend/docs/PROTOTYPE_KNOWLEDGE.md`；本轮结果文件为 `backend/docs/medical_retrieval_evaluation_v3_results.json`（含每题每个候选的分数与否决原因，**不含题目原文**；v2 文件保留不覆盖）。
+
 **上一次核对（2026-09-15，未经本轮复核，仅作历史参考）**：Docker Desktop Linux Engine
 可连接，`medical-assistant-postgres` 容器为 `healthy` 并映射 `127.0.0.1:5432`；
 库中共 2 个原型来源、15 篇文档、43 个文本块、43 个有向量的文本块，其中

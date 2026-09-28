@@ -17,6 +17,16 @@ from app.ai.graph.state import (
     RetrievalEvidence,
 )
 from app.core.config import get_settings
+from app.rag.relevance import (
+    CURRENT_CONSULTATION_KEYWORD_ONLY_THRESHOLD,
+    CURRENT_CONSULTATION_KEYWORD_THRESHOLD,
+    CURRENT_CONSULTATION_VECTOR_THRESHOLD,
+    candidate_threshold_gate,
+    current_consultation_gate,
+    filter_evidence,
+    is_relevant,
+    scores_from_mapping,
+)
 from app.rag.retrieval import RetrievalError, RetrievalResult, search_knowledge
 from app.rag.web_search import (
     SOURCE_KEY,
@@ -88,15 +98,30 @@ def _evidence_item(item) -> RetrievalEvidence:
 
 
 def _retrieval_item_is_relevant(item: RetrievalEvidence, threshold: float) -> bool:
-    vector_similarity = item.get("vector_similarity")
-    keyword_score = item.get("keyword_score")
-    # Legacy/mocked evidence only has similarity and remains backward-compatible.
-    if vector_similarity is None and keyword_score is None:
-        return item["similarity"] >= threshold
-    return bool(
-        (vector_similarity is not None and vector_similarity >= threshold)
-        or (keyword_score is not None and keyword_score >= 0.2)
+    """历史兼容层：旧调用点是「给我一个显式阈值」的口径。
+
+    真正的判定已经统一到 `app.rag.relevance`（全项目唯一一份），这里只是把「一个显式阈值 +
+    固定关键词 0.2 + 不区分来源」翻译成同一套 gate，避免再出现第二份数字。
+    """
+    return is_relevant(
+        scores_from_mapping(item),
+        candidate_threshold_gate(
+            vector_threshold=threshold,
+            keyword_threshold=CURRENT_CONSULTATION_KEYWORD_THRESHOLD,
+            keyword_only_threshold=CURRENT_CONSULTATION_KEYWORD_ONLY_THRESHOLD,
+            web_vector_threshold=None,
+        ),
     )
+
+
+# 门槛数字只有 `app.rag.relevance` 一份（见根目录 `RETRIEVAL_RELEVANCE_GATE_PLAN.md` 阶段 B）。
+# 两个实例对应咨询图里两个历史分支的不同口径：
+#   TOPIC_RELEVANCE_GATE —— 命中泛化主题：网页缓存语料 0.60，其余来源 0.72；
+#   PLAIN_RELEVANCE_GATE —— 未命中泛化主题：此前对所有来源一律 0.72（含网页缓存语料）。
+TOPIC_RELEVANCE_GATE = current_consultation_gate()
+PLAIN_RELEVANCE_GATE = current_consultation_gate(
+    web_vector_threshold=CURRENT_CONSULTATION_VECTOR_THRESHOLD,
+)
 
 
 def build_consultation_generation_graph(
@@ -123,17 +148,16 @@ def build_consultation_generation_graph(
         items = [_evidence_item(item) for item in result.items]
         topic = generic_topic(state["user_text"])
         if topic:
-            items = [
-                item
-                for item in items
-                if topic_matches_text(topic, item["title"] + item["content"])
-                and _retrieval_item_is_relevant(
-                    item,
-                    0.60 if item["source_key"] == SOURCE_KEY else 0.72,
-                )
-            ]
+            items = filter_evidence(
+                [
+                    item
+                    for item in items
+                    if topic_matches_text(topic, item["title"] + item["content"])
+                ],
+                TOPIC_RELEVANCE_GATE,
+            )
         else:
-            items = [item for item in items if _retrieval_item_is_relevant(item, 0.72)]
+            items = filter_evidence(items, PLAIN_RELEVANCE_GATE)
         return {
             "retrieval_status": "completed" if items else "empty",
             "retrieval_items": items,
@@ -161,10 +185,11 @@ def build_consultation_generation_graph(
                 "web_search_error_code": "WEB_SEARCH_UNAVAILABLE",
             }
         hits = [
-            hit for hit in hits
+            hit
+            for hit in hits
             if trusted_organization(hit.url) == hit.organization
             and topic_matches_text(topic, hit.title + hit.excerpt)
-        ][:web_hit_limit(topic)]
+        ][: web_hit_limit(topic)]
         items: list[RetrievalEvidence] = [
             {
                 "source_key": SOURCE_KEY,

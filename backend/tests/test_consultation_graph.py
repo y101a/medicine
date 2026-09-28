@@ -183,3 +183,83 @@ def test_retrieval_gate_separates_medical_questions_from_normal_chat():
 
     assert all(evaluate_retrieval_gate(text).should_retrieve for text in medical_inputs)
     assert not any(evaluate_retrieval_gate(text).should_retrieve for text in normal_inputs)
+
+
+def _citation(
+    slug: str,
+    *,
+    similarity: float,
+    keyword: float | None = None,
+    vector: float | None = None,
+) -> RetrievalCitation:
+    return RetrievalCitation(
+        chunk_id=uuid4(),
+        document_id=uuid4(),
+        source_key="developer_prototype_knowledge",
+        organization="项目开发者",
+        title=slug,
+        canonical_url=f"https://prototype.invalid/medical-knowledge/{slug}",
+        section_title="常见情况",
+        version_label="prototype-test",
+        published_at=datetime.now(UTC),
+        content="用于隔离测试的原型证据。",
+        similarity=similarity,
+        trust_level="prototype",
+        keyword_score=keyword,
+        vector_similarity=vector,
+    )
+
+
+def _result(*items: RetrievalCitation) -> RetrievalResult:
+    return RetrievalResult(
+        query_redacted=False,
+        model="qwen3.7-text-embedding-flash",
+        version="2026-09-01",
+        items=list(items),
+    )
+
+
+async def test_generation_graph_returns_empty_evidence_without_breaking_the_answer_path():
+    """§4.6：证据全被门槛拦下时，检索标记为空、不产出任何引用，但回答链路照常继续。"""
+
+    async def weak_retriever(_db, _query: str, *, top_k: int):
+        assert top_k == 4
+        return _result(_citation("headache", similarity=0.31, vector=0.31))
+
+    graph = build_consultation_generation_graph(weak_retriever)
+    result = await graph.ainvoke({"user_text": "普通头痛科普", "db": object()})
+
+    assert result["retrieval_status"] == "empty"
+    assert result["retrieval_items"] == []
+    assert result["next_step"] == "generation_ready"
+    assert result["retrieval_intent"] is True
+
+
+async def test_generation_graph_keeps_unembedded_exact_keyword_evidence():
+    """§4.6/§4.3：没有当前向量但关键词精确命中的证据，不能在咨询链路里被误杀。"""
+
+    async def keyword_retriever(_db, _query: str, *, top_k: int):
+        return _result(_citation("crohn", similarity=0.0, keyword=1.0))
+
+    graph = build_consultation_generation_graph(keyword_retriever)
+    result = await graph.ainvoke({"user_text": "普通头痛科普", "db": object()})
+
+    assert result["retrieval_status"] == "completed"
+    assert len(result["retrieval_items"]) == 1
+    assert result["retrieval_items"][0]["keyword_score"] == 1.0
+
+
+async def test_generation_graph_filters_candidates_one_by_one():
+    """§4.1：同一次召回里，低分候选被删、高分候选保留（不是只看第一项）。"""
+
+    async def mixed_retriever(_db, _query: str, *, top_k: int):
+        return _result(
+            _citation("weak-first", similarity=0.2, vector=0.2),
+            _citation("strong-later", similarity=0.9, vector=0.93),
+        )
+
+    graph = build_consultation_generation_graph(mixed_retriever)
+    result = await graph.ainvoke({"user_text": "普通头痛科普", "db": object()})
+
+    assert result["retrieval_status"] == "completed"
+    assert [item["title"] for item in result["retrieval_items"]] == ["strong-later"]
