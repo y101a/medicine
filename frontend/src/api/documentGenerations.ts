@@ -13,6 +13,9 @@ export const DOCUMENT_GENERATION_NOTICE_VERSION = 'document-generation-v1'
 /** 创建任务只等服务端受理（成功是 202，真正生成在后台 worker），所以超时不看生成耗时。 */
 const CREATE_TIMEOUT_MS = 60_000
 
+/** 带模板的创建要上传最多 10 MiB 的 `.pptx`（契约 §3.3），给比普通创建更宽的上限。 */
+const TEMPLATE_UPLOAD_TIMEOUT_MS = 120_000
+
 /** 查询只是读任务状态，但 worker 可能正在写库，给比默认 15 秒更宽的上限。 */
 const POLL_TIMEOUT_MS = 30_000
 
@@ -29,6 +32,34 @@ export const documentGenerationsApi = {
       `/consultations/${consultationId}/document-generations`,
       payload,
       { timeout: CREATE_TIMEOUT_MS },
+    )).data
+  },
+  /**
+   * 带 PPTX 模板的创建（契约 §3.3）：`multipart/form-data`，字段固定为
+   * `clientRequestId` / `sourceMessageId` / `noticeAccepted` / `noticeVersion` /
+   * `templateNoticeAccepted` / `file`。返回与普通创建相同的 202 任务对象，`templateMode` 为 `uploaded`。
+   *
+   * 模板**只走这一条路**：不进病历附件入口（那条链路只提取文字，且生成流程拒绝病历附件）、
+   * 也不作为聊天内容发给模型。拒绝码：`PPT_TEMPLATE_TOO_LARGE` 413、
+   * `PPT_TEMPLATE_TYPE_NOT_ALLOWED` 415、`PPT_TEMPLATE_INVALID`/`PPT_TEMPLATE_NOT_APPLICABLE`/
+   * `PPT_TEMPLATE_NOTICE_REQUIRED` 422、同一来源消息换模板 `DOCUMENT_GENERATION_TEMPLATE_CONFLICT` 409。
+   */
+  async createWithTemplate(
+    consultationId: string,
+    payload: DocumentGenerationRequest,
+    file: File,
+  ) {
+    const data = new FormData()
+    data.append('clientRequestId', payload.clientRequestId)
+    data.append('sourceMessageId', payload.sourceMessageId)
+    data.append('noticeAccepted', String(payload.noticeAccepted))
+    data.append('noticeVersion', payload.noticeVersion)
+    data.append('templateNoticeAccepted', 'true')
+    data.append('file', file)
+    return (await http.post<DocumentGeneration>(
+      `/consultations/${consultationId}/document-generations/with-template`,
+      data,
+      { timeout: TEMPLATE_UPLOAD_TIMEOUT_MS },
     )).data
   },
   /** 单个任务状态；轮询用。 */

@@ -9,6 +9,7 @@ import {
   DOCUMENT_GENERATION_STAGE_HINTS,
   DOCUMENT_GENERATION_STAGES,
   DOCUMENT_GENERATION_STATUS_LABELS,
+  DOCUMENT_TEMPLATE_MODE_LABELS,
   documentGenerationStageIndex,
   formatDocumentWait,
   type DocumentGeneration,
@@ -97,6 +98,11 @@ const waitedText = computed(() => (
 
 const formatText = computed(() => props.task.formats.map((item) => DOCUMENT_FORMAT_LABELS[item]).join(' + '))
 
+/** 实际用了哪种模板（契约 §3.3）：只显示服务端给的值，刷新恢复也一样，缺值就不显示这一行。 */
+const templateLabel = computed(() => (
+  props.task.templateMode ? DOCUMENT_TEMPLATE_MODE_LABELS[props.task.templateMode] : ''
+))
+
 const expiresText = computed(() => {
   if (!props.task.expiresAt) return ''
   const date = new Date(props.task.expiresAt)
@@ -121,6 +127,7 @@ function fileMeta(file: DocumentGenerationFile): string {
       </span>
       <span class="generated-document-card__meta">
         {{ formatText }}
+        <template v-if="templateLabel"> · {{ templateLabel }}</template>
         <template v-if="isCompleted && task.sourceCount > 0"> · 参考 {{ task.sourceCount }} 条来源</template>
         <template v-if="isCompleted && expiresText"> · 保留至 {{ expiresText }}</template>
       </span>

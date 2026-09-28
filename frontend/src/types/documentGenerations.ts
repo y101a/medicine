@@ -68,6 +68,11 @@ export interface DocumentGeneration {
   errorCode?: string | null
   /** 成品保留到期时间；`null` 表示尚未生成（方案 §0.6：加密保存 30 天）。 */
   expiresAt: string | null
+  /**
+   * 实际使用的模板（契约 §3.3）。服务端在任务对象上回这个字段，前端**只显示、不推断**；
+   * 声明为可选是为了兼容旧响应与测试桩，缺值时卡片只是不显示模板那一行。
+   */
+  templateMode?: DocumentTemplateMode
   createdAt: string
   updatedAt: string
 }
@@ -147,6 +152,47 @@ export function formatDocumentWait(seconds: number): string {
 
 /** 成品保留期（方案 §0.6，用户 2026-09-27 已确认：加密保存 30 天，可提前永久删除）。 */
 export const DOCUMENT_GENERATION_RETENTION_DAYS = 30
+
+/**
+ * 模板类型（契约 §3.3）：服务端在任务对象上回的 `templateMode`。
+ * `default` = 白底默认版式；`builtin` = 用户明确要求模板但没上传时的内置配色；
+ * `uploaded` = 用户上传的 `.pptx` 模板。前端**只显示服务端给的值**，不自己推断用了哪种。
+ */
+export type DocumentTemplateMode = 'default' | 'builtin' | 'uploaded'
+
+export const DOCUMENT_TEMPLATE_MODE_LABELS: Record<DocumentTemplateMode, string> = {
+  default: '默认版式',
+  builtin: '内置模板',
+  uploaded: '你上传的模板',
+}
+
+/**
+ * 模板的文件限制（契约 §3.3）：`.pptx`、≤10 MiB、2–20 页。
+ * **页数只能由服务端数**（前端不解析 OOXML），所以这里只做扩展名与体积的本地预检，
+ * 页数与结构问题一律以服务端受控错误码为准。
+ */
+export const DOCUMENT_TEMPLATE_MAX_BYTES = 10 * 1024 * 1024
+export const DOCUMENT_TEMPLATE_ACCEPT =
+  '.pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation'
+export const DOCUMENT_TEMPLATE_MIN_PAGES = 2
+export const DOCUMENT_TEMPLATE_MAX_PAGES = 20
+
+/**
+ * 选择模板前必须讲清的事（契约 §3.3）：原件加密保存、只用于本次渲染、不送内容模型、
+ * 随任务/会话/账号删除或保留到期而删除；以及**模板里原有的背景字与母版字去不掉**。
+ */
+export const DOCUMENT_TEMPLATE_NOTICE_TEXT =
+  '模板原件会在本服务加密保存，只用于这次渲染，不会送给内容模型；'
+  + `删除这次任务、删除会话或账号、或超过 ${DOCUMENT_GENERATION_RETENTION_DAYS} 天保留期后都会被删除。`
+  + '模板里已有的背景图片文字与母版固定文字不会被去掉，上传前请自己检查。'
+
+/**
+ * 说明已经确认过时的短提示（用户 2026-09-28 决定：每次都弹确认弹窗，第 2 次起用短版，
+ * 这样模板选择器随时可达，同时每次生成前都再确认一次「可能产生费用」）。
+ */
+export const DOCUMENT_GENERATION_SHORT_NOTICE_TEXT =
+  '说明已经确认过，这次直接生成：内容由 AI 根据当前知识库整理，仅作健康科普，'
+  + `不作诊断、处方或治疗依据；生成可能产生模型费用，文件在 ${DOCUMENT_GENERATION_RETENTION_DAYS} 天后自动删除。`
 
 /**
  * 任务卡必须显示的边界声明（方案 §8.2：必须清楚显示「AI 生成的健康科普资料」，

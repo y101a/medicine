@@ -7,6 +7,7 @@ import {
   documentDownloadName,
   type DocumentGeneration,
   type DocumentGenerationFile,
+  type DocumentGenerationRequest,
   type DocumentGenerationStatus,
 } from '../types/documentGenerations'
 
@@ -51,6 +52,14 @@ const ERROR_MESSAGES: Record<string, string> = {
   DOCUMENT_GENERATION_NOT_CONFIGURED: '文档生成尚未配置，暂时不可用',
   DOCUMENT_MODEL_TIMEOUT: '内容生成超时，请稍后重试',
   GENERATED_DOCUMENT_EXPIRED: `这份文件已过 ${DOCUMENT_GENERATION_RETENTION_DAYS} 天保留期，原件已按保留策略清理`,
+  // 上传 PPTX 模板的拒绝码（契约 §3.3）。文案照服务端的判定口径写，不缩小也不夸大：
+  // 「结构不被支持」确实包含复杂动画、SmartArt、图表、外链、宏这些被拒的东西。
+  PPT_TEMPLATE_TOO_LARGE: '模板超过 10 MiB，请换一个更小的 .pptx 文件',
+  PPT_TEMPLATE_TYPE_NOT_ALLOWED: '只支持 .pptx 模板：.ppt、宏文件与加密文件都不行',
+  PPT_TEMPLATE_INVALID: '这个模板打不开或结构不被支持（复杂动画、SmartArt、图表、外链等可能被拒绝）',
+  PPT_TEMPLATE_NOT_APPLICABLE: '这条消息没有要求 PPT，模板套不上；想用模板请明确说「生成一份…的 PPT」',
+  PPT_TEMPLATE_NOTICE_REQUIRED: '请先确认模板的保存与使用说明',
+  DOCUMENT_GENERATION_TEMPLATE_CONFLICT: '这条消息已经用另一个模板生成过；换模板请重新发一条消息再试',
 }
 
 export function documentGenerationErrorMessage(cause: unknown): string {
@@ -200,9 +209,16 @@ export function useDocumentGeneration(consultationId: Ref<string | null>) {
 
   /**
    * 提交一次生成。主题与格式由服务端从 `sourceMessageId` 原文重新解析，前端不传任何覆盖值。
-   * 同一来源消息复用 `clientRequestId`：重复提交由服务端幂等返回原任务，不会重复调用模型。
+   * 同一来源消息复用 `clientRequestId`：重复提交由服务端幂等返回原任务、不会重复调用模型；
+   * 同一条消息换模板则由服务端判 `DOCUMENT_GENERATION_TEMPLATE_CONFLICT`（不静默换模板）。
+   *
+   * `templateFile` 只在用户于确认弹窗里**主动选了 `.pptx`** 时才有值（契约 §3.3）：
+   * 有值走 multipart 创建接口，没值仍是原 JSON 接口，行为与之前完全一致。
    */
-  async function submit(sourceMessageId: string): Promise<DocumentGenerationSubmitResult> {
+  async function submit(
+    sourceMessageId: string,
+    templateFile: File | null = null,
+  ): Promise<DocumentGenerationSubmitResult> {
     const id = consultationId.value
     if (!id) return { ok: false, message: '会话还没准备好，请稍后再试' }
     if (submitting.value) return { ok: false, message: '上一次提交还在处理，请稍候' }
@@ -211,12 +227,15 @@ export function useDocumentGeneration(consultationId: Ref<string | null>) {
     requestIds.set(sourceMessageId, clientRequestId)
     submitting.value = true
     try {
-      const created = await documentGenerationsApi.create(id, {
+      const payload: DocumentGenerationRequest = {
         clientRequestId,
         sourceMessageId,
         noticeAccepted: true,
         noticeVersion: DOCUMENT_GENERATION_NOTICE_VERSION,
-      })
+      }
+      const created = templateFile
+        ? await documentGenerationsApi.createWithTemplate(id, payload, templateFile)
+        : await documentGenerationsApi.create(id, payload)
       replace(created)
       delay = POLL_START_MS
       scheduleNextPoll()

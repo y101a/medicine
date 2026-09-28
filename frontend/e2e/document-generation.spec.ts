@@ -121,16 +121,27 @@ interface CapturedRequests {
   paths: string[]
   methods: string[]
   bodies: Record<string, unknown>[]
+  /** 带模板创建的 multipart **原文**：字段名与文件名只能从这里断言（`postDataJSON` 读不了表单）。 */
+  templateBodies: string[]
+  templateContentTypes: string[]
 }
 
 /** 记录请求路径、方法与创建任务的请求体：断言「有没有打这个接口、带了什么」。 */
 function capture(page: Page): CapturedRequests {
-  const captured: CapturedRequests = { paths: [], methods: [], bodies: [] }
+  const captured: CapturedRequests = {
+    paths: [], methods: [], bodies: [], templateBodies: [], templateContentTypes: [],
+  }
   page.on('request', (request: Request) => {
     const path = new URL(request.url()).pathname
     captured.paths.push(path)
     captured.methods.push(`${request.method()} ${path}`)
-    if (request.method() === 'POST' && path.endsWith('/document-generations')) {
+    if (request.method() !== 'POST') return
+    if (path.endsWith('/document-generations/with-template')) {
+      captured.templateBodies.push(request.postData() || '')
+      captured.templateContentTypes.push(request.headers()['content-type'] || '')
+      return
+    }
+    if (path.endsWith('/document-generations')) {
       captured.bodies.push(request.postDataJSON() as Record<string, unknown>)
     }
   })
@@ -441,5 +452,96 @@ test.describe('双格式、下载、删除与恢复', () => {
     await expect(dialog.getByRole('button', { name: '取消' })).toBeEnabled()
     // 与配图弹窗同一条规则：工作区本身是桌面优先（`min-width: 1000px`，ADR-011），
     // 窄屏下页面整体会横向溢出，所以只量**弹窗**（挂在 body 上，必须自己适配视口）的几何。
+    // 纵向也要量：加了模板区之后弹窗变高，确认按钮必须仍落在视口内（正文区自己滚动）。
+    const confirmBox = await dialog.getByRole('button', { name: '同意并生成' }).boundingBox()
+    expect(confirmBox, '确认按钮应有布局盒').not.toBeNull()
+    const bottom = Math.round(confirmBox!.y + confirmBox!.height)
+    console.log(`[e2e] 文档说明弹窗确认按钮下沿：${bottom}px（视口高 720px）`)
+    expect(bottom, '确认按钮被挤出视口，用户点不到').toBeLessThanOrEqual(720)
+  })
+})
+
+/**
+ * 上传 PPTX 模板（契约 `PPT_WORD_PLAN.md` §3.3；Codex 在 `COORDINATION.md` §6 第 175 行的前端交接）。
+ *
+ * 这里只能验证「前端按契约发了什么、拿到响应后显示成什么样」：桩里的「.pptx」是一段假字节，
+ * **真实 Office/WPS 版式、背景与文字框映射必须由人工打开文件验收**（方案 §9.3）。
+ */
+test.describe('上传 PPTX 模板', () => {
+  /** 带模板创建返回的任务：`templateMode` 是 `uploaded`（契约 §3.3），前端只显示这个值。 */
+  const UPLOADED_TASK = { ...PENDING_TASK, templateMode: 'uploaded' }
+
+  test('选中 .pptx 走带模板接口，multipart 字段齐全，卡片显示实际模板类型', async ({ page }) => {
+    const captured = capture(page)
+    await installApiStubs(page, {
+      extra: stubs({
+        'POST /consultations/*/document-generations/with-template': { status: 202, body: UPLOADED_TASK },
+      }),
+    })
+    // 预置说明版本：走「已确认过」的短版弹窗——老用户也必须还能选模板（用户 2026-09-28 的决定）。
+    await page.addInitScript(
+      ([key, version]) => window.localStorage.setItem(key, version),
+      [NOTICE_KEY, NOTICE_VERSION],
+    )
+    await page.goto('/app/chat')
+    await settle(page)
+    await waitForRendered(page, '.composer')
+
+    await askForDocument(page)
+    const dialog = noticeDialog(page)
+    await expect(dialog, '已确认过说明也要弹窗，否则模板没有入口').toBeVisible({ timeout: 15_000 })
+    await expect(dialog).toContainText('说明已经确认过')
+    await expect(dialog.getByRole('button', { name: '同意并生成' }), '短版不再要求勾说明').toBeEnabled()
+
+    await dialog.locator('input[type="file"]').setInputFiles({
+      name: 'my-template.pptx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      buffer: Buffer.from('e2e-fake-pptx-not-a-real-file'),
+    })
+    await expect(dialog).toContainText('my-template.pptx')
+    // 契约 §3.3：选了模板就必须单独确认模板说明，否则服务端 422 PPT_TEMPLATE_NOTICE_REQUIRED。
+    await expect(dialog.getByRole('button', { name: '同意并生成' }), '未勾模板说明不得提交').toBeDisabled()
+    await dialog.locator('.el-checkbox', { hasText: '模板原件' }).click()
+    await expect(dialog.getByRole('button', { name: '同意并生成' })).toBeEnabled()
+    await dialog.getByRole('button', { name: '同意并生成' }).click()
+    await settle(page, 1_200)
+
+    expect(captured.bodies, '带模板时不得再打原 JSON 创建接口').toHaveLength(0)
+    expect(captured.templateBodies, '应恰好打一次带模板接口').toHaveLength(1)
+    const body = captured.templateBodies[0]
+    for (const field of [
+      'clientRequestId', 'sourceMessageId', 'noticeAccepted', 'noticeVersion', 'templateNoticeAccepted',
+    ]) {
+      expect(body, `multipart 里缺字段 ${field}`).toContain(`name="${field}"`)
+    }
+    expect(body, '模板必须以 file 字段上传并带上原文件名').toContain('name="file"; filename="my-template.pptx"')
+    expect(body, '说明版本必须是契约固定值').toContain(NOTICE_VERSION)
+    expect(captured.templateContentTypes[0], '必须是 multipart 表单').toContain('multipart/form-data')
+
+    await expect(
+      page.locator('.generated-document-card__meta'),
+      '卡片要显示服务端给的实际模板类型',
+    ).toContainText('你上传的模板')
+  })
+
+  test('首次给完整说明，确认过一次后第二次是短版，模板入口不消失', async ({ page }) => {
+    await openChat(page)
+    await askForDocument(page)
+
+    const dialog = noticeDialog(page)
+    await expect(dialog).toBeVisible({ timeout: 15_000 })
+    await expect(dialog).toContainText('内容由 AI 根据当前知识库生成')
+    await agreeCheckbox(page).click()
+    await dialog.getByRole('button', { name: '同意并生成' }).click()
+    await settle(page, 1_200)
+    await expect(page.locator('.generated-document-card')).toBeVisible()
+
+    // 再来一次：不是静默直连生成，而是短版确认——所以模板入口随时可达。
+    await askForDocument(page)
+    await expect(dialog).toBeVisible({ timeout: 15_000 })
+    await expect(dialog).toContainText('说明已经确认过')
+    await expect(dialog.locator('.el-checkbox', { hasText: '我已阅读并同意上述说明' })).toHaveCount(0)
+    await expect(dialog.getByRole('button', { name: '同意并生成' })).toBeEnabled()
+    await expect(dialog.locator('input[type="file"]'), '短版也要能选模板').toHaveCount(1)
   })
 })

@@ -42,7 +42,7 @@
 - 前端：`npm run build` exit 0、`npx vitest run` **220 项 / 19 文件**（新增 `frontend/src/views/documentGeneration.test.ts` 24 项）、`npx playwright test` **73 项**（新增 `frontend/e2e/document-generation.spec.ts` 8 项）。上一档为 2026-09-26 的 **196 / 18** 与 **65**（短信与手机号验证前端，提交 `fa6cb86`）。
 - 后端（**Codex 报告，DSH 未复核**）：完整套件 **316 项通过**、Ruff 全绿。检索评测 v2（提交 `03d5ecf`）：80 题冻结（60 调参 / 20 留出），关键词基线 Recall@1 **0.3438**、Recall@3 **0.3594**、MRR **0.3490**、未覆盖集误召回 **0.1250**、通过率 **0.4625**（请求见 `COORDINATION.md` 第 176 行）。
 - 迁移：**本轮未复核**。`COORDINATION.md` 7.1 显示 Codex 正在做 `20260927_0024`（文档生成，进行中）；DSH 侧最近一次实跑仍是 `20260926_0023`。
-- 新产品能力：**PPT/Word 医学科普文档生成**。方案由 Codex 补写（根目录 `PPT_WORD_PLAN.md`；用户 2026-09-27 已确认成品加密保存 30 天、可提前永久删除）。**前端已按方案第 5/8/9 节实现**：只有自然语言里同时出现生成动作、明确格式（PPT/Word）与医学主题才触发（缺格式故意不命中，交给普通聊天问清）、命中后跳过 `/stream`、**不新增任何生成按钮**、首次说明按版本记忆且**取消不发请求**、一个任务可含 DOCX/PPTX 两个下载项、刷新/切会话按 `sourceMessageId` 恢复、2→5 秒退避轮询、鉴权 Blob 下载（文件名固定 `AI医学科普-YYYYMMDD.docx|.pptx`）、删除与 30 天到期。**后端尚未落地，前端全部用接口桩验证，真实链路未验证**；人工验收（Office/WPS 打开、拒答矩阵）见 `frontend/BROWSER_ACCEPTANCE.md` 第三节第 15 条。
+- 新产品能力：**PPT/Word 医学科普文档生成**。方案由 Codex 补写（根目录 `PPT_WORD_PLAN.md`；用户 2026-09-27 已确认成品加密保存 30 天、可提前永久删除）。**前端已按方案第 5/8/9 节实现**：只有自然语言里同时出现生成动作、明确格式（PPT/Word）与医学主题才触发（缺格式故意不命中，交给普通聊天问清）、命中后跳过 `/stream`、**不新增任何生成按钮**、首次说明按版本记忆且**取消不发请求**、一个任务可含 DOCX/PPTX 两个下载项、刷新/切会话按 `sourceMessageId` 恢复、2→5 秒退避轮询、鉴权 Blob 下载（文件名固定 `AI医学科普-YYYYMMDD.docx|.pptx`）、删除与 30 天到期。**后端随后由 Codex 落地**（文档生成后端已提交；**PPTX 模板流程 2026-09-28 仍在 Codex 工作树、未提交**），前端仍以接口桩验证为主，**真实链路未验证**；人工验收（Office/WPS 打开、拒答矩阵）见 `frontend/BROWSER_ACCEPTANCE.md` 第三节第 15 条。
 
 **2026-09-27 追加（DSH 实跑；账户资料可改：改用户名 + 换绑手机号，提交 `7184fc8`）**：
 
@@ -54,6 +54,14 @@
 
 - 前端：`npm run build` exit 0、`npx vitest run` **239 项 / 20 文件**、`npx playwright test` **78 项中 77 通过**。**这两个数字含他人未提交的改动**：`src/utils/modelPreference.test.ts` 4 项与 `HomeView`/`consultations.test.ts` 的修改（Codex `COORDINATION.md` §7.2 的 2026-09-28 条目、用户直接授权）——本项自己只加 **7 项单测 + 1 项 e2e**；唯一失败的 `layout.spec.ts` 旧路径重定向**隔离复跑 13 passed**，与 2026-09-22 记录过的全量跑抖动同现象。
 - 新产品行为：生成 PPT/Word 的**等待期现在有据可读**——三点呼吸动效、三个真实阶段（排队等待处理 / 整理内容与引用 / 排版生成文件，对应服务端 `queued`/`generating`/`rendering`）、「已等待 N 分 N 秒」（按服务端 `createdAt` 每秒重算）与「单个任务服务端最长处理约 5 分钟」。**没有进度百分比，也没有预计剩余时间**：后端不返回这两个事实，前端不编——用户问的是「还要等多久」，这里给的是「已经等了多久 + 有上限」，而不是假 ETA。`prefers-reduced-motion` 下只关动画，文字信息全保留。**观感与真实链路都未由人/真后端验证**，人工项见 `frontend/BROWSER_ACCEPTANCE.md` 第三节第 15 条。
+
+**2026-09-28 追加（DSH 实跑；用户上传 PPTX 模板的前端接线，契约 `PPT_WORD_PLAN.md` §3.3 / `COORDINATION.md` §6 第 175 行交接）**：
+
+- 用户 2026-09-28 拍板：**每次生成都弹一次确认弹窗**，第 2 次起用短版（一句提醒 + 模板选择器）。原因是模板选择器就在确认弹窗里，而原逻辑「记住说明版本后就直接生成」会让已确认过说明的用户**没有地方选模板**。代价是每次生成多一步点击；换来的是每次生成前都再确认一次「可能产生模型费用」，模板入口也始终可达。
+- 新产品能力：文档生成确认弹窗里可选一个 `.pptx` 模板（**不新增常驻按钮、不走病历附件入口、不作为聊天内容送给模型**）。选了模板走 `POST /consultations/{id}/document-generations/with-template`（`multipart/form-data`，字段 `clientRequestId`/`sourceMessageId`/`noticeAccepted`/`noticeVersion`/`templateNoticeAccepted`/`file`），没选仍走原 JSON 接口；任务卡显示服务端回的 `templateMode`（你上传的模板 / 内置模板 / 默认版式）。本地只预检扩展名与 10 MiB；**被拦下后确认按钮先禁用**，必须显式点「不用模板，直接生成」，不得静默换成默认版式。桌面端弹窗正文区限高 58vh 可滚动，窄屏下确认按钮实测下沿 630px（视口 720px）仍可点。
+- 前端：`npm run build` exit 0、`npx vitest run` **245 项 / 20 文件**（上档 239；本项加 6 项单测）、`npx playwright test` **80 项中 79 通过**（上档 78 中 77；本项加 2 项 e2e）。唯一失败仍是 `layout.spec.ts` 旧路径重定向——与 2026-09-22、2026-09-27 记录过的全量跑抖动同一现象（隔离复跑 13 项全过）。
+- **未提交的部分**：`frontend/src/views/HomeView.vue` 里本项有 4 个 hunk（短版标记、`@confirm` 透传模板文件、每次都弹、`:already-accepted`），但同一文件内还有 **Codex 未提交的 modelPreference 改动**（另外 4 个 hunk）。按 `COORDINATION.md` §1 与 2026-09-21 先例**不做逐块暂存**：本项只提交其余文件，`HomeView.vue` 留在工作树（工作树里功能已生效），已在 §6 询问 Codex 何时释放该文件。
+- **模板的真实版式未验证**：e2e 里的 `.pptx` 是假字节，Office/WPS 视觉验收必须人工做。用户计划用 WPS/PowerPoint 自建两页模板（封面 + 正文、两页各设不同背景、各放标题与正文文字框）做第一轮实测，步骤与逐条检查见 `frontend/BROWSER_ACCEPTANCE.md` 第三节第 15 条。**模板后端本轮是 Codex 未提交的在途改动**（含迁移 `20260928_0026`，已应用到本地库），真实联调前需先确认它已提交。
 
 **上一次核对（2026-09-15，未经本轮复核，仅作历史参考）**：Docker Desktop Linux Engine
 可连接，`medical-assistant-postgres` 容器为 `healthy` 并映射 `127.0.0.1:5432`；

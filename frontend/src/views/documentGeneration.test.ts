@@ -54,7 +54,7 @@ vi.mock('../api/documentGenerations', () => ({
   // 说明版本是契约固定值，必须与真实模块一致，否则请求体带上错版本会被服务端 422。
   DOCUMENT_GENERATION_NOTICE_VERSION: 'document-generation-v1',
   documentGenerationsApi: {
-    create: vi.fn(), get: vi.fn(), list: vi.fn(), content: vi.fn(), remove: vi.fn(),
+    create: vi.fn(), createWithTemplate: vi.fn(), get: vi.fn(), list: vi.fn(), content: vi.fn(), remove: vi.fn(),
   },
 }))
 vi.mock('../composables/useVoiceRecorder', async () => {
@@ -164,6 +164,10 @@ beforeEach(() => {
   vi.mocked(imageGenerationsApi.list).mockResolvedValue([])
   vi.mocked(documentGenerationsApi.list).mockResolvedValue([])
   vi.mocked(documentGenerationsApi.create).mockResolvedValue(queuedTask)
+  // 带模板创建返回同一个任务对象，只是 `templateMode` 为 uploaded（契约 §3.3）。
+  vi.mocked(documentGenerationsApi.createWithTemplate).mockResolvedValue({
+    ...queuedTask, templateMode: 'uploaded',
+  })
   vi.mocked(documentGenerationsApi.content).mockResolvedValue(new Blob(['docx'], { type: 'application/zip' }))
   vi.mocked(documentGenerationsApi.remove).mockResolvedValue(undefined)
   // jsdom 没有 Object URL；判定用的仍是真实的创建与释放调用。
@@ -183,6 +187,11 @@ describe('自然语言触发（方案 §8.2：不新增任何生成按钮）', (
     const { wrapper } = await setup()
 
     await sendMessage(wrapper, '帮我生成一份高血压预防的 PPT')
+
+    // 2026-09-28 起每次生成都先弹确认弹窗：已确认过说明时是短版，直接确认（短版没有勾选框）。
+    expect(document.querySelector('.document-generation-dialog')).not.toBeNull()
+    dialogConfirmButton()?.click()
+    await flushPromises()
 
     expect(consultationsApi.stream).not.toHaveBeenCalled()
     expect(documentGenerationsApi.create).toHaveBeenCalledTimes(1)
@@ -221,6 +230,10 @@ describe('自然语言触发（方案 §8.2：不新增任何生成按钮）', (
     const { wrapper } = await setup()
 
     await sendMessage(wrapper, '帮我生成一份高血压预防的 PPT')
+
+    // 短版弹窗没有勾选框，确认按钮直接就绪。
+    dialogConfirmButton()?.click()
+    await flushPromises()
 
     expect(wrapper.get('textarea').attributes('disabled')).toBeUndefined()
     expect(document.querySelector('.generated-document-card__pending')?.textContent)
@@ -634,5 +647,188 @@ describe('等待体验：真实阶段 + 已等待时长（不编进度）', () =
     expect(documentGenerationStageIndex('generating')).toBe(1)
     expect(documentGenerationStageIndex('rendering')).toBe(2)
     expect(documentGenerationStageIndex('completed')).toBe(-1)
+  })
+})
+
+/**
+ * 上传 PPTX 模板（契约 `PPT_WORD_PLAN.md` §3.3；Codex §6 第 175 行交接，2026-09-28）。
+ *
+ * 三条硬约束：
+ * 1. 模板**只从确认弹窗里选**——不进病历附件入口、也不作为聊天内容发给模型；
+ * 2. 选了文件才要求单独勾选模板说明（`templateNoticeAccepted`），未勾选不得提交；
+ * 3. 本地只拦扩展名与体积；页数、结构、可用性一律以服务端受控错误码为准（前端不解析 OOXML）。
+ *
+ * 另有用户 2026-09-28 的决定：**每次生成都弹确认弹窗**，已确认过说明时用短版——否则模板入口
+ * 对老用户不可达（原来「记住版本就直接生成」）。
+ */
+describe('上传 PPTX 模板', () => {
+  function templateInput(): HTMLInputElement {
+    const input = document.querySelector<HTMLInputElement>('.document-generation-dialog input[type="file"]')
+    expect(input, '确认弹窗里应有模板文件选择器').not.toBeNull()
+    return input as HTMLInputElement
+  }
+  function pickFiles(files: File[]) {
+    const input = templateInput()
+    Object.defineProperty(input, 'files', { value: files, configurable: true })
+    input.dispatchEvent(new Event('change'))
+  }
+  function agreeBoxes(): HTMLElement[] {
+    return Array.from(document.querySelectorAll<HTMLElement>('.document-generation-dialog .el-checkbox'))
+  }
+  function clickTemplateAgree() {
+    const box = agreeBoxes().find(item => item.textContent?.includes('模板原件'))
+    expect(box, '选了模板应出现模板说明勾选框').toBeTruthy()
+    box?.querySelector<HTMLInputElement>('input')?.click()
+  }
+  function pptxFile(name = 'my-template.pptx', bytes = 2_048) {
+    return new File([new Uint8Array(bytes)], name, {
+      type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    })
+  }
+
+  it('已确认过说明时仍弹窗（短版），模板入口可达', async () => {
+    localStorage.setItem(DOCUMENT_GENERATION_NOTICE_STORAGE_KEY, DOCUMENT_GENERATION_NOTICE_VERSION)
+    const { wrapper } = await setup()
+
+    await sendMessage(wrapper, '帮我生成一份高血压预防的 PPT')
+
+    const dialog = document.querySelector('.document-generation-dialog')
+    expect(dialog, '已确认过说明也要弹窗，否则模板没有入口').not.toBeNull()
+    expect(dialog?.textContent).toContain('说明已经确认过')
+    // 短版不再要求勾选说明，但模板选择器必须在。
+    expect(agreeBoxes().some(box => box.textContent?.includes('我已阅读并同意上述说明'))).toBe(false)
+    expect(dialogConfirmButton()?.disabled).toBe(false)
+    expect(templateInput()).toBeTruthy()
+    expect(documentGenerationsApi.create).not.toHaveBeenCalled()
+  })
+
+  it('选了 .pptx 走带模板接口并带全字段；未勾模板说明不能提交', async () => {
+    const { wrapper } = await setup()
+    await sendMessage(wrapper, '帮我生成一份高血压预防的 PPT')
+    agreeDialog()
+    await flushPromises()
+
+    const file = pptxFile()
+    pickFiles([file])
+    await flushPromises()
+
+    expect(document.querySelector('.document-generation-dialog')?.textContent).toContain('my-template.pptx')
+    // 契约 §3.3：勾了模板就必须单独确认模板说明，否则服务端 422 PPT_TEMPLATE_NOTICE_REQUIRED。
+    expect(dialogConfirmButton()?.disabled, '未勾模板说明不得提交').toBe(true)
+    clickTemplateAgree()
+    await flushPromises()
+    expect(dialogConfirmButton()?.disabled).toBe(false)
+
+    dialogConfirmButton()?.click()
+    await flushPromises()
+
+    expect(documentGenerationsApi.create, '带模板时不得再走原 JSON 接口').not.toHaveBeenCalled()
+    expect(documentGenerationsApi.createWithTemplate).toHaveBeenCalledTimes(1)
+    const [consultationId, payload, sent] = vi.mocked(documentGenerationsApi.createWithTemplate).mock.calls[0]
+    expect(consultationId).toBe('c1')
+    expect(sent).toBe(file)
+    expect(payload.sourceMessageId).toBe('u9')
+    expect(payload.noticeAccepted).toBe(true)
+    expect(payload.noticeVersion).toBe('document-generation-v1')
+    expect(payload.clientRequestId).toBeTruthy()
+    // 任务卡显示服务端给的实际模板类型。
+    expect(document.querySelector('.generated-document-card__meta')?.textContent).toContain('你上传的模板')
+  })
+
+  it('本地拦住非 .pptx 与超过 10 MiB 的文件，且不发任何请求', async () => {
+    const { wrapper } = await setup()
+    await sendMessage(wrapper, '帮我生成一份高血压预防的 PPT')
+    agreeDialog()
+    await flushPromises()
+
+    pickFiles([new File(['x'], 'template.doc')])
+    await flushPromises()
+    expect(document.querySelector('.document-generation-dialog__template-error')?.textContent)
+      .toContain('只支持 .pptx')
+
+    pickFiles([new File([new Uint8Array(10 * 1024 * 1024 + 1)], 'big.pptx')])
+    await flushPromises()
+    expect(document.querySelector('.document-generation-dialog__template-error')?.textContent)
+      .toContain('不能超过')
+
+    // 拦下之后不得静默丢模板去生成默认版式：确认先停住，用户明确「不用模板」才继续。
+    expect(dialogConfirmButton()?.disabled, '有非法模板时不得直接生成').toBe(true)
+    dialogConfirmButton()?.click()
+    await flushPromises()
+    expect(documentGenerationsApi.createWithTemplate).not.toHaveBeenCalled()
+    expect(documentGenerationsApi.create).not.toHaveBeenCalled()
+
+    const clearButton = Array.from(
+      document.querySelectorAll<HTMLElement>('.document-generation-dialog button'),
+    ).find(button => button.textContent?.includes('不用模板'))
+    expect(clearButton, '拦下后要给一个明确的出口').toBeTruthy()
+    clearButton?.click()
+    await flushPromises()
+    expect(document.querySelector('.document-generation-dialog__template-error')).toBeNull()
+    expect(dialogConfirmButton()?.disabled).toBe(false)
+
+    dialogConfirmButton()?.click()
+    await flushPromises()
+    expect(documentGenerationsApi.create, '明确不用模板后仍走原 JSON 接口').toHaveBeenCalledTimes(1)
+  })
+
+  it('服务端的模板拒绝码显示成受控中文，不透传内部文案', async () => {
+    vi.mocked(documentGenerationsApi.createWithTemplate).mockRejectedValueOnce(
+      new ApiError('template zip boom', 'PPT_TEMPLATE_INVALID', 422),
+    )
+    const { wrapper } = await setup()
+    await sendMessage(wrapper, '帮我生成一份高血压预防的 PPT')
+    agreeDialog()
+    await flushPromises()
+
+    pickFiles([pptxFile()])
+    await flushPromises()
+    clickTemplateAgree()
+    await flushPromises()
+    dialogConfirmButton()?.click()
+    await flushPromises()
+
+    const error = document.querySelector('.document-generation-dialog__error')?.textContent || ''
+    expect(error).toContain('这个模板打不开或结构不被支持')
+    expect(error, '不得透传内部原文或错误码').not.toContain('template zip boom')
+    expect(error).not.toContain('PPT_TEMPLATE_INVALID')
+  })
+
+  it('取消后重新发起不会保留上次选的模板', async () => {
+    const { wrapper } = await setup()
+    await sendMessage(wrapper, '帮我生成一份高血压预防的 PPT')
+    agreeDialog()
+    await flushPromises()
+
+    pickFiles([pptxFile()])
+    await flushPromises()
+    expect(document.querySelector('.document-generation-dialog')?.textContent).toContain('my-template.pptx')
+
+    dialogCancelButton()?.click()
+    await flushPromises()
+    await flushPromises()
+
+    await sendMessage(wrapper, '帮我生成一份高血压预防的 PPT')
+    await flushPromises()
+
+    const text = document.querySelector('.document-generation-dialog')?.textContent || ''
+    expect(text, '新一次确认不应带着上次的文件').not.toContain('my-template.pptx')
+    expect(agreeBoxes().some(box => box.textContent?.includes('模板原件')), '没有文件就不该有模板勾选框').toBe(false)
+    expect(documentGenerationsApi.createWithTemplate).not.toHaveBeenCalled()
+  })
+
+  it('任务卡显示的模板类型来自服务端，刷新恢复也一样', async () => {
+    const uploaded = mount(GeneratedDocumentCard, {
+      props: { task: { ...completedTask, templateMode: 'uploaded' as const } },
+      global: { plugins: [ElementPlus] },
+    })
+    expect(uploaded.find('.generated-document-card__meta').text()).toContain('你上传的模板')
+    await uploaded.setProps({ task: { ...completedTask, templateMode: 'builtin' as const } })
+    expect(uploaded.find('.generated-document-card__meta').text()).toContain('内置模板')
+    await uploaded.setProps({ task: { ...completedTask, templateMode: 'default' as const } })
+    expect(uploaded.find('.generated-document-card__meta').text()).toContain('默认版式')
+    await uploaded.setProps({ task: { ...completedTask, templateMode: undefined } })
+    expect(uploaded.find('.generated-document-card__meta').text()).not.toContain('版式')
+    uploaded.unmount()
   })
 })
