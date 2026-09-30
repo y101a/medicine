@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 ImageGenerationStyle = Literal["medical_illustration", "flat_illustration", "friendly_cartoon"]
 ImageAspectRatio = Literal["1:1", "4:3", "3:4", "16:9"]
 ImageGenerationStatus = Literal[
-    "submitted", "running", "completed", "failed", "cancelled", "expired"
+    "submitted", "running", "reviewing", "completed", "failed", "cancelled", "expired"
 ]
 
 
@@ -39,6 +39,8 @@ class ImageGenerationOut(BaseModel):
     image_available: bool = Field(serialization_alias="imageAvailable")
     image_expires_at: datetime | None = Field(default=None, serialization_alias="imageExpiresAt")
     error_code: str | None = Field(default=None, serialization_alias="errorCode")
+    review_summary: str | None = Field(default=None, serialization_alias="reviewSummary")
+    regeneration_count: int = Field(serialization_alias="regenerationCount")
     created_at: datetime = Field(serialization_alias="createdAt")
     updated_at: datetime = Field(serialization_alias="updatedAt")
 

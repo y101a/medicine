@@ -99,7 +99,7 @@ class Settings(BaseSettings):
     # OpenAI-compatible QWEN_BASE_URL.
     image_generation_api_key: SecretStr | None = None
     image_generation_base_url: str = "https://dashscope.aliyuncs.com/api/v1"
-    image_generation_model: str = "wan2.6-t2i"
+    image_generation_model: str = "qwen-image-3.0-pro"
     image_generation_provider_code: str = "medical-assistant-local"
     image_generation_timeout_seconds: float = Field(default=30, ge=5, le=60)
     image_generation_poll_seconds: int = Field(default=3, ge=2, le=30)
@@ -289,8 +289,8 @@ class Settings(BaseSettings):
     @field_validator("image_generation_model")
     @classmethod
     def validate_image_generation_model(cls, value: str) -> str:
-        if value.strip() != "wan2.6-t2i":
-            raise ValueError("当前只允许 wan2.6-t2i 图片生成模型")
+        if value.strip() != "qwen-image-3.0-pro":
+            raise ValueError("当前只允许 qwen-image-3.0-pro 图片生成模型")
         return value.strip()
 
     @field_validator("image_generation_provider_code")

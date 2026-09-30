@@ -14,6 +14,7 @@ from app.ai.follow_up import (
     serialize_follow_up,
     split_follow_up_content,
 )
+from app.ai.generated_image_context import build_generated_image_context
 from app.ai.graph import render_rag_context, run_consultation_generation
 from app.api.dependencies import CurrentUser, DbSession
 from app.core.config import get_settings
@@ -129,9 +130,20 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
         )
         refs = await attachment_service.message_attachment_refs(db, [user_message_id])
         attachment_refs = refs.get(user_message_id, [])
-    private_context = "\n\n".join(
-        item for item in (health_context, attachment_context) if item
-    ) or None
+    generated_image_context = await build_generated_image_context(
+        db,
+        user_id=user.id,
+        consultation_id=cid,
+        question=user_text,
+    )
+    private_context = (
+        "\n\n".join(
+            item
+            for item in (health_context, attachment_context, generated_image_context)
+            if item
+        )
+        or None
+    )
     rag_context = render_rag_context(graph_result["retrieval_items"])
     topic = generic_topic(user_text)
     coverage_limited = bool(
@@ -174,8 +186,7 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
                     "provider": model.provider,
                 },
                 "attachmentsUsed": [
-                    item.model_dump(by_alias=True, mode="json")
-                    for item in attachment_refs
+                    item.model_dump(by_alias=True, mode="json") for item in attachment_refs
                 ],
                 "retrieval": {
                     "status": graph_result["retrieval_status"],
@@ -253,9 +264,7 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
                     yield encode({"type": "delta", "content": pending})
                 content = "".join(parts)
             if follow_up_payload is None:
-                content, verified_citations = audit_answer_citations(
-                    content, citation_snapshots
-                )
+                content, verified_citations = audit_answer_citations(content, citation_snapshots)
             else:
                 verified_citations = []
             message = await service.append_assistant_message(
@@ -269,9 +278,7 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
                 model.name,
                 citations=verified_citations,
                 answer_format=payload.answer_format,
-                medical_content=(
-                    graph_result["retrieval_gate_reason"] == "medical_content"
-                ),
+                medical_content=(graph_result["retrieval_gate_reason"] == "medical_content"),
                 source_message_id=source_message_id,
             )
             yield encode(

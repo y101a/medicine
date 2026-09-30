@@ -125,6 +125,7 @@ async def create_provider_task(
         "input": {"messages": [{"role": "user", "content": [{"text": prompt}]}]},
         "parameters": {
             "prompt_extend": True,
+            "enable_thinking": True,
             "watermark": False,
             "n": 1,
             "negative_prompt": negative_prompt,

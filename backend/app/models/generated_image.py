@@ -51,6 +51,15 @@ class GeneratedImage(Base):
     error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
     next_poll_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     poll_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    review_summary_ciphertext: Mapped[str | None] = mapped_column(Text, nullable=True)
+    review_model: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    review_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    review_attempt_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    regeneration_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -68,10 +77,13 @@ class GeneratedImage(Base):
             "aspect_ratio IN ('1:1', '4:3', '3:4', '16:9')", name="aspect_ratio_supported"
         ),
         CheckConstraint(
-            "status IN ('submitted', 'running', 'completed', 'failed', 'cancelled', 'expired')",
+            "status IN ('submitted', 'running', 'reviewing', 'completed', 'failed', "
+            "'cancelled', 'expired')",
             name="status_supported",
         ),
         CheckConstraint("poll_count >= 0", name="poll_count_nonnegative"),
+        CheckConstraint("review_attempt_count >= 0", name="review_attempt_count_nonnegative"),
+        CheckConstraint("regeneration_count BETWEEN 0 AND 1", name="regeneration_count_supported"),
         CheckConstraint(
             "(status = 'completed' AND storage_key IS NOT NULL "
             "AND image_key_ciphertext IS NOT NULL "
@@ -79,7 +91,13 @@ class GeneratedImage(Base):
             "AND byte_size IS NOT NULL AND image_expires_at IS NOT NULL "
             "AND completed_at IS NOT NULL "
             "AND image_deleted_at IS NULL AND provider_task_id_ciphertext IS NULL) OR "
-            "(status <> 'completed' AND storage_key IS NULL AND image_key_ciphertext IS NULL "
+            "(status = 'reviewing' AND storage_key IS NOT NULL "
+            "AND image_key_ciphertext IS NOT NULL AND mime_type = 'image/webp' "
+            "AND width IS NOT NULL AND height IS NOT NULL AND byte_size IS NOT NULL "
+            "AND image_expires_at IS NULL AND completed_at IS NULL "
+            "AND image_deleted_at IS NULL AND provider_task_id_ciphertext IS NULL) OR "
+            "(status NOT IN ('completed', 'reviewing') AND storage_key IS NULL "
+            "AND image_key_ciphertext IS NULL "
             "AND mime_type IS NULL AND width IS NULL AND height IS NULL AND byte_size IS NULL)",
             name="storage_state_supported",
         ),
@@ -90,7 +108,7 @@ class GeneratedImage(Base):
             "uq_generated_images_user_active",
             "user_id",
             unique=True,
-            postgresql_where=text("status IN ('submitted', 'running')"),
+            postgresql_where=text("status IN ('submitted', 'running', 'reviewing')"),
         ),
         Index("ix_generated_images_user_created", "user_id", "created_at"),
         Index("ix_generated_images_status_poll", "status", "next_poll_at"),
