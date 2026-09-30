@@ -20,6 +20,9 @@ from app.rag.relevance import (
     CURRENT_CONSULTATION_KEYWORD_ONLY_THRESHOLD,
     CURRENT_CONSULTATION_KEYWORD_THRESHOLD,
     CURRENT_CONSULTATION_VECTOR_THRESHOLD,
+    PRODUCTION_KEYWORD_ONLY_THRESHOLD,
+    PRODUCTION_KEYWORD_THRESHOLD,
+    PRODUCTION_VECTOR_THRESHOLD,
     WEB_SEARCH_SOURCE_KEY,
     RelevanceScores,
     candidate_threshold_gate,
@@ -29,6 +32,7 @@ from app.rag.relevance import (
     gate_from_profile,
     is_relevant,
     no_gate,
+    production_relevance_gate,
     relevance_decision,
     scores_from_citation,
     scores_from_mapping,
@@ -325,3 +329,23 @@ def test_filter_citations_works_on_the_api_level_type():
 
     assert [item.title for item in kept] == ["keep"]
     assert scores_from_citation(items[0]).vector_similarity == 0.93
+
+
+def test_production_gate_uses_only_the_frozen_validated_thresholds():
+    gate = production_relevance_gate()
+
+    assert PRODUCTION_VECTOR_THRESHOLD == 0.56
+    assert PRODUCTION_KEYWORD_THRESHOLD == 0.2
+    assert PRODUCTION_KEYWORD_ONLY_THRESHOLD == 0.2
+    assert gate.thresholds() == {
+        "vector": 0.56,
+        "keyword": 0.2,
+        "keywordOnly": 0.2,
+        "webVector": 0.60,
+    }
+    assert is_relevant(scores(vector=0.56), gate) is True
+    assert is_relevant(scores(vector=0.559999), gate) is False
+    assert is_relevant(scores(keyword=0.2), gate) is True
+    assert is_relevant(
+        scores(vector=0.599999, source_key=WEB_SEARCH_SOURCE_KEY), gate
+    ) is False

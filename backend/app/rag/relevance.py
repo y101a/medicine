@@ -3,8 +3,10 @@
 **为什么需要它**：咨询图 ``app/ai/graph/workflow.py`` 早就有局部门槛——普通来源向量
 0.72、网页来源 0.60、关键词分 ≥0.2 也放行——但那份数字长在 workflow 内部；评测器
 (``app/rag/evaluation.py``)、知识接口 (``app/api/routes/knowledge.py``)、文档生成
-(``app/services/document_generations.py``) 都没有用它。同一次召回因此在三条链路里
+(``app/services/document_generations.py``) 曾经没有统一使用它。同一次召回因此在三条链路里
 行为不同，而 0.55 那种「只用首位分数」的离线近似又不是逐候选实验，不能直接上线。
+2026-09-30 修订 `medicine-use` 后重新运行冻结 80 题，逐候选门槛通过 tune/holdout 验收，
+三条消费者现统一调用本模块的 ``production_relevance_gate``。
 
 本模块只做一件事：给定**一个候选的真实分数**与一个 gate，回答保留还是丢弃，并给出
 可测试的 reason。纯函数、无 IO、不碰数据库、不调用模型。
@@ -54,6 +56,13 @@ CURRENT_CONSULTATION_KEYWORD_ONLY_THRESHOLD = 0.2
 # 联网搜索缓存的语料是另一种来源（界面上标「未经医学审核」），历史门槛更宽；本任务不改它的
 # 触发与来源标注，只把数字集中到这里，避免再出现第二份。
 WEB_SEARCH_VECTOR_THRESHOLD = CURRENT_CONSULTATION_WEB_VECTOR_THRESHOLD
+
+# 生产候选门槛来自 2026-09-30 冻结评测：只用 tune 选择，holdout 仅验证一次。
+# holdout：未覆盖误召回率 0、Recall@3 0.9375、总体通过率 0.95。
+# 无向量关键词 0.2 是保护精确术语命中的产品约束，不是扫参维度。
+PRODUCTION_VECTOR_THRESHOLD = 0.56
+PRODUCTION_KEYWORD_THRESHOLD = 0.2
+PRODUCTION_KEYWORD_ONLY_THRESHOLD = 0.2
 
 RelevanceReason = Literal[
     "profile-none",
@@ -161,6 +170,19 @@ def candidate_threshold_gate(
         keyword_threshold,
         keyword_only_threshold,
         web_vector_threshold,
+    )
+
+
+def production_relevance_gate(
+    *,
+    web_vector_threshold: float | None = WEB_SEARCH_VECTOR_THRESHOLD,
+) -> RelevanceGate:
+    """返回经冻结 tune/holdout 验收的线上逐候选门槛。"""
+    return candidate_threshold_gate(
+        vector_threshold=PRODUCTION_VECTOR_THRESHOLD,
+        keyword_threshold=PRODUCTION_KEYWORD_THRESHOLD,
+        keyword_only_threshold=PRODUCTION_KEYWORD_ONLY_THRESHOLD,
+        web_vector_threshold=web_vector_threshold,
     )
 
 

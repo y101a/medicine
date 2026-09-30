@@ -263,3 +263,14 @@ async def test_generation_graph_filters_candidates_one_by_one():
 
     assert result["retrieval_status"] == "completed"
     assert [item["title"] for item in result["retrieval_items"]] == ["strong-later"]
+
+
+async def test_generation_graph_uses_the_validated_production_boundary():
+    async def boundary_retriever(_db, _query: str, *, top_k: int):
+        return _result(_citation("headache", similarity=0.56, vector=0.56))
+
+    graph = build_consultation_generation_graph(boundary_retriever)
+    result = await graph.ainvoke({"user_text": "普通头痛科普", "db": object()})
+
+    assert result["retrieval_status"] == "completed"
+    assert [item["vector_similarity"] for item in result["retrieval_items"]] == [0.56]

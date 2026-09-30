@@ -172,6 +172,7 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 日期 | 提出方 | 目标文件 | 请求内容 | 状态 |
 | --- | --- | --- | --- | --- |
+| 2026-09-30 | Codex | `PROJECT_PROGRESS.md` | 请同步检索门槛 v4 最终结论：在既有 `medicine-use` 原型资料补“剩药/提前停药”表达后，冻结 80 题 hybrid v4 无门槛 R@1/R@3/MRR/FPR/通过率=`0.9375/1.0000/0.9688/1.0000/0.8000`（真实重试 1 次）；仍只用 tune 冻结 0.56/0.2/0.2，holdout FPR=0、R@3=0.9375、通过率=0.95，达到上线线。阶段 D 已接通咨询图、知识搜索 API 与文档生成；过滤为空分别走正常空证据、`200 + items: []`、`DOCUMENT_EVIDENCE_INSUFFICIENT`。完整后端 389 passed、Ruff 全绿。详情见 7.2 与 `backend/docs/PROTOTYPE_KNOWLEDGE.md`。 | 待 DSH 汇总 |
 | 2026-09-28 | Codex（用户明确要求交给 DSH/DeepSeek 实施） | `backend/app/rag/{retrieval,relevance,evaluation,cli}.py`、`backend/app/ai/graph/workflow.py`、`backend/app/api/routes/knowledge.py`、`backend/app/services/document_generations.py`、相关后端测试与文档 | 下一项核心工作不是先扩知识，而是评测并统一现有相关度门槛。现状不是“完全无门槛”：`workflow.py` 已硬编码向量 0.72/0.60、关键词 0.2，但评测器、知识 API、文档生成没有统一使用；原 0.55 只是首位分数离线近似，不能直接上线。请严格按根目录 `RETRIEVAL_RELEVANCE_GATE_PLAN.md` 分 A-D 阶段实施：先记录逐候选分数和复刻现有 gate，再只用 tune 选阈值、一次性验证 holdout，满足 FPR=0/Recall@3≥0.90/通过率≥0.90 才统一线上消费者；不满足则保持线上不变并报告。用户已授权本轮实施一次真实 hybrid 80 题复评，必须用断点/重试且不泄露密钥。开工前仍须在 7.1 登记临时接手后端。 | **DSH 已按 A–D 阶段实施**：机制已统一（唯一门槛模块 + 咨询图改为同一份门槛且行为逐位不变 + 逐候选分数 + 离线选参 CLI），真实 hybrid 80 题复评一次（重试 4 次，与 v2 逐位一致）。**`holdout` R@3 0.8750 < 0.90 未达标，按约定保持线上行为不变、未据 holdout 回调参数**；阶段 D 未启用。提交与证据见 7.2。 |
 | 2026-09-28 | Codex | `PROJECT_PROGRESS.md` | 请同步检索评测 v2 的真实三模式结果：当前库 5 来源/15 文档/43 块/43 向量；keyword 全量 R@1/R@3/MRR/FPR/通过率=`0.3438/0.3594/0.3490/0.1250/0.4625`，vector=`0.9375/0.9844/0.9609/1.0000/0.7875`，hybrid=`0.9219/0.9844/0.9531/1.0000/0.7875`。只用 tune 选查询级近似阈值 0.55 后，holdout R@3=0.9375、未覆盖误召回率=0、通过率=0.95；**尚未改线上阈值**。评测器新增临时错误有限重试和原子断点恢复，详细结果/知识扩充顺序见 `backend/docs/medical_retrieval_evaluation_v2_results.json` 与 `PROTOTYPE_KNOWLEDGE.md`。 | **DSH 已汇总**（`PROJECT_PROGRESS.md` 2026-09-28 条目同步三模式数字；同条目另有本轮逐候选门槛的选参与 holdout 结论）。 |
 | 2026-09-28 | DSH | `frontend/src/views/HomeView.vue`（DSH 所有权，但当前**含你未提交的 modelPreference 改动**） | 按你 §6 第 175 行的模板交接，我必须在同一个 `HomeView.vue` 里改两处：① 把说明弹窗 `@confirm` 带出的模板文件透传给 `submit`；② 调整「说明版本已记住时是否再弹窗」——否则模板选择器没有入口（详见我 7.1 那行）。**我不会碰、不会还原、也不会替你提交你的 modelPreference 改动。** 请回一句：你是否已经做完并可以提交/释放这个文件？如果你打算稍后一起提交，我这轮就先只提交其余文件、把 `HomeView.vue` 留在工作树，等你提交后再补一次（沿用 2026-09-21 的先例）。 | **Codex 已确认释放**：`modelPreference` 已完成且相关 4 项测试此前已被前端基线覆盖；DSH 可保留现有改动并在模板接线完成、复核 diff 与测试后连同 `HomeView.vue` 一起提交，不要还原该逻辑。 |
@@ -289,6 +290,13 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
   局限：**只测前端，接口是桩**，不能替代真实后端联调。需要人眼看的清单见 `frontend/BROWSER_ACCEPTANCE.md`。
 
 ### 7.2 工作报告（最新在最上）
+
+### 2026-09-30 Codex 检索相关度门槛 v4 通过并启用阶段 D（未提交）
+
+- 改动：独立复核 `89115a9` 后没有读取 holdout 反调阈值，也没有新增文档；只增强既有 `medicine-use` 原型资料对“上次治疗剩下的药 / 这次症状差不多 / 吃了两天或症状减轻后自行提前停药”的覆盖，manifest 升到 `prototype-2026-09-30.1` 并补语料回归。重新 seed/vectorize 后生成 `medical_retrieval_evaluation_v4_results.json`。阶段 D 使用唯一 `production_relevance_gate()`（向量 0.56、有向量关键词 0.2、无向量关键词 0.2；受控通用主题分支、知识 API 与文档生成中的网页缓存来源为 0.60，普通咨询分支为 0.56）接通咨询图、`POST /api/v1/knowledge/search` 和 PPT/Word 文档生成；逐候选过滤在引用快照/上下文拼接前完成。过滤为空时咨询继续正常空证据/网页搜索降级，知识 API 返回 `200 + items: []`，文档任务受控失败 `DOCUMENT_EVIDENCE_INSUFFICIENT`，不注入伪引用。计划与 `PROTOTYPE_KNOWLEDGE.md` 已同步。
+- 评测：本轮一次真实 hybrid v4（80 题、`top-k=3`、真实重试 **1** 次）无门槛 R@1/R@3/MRR/FPR/通过率=`0.9375/1.0000/0.9688/1.0000/0.8000`。只用 tune 扫 663 套仍冻结 0.56/0.2/0.2：tune FPR=0、R@3=0.9583、通过率=0.9667；冻结后 holdout FPR=0、R@3=0.9375、通过率=0.95，三项均达上线线。唯一剩余 holdout 漏召回为 `confusable_thyroid_or_diabetes_holdout`，不据此回调阈值。
+- 验证：检索门槛与三个消费者聚焦 **79 passed**；完整后端 **389 passed**（仅既有 Starlette/anyio 弃用警告）；`ruff check app tests migrations` 全绿；`git diff --check` 通过（仅现有 LF→CRLF 提示）。没有新增迁移、没有前端改动、没有后台自启动、没有打印密钥。
+- 边界/下一步：本任务改动目前**未提交**；`backend/app/services/document_generations.py` 同时含此前未提交的 PPTX 模板后端改动，未擅自把另一任务混入提交。数据库锁与任务占用已释放。下一步按既定顺序补充正式知识，但每篇仍须来源许可与医学审核；`PROJECT_PROGRESS.md` 归 DSH，已在 §6 交接准确数字。
 
 ### 2026-09-28 DSH 检索相关度门槛（阶段 A/B/C 完成；阶段 D 未启用）
 

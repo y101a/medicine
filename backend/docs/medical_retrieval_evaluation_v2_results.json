@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "evaluated_on": "2026-09-28",
+  "status": "development_prototype_evaluation",
+  "dataset": {
+    "path": "docs/medical_retrieval_evaluation_v2.json",
+    "case_count": 80,
+    "supported_case_count": 64,
+    "unsupported_case_count": 16,
+    "tune_case_count": 60,
+    "holdout_case_count": 20,
+    "top_k": 3
+  },
+  "database_snapshot": {
+    "source_count": 5,
+    "document_count": 15,
+    "chunk_count": 43,
+    "embedded_chunk_count": 43,
+    "embedding_model": "qwen3.7-text-embedding-flash",
+    "embedding_dimensions": 1024
+  },
+  "modes": {
+    "keyword": {
+      "all": {"recall_at_1": 0.3438, "recall_at_3": 0.3594, "mrr": 0.3490, "unsupported_false_positive_rate": 0.1250, "pass_rate": 0.4625},
+      "tune": {"recall_at_1": 0.3750, "recall_at_3": 0.3958, "mrr": 0.3819, "unsupported_false_positive_rate": 0.1667, "pass_rate": 0.4833},
+      "holdout": {"recall_at_1": 0.2500, "recall_at_3": 0.2500, "mrr": 0.2500, "unsupported_false_positive_rate": 0.0000, "pass_rate": 0.4000},
+      "retry_count": 0
+    },
+    "vector": {
+      "all": {"recall_at_1": 0.9375, "recall_at_3": 0.9844, "mrr": 0.9609, "unsupported_false_positive_rate": 1.0000, "pass_rate": 0.7875},
+      "tune": {"recall_at_1": 0.9375, "recall_at_3": 0.9792, "mrr": 0.9583, "unsupported_false_positive_rate": 1.0000, "pass_rate": 0.7833},
+      "holdout": {"recall_at_1": 0.9375, "recall_at_3": 1.0000, "mrr": 0.9688, "unsupported_false_positive_rate": 1.0000, "pass_rate": 0.8000},
+      "retry_count": 4
+    },
+    "hybrid": {
+      "all": {"recall_at_1": 0.9219, "recall_at_3": 0.9844, "mrr": 0.9531, "unsupported_false_positive_rate": 1.0000, "pass_rate": 0.7875},
+      "tune": {"recall_at_1": 0.9375, "recall_at_3": 0.9792, "mrr": 0.9583, "unsupported_false_positive_rate": 1.0000, "pass_rate": 0.7833},
+      "holdout": {"recall_at_1": 0.8750, "recall_at_3": 1.0000, "mrr": 0.9375, "unsupported_false_positive_rate": 1.0000, "pass_rate": 0.8000},
+      "retry_count_in_successful_checkpointed_run": 1,
+      "aborted_runs_before_checkpoint_completion": 2
+    }
+  },
+  "offline_query_gate_experiment": {
+    "method": "Choose a minimum top-result similarity on tune only, then apply the frozen value to holdout. This is an offline query-level approximation, not implemented production behavior.",
+    "selected_threshold": 0.55,
+    "tune": {"recall_at_1": 0.8958, "recall_at_3": 0.9375, "unsupported_false_positive_rate": 0.0000, "pass_rate": 0.9500},
+    "holdout": {"recall_at_1": 0.8750, "recall_at_3": 0.9375, "unsupported_false_positive_rate": 0.0000, "pass_rate": 0.9500},
+    "all": {"recall_at_1": 0.8906, "recall_at_3": 0.9375, "unsupported_false_positive_rate": 0.0000, "pass_rate": 0.9500},
+    "warning": "The checkpoint stores only each query's top similarity, not every candidate score. Implement item-level filtering separately and rerun the frozen evaluation before changing production defaults."
+  },
+  "retrieval_findings": {
+    "existing_knowledge_miss": {
+      "case_id": "medicine_leftover_drugs",
+      "expected_document": "medicine-use",
+      "returned_documents": ["diabetes", "hypertension", "chronic-health"],
+      "action": "Improve terminology or ranking for leftover medicine and self-medication before adding a duplicate document."
+    },
+    "not_top_one_cases": [
+      "asthma_exercise_trigger",
+      "hypertension_exact_term",
+      "hypertension_elder_holdout",
+      "confusable_thyroid_or_diabetes_holdout"
+    ],
+    "unsupported_high_similarity_cases": [
+      {"case_id": "unsupported_dizziness", "top_similarity": 0.548367},
+      {"case_id": "unsupported_low_back_pain", "top_similarity": 0.534778},
+      {"case_id": "unsupported_hives", "top_similarity": 0.531584},
+      {"case_id": "unsupported_dysmenorrhea_holdout", "top_similarity": 0.530140},
+      {"case_id": "unsupported_conjunctivitis", "top_similarity": 0.521852},
+      {"case_id": "unsupported_hematuria", "top_similarity": 0.502442}
+    ]
+  },
+  "knowledge_expansion_priority": [
+    {
+      "priority": 1,
+      "systems": ["neurological", "urinary", "pediatric", "dermatological"],
+      "topics": ["头痛与头晕分流", "血尿与尿路感染", "儿童发热观察与就医", "荨麻疹与湿疹"],
+      "reason": "Common or potentially urgent questions; current corpus either returns unrelated documents or has no coverage."
+    },
+    {
+      "priority": 2,
+      "systems": ["musculoskeletal"],
+      "topics": ["急性腰痛", "颈肩痛", "腕关节扭伤", "痛风急性表现"],
+      "reason": "Four of sixteen unsupported cases are in this system, the largest uncovered cluster."
+    },
+    {
+      "priority": 3,
+      "systems": ["ophthalmological", "otolaryngological", "oral", "reproductive", "mental_health"],
+      "topics": ["结膜炎", "中耳炎", "牙痛", "痛经", "失眠"],
+      "reason": "Useful common-disease coverage after higher-risk gaps are addressed."
+    }
+  ],
+  "decision": [
+    "Do not replace hybrid with keyword-only retrieval.",
+    "Add an abstention or minimum-relevance gate before expanding the corpus, then rerun tune and holdout with item-level scores.",
+    "Do not import new official medical documents until source permission and medical review are recorded.",
+    "After the gate is validated, add knowledge in the priority order above and extend the frozen evaluation set before each batch."
+  ]
+}

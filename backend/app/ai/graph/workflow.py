@@ -20,11 +20,10 @@ from app.core.config import get_settings
 from app.rag.relevance import (
     CURRENT_CONSULTATION_KEYWORD_ONLY_THRESHOLD,
     CURRENT_CONSULTATION_KEYWORD_THRESHOLD,
-    CURRENT_CONSULTATION_VECTOR_THRESHOLD,
     candidate_threshold_gate,
-    current_consultation_gate,
     filter_evidence,
     is_relevant,
+    production_relevance_gate,
     scores_from_mapping,
 )
 from app.rag.retrieval import RetrievalError, RetrievalResult, search_knowledge
@@ -114,13 +113,11 @@ def _retrieval_item_is_relevant(item: RetrievalEvidence, threshold: float) -> bo
     )
 
 
-# 门槛数字只有 `app.rag.relevance` 一份（见根目录 `RETRIEVAL_RELEVANCE_GATE_PLAN.md` 阶段 B）。
-# 两个实例对应咨询图里两个历史分支的不同口径：
-#   TOPIC_RELEVANCE_GATE —— 命中泛化主题：网页缓存语料 0.60，其余来源 0.72；
-#   PLAIN_RELEVANCE_GATE —— 未命中泛化主题：此前对所有来源一律 0.72（含网页缓存语料）。
-TOPIC_RELEVANCE_GATE = current_consultation_gate()
-PLAIN_RELEVANCE_GATE = current_consultation_gate(
-    web_vector_threshold=CURRENT_CONSULTATION_VECTOR_THRESHOLD,
+# 门槛数字只有 `app.rag.relevance` 一份。2026-09-30 冻结评测通过后，咨询图启用
+# 0.56/0.2/0.2；命中泛化主题时网页缓存仍沿用独立 0.60，未命中时与其他来源同为 0.56。
+TOPIC_RELEVANCE_GATE = production_relevance_gate()
+PLAIN_RELEVANCE_GATE = production_relevance_gate(
+    web_vector_threshold=None,
 )
 
 

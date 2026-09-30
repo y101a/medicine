@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from app.api.dependencies import CurrentUser, DbSession
 from app.core.errors import AppError
+from app.rag.relevance import filter_citations, production_relevance_gate
 from app.rag.retrieval import RetrievalError, search_knowledge
 from app.schemas.knowledge import (
     KnowledgeCitationOut,
@@ -24,9 +25,10 @@ async def search_medical_knowledge(
         result = await search_knowledge(db, payload.query, top_k=payload.top_k)
     except RetrievalError as exc:
         raise AppError(exc.status_code, exc.code, str(exc)) from exc
+    items = filter_citations(result.items, production_relevance_gate())
     return KnowledgeSearchResponse(
         query_redacted=result.query_redacted,
         embedding_model=result.model,
         embedding_version=result.version,
-        items=[KnowledgeCitationOut(**asdict(item)) for item in result.items],
+        items=[KnowledgeCitationOut(**asdict(item)) for item in items],
     )

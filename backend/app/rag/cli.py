@@ -30,6 +30,15 @@ from app.rag.retrieval import RETRIEVAL_MODES
 from app.rag.source_sync import SourceRegistryError, sync_approved_sources
 from app.rag.vectorizer import ControlledVectorizationError, vectorize_document
 
+DEFAULT_GATE_VECTOR_THRESHOLDS = ",".join(
+    f"{value / 100:.2f}".rstrip("0").rstrip(".") for value in range(30, 81)
+)
+DEFAULT_GATE_KEYWORD_THRESHOLDS = ",".join(
+    f"{value / 100:.2f}".rstrip("0").rstrip(".") for value in range(20, 81, 5)
+)
+# 产品约束，不是调参维度：无当前向量的精确关键词候选必须保留既有 0.2 规则。
+DEFAULT_GATE_KEYWORD_ONLY_THRESHOLDS = "0.2"
+
 
 @dataclass(frozen=True, slots=True)
 class PrototypeVectorizeResult:
@@ -220,15 +229,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sweep_parser.add_argument(
         "--vector-thresholds",
-        default="0.45,0.5,0.55,0.6,0.65,0.7,0.75",
+        default=DEFAULT_GATE_VECTOR_THRESHOLDS,
     )
     sweep_parser.add_argument(
         "--keyword-thresholds",
-        default="0.2,0.3,0.4,0.5,0.6",
+        default=DEFAULT_GATE_KEYWORD_THRESHOLDS,
     )
     sweep_parser.add_argument(
         "--keyword-only-thresholds",
-        default="0.2,0.35,0.5,0.8",
+        default=DEFAULT_GATE_KEYWORD_ONLY_THRESHOLDS,
+        help="无当前向量的精确关键词门槛；默认固定 0.2，不参与选参",
     )
     sweep_parser.add_argument("--frozen-vector-threshold", type=float, default=None)
     sweep_parser.add_argument("--frozen-keyword-threshold", type=float, default=None)

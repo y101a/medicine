@@ -1,5 +1,5 @@
 {
-  "version": "prototype-2026-09-14.1",
+  "version": "prototype-2026-09-30.1",
   "documents": [
     {
       "slug": "emergency-warning",
@@ -14,7 +14,7 @@
       "slug": "medicine-use",
       "title": "合理用药与抗菌药物原型资料",
       "file": "medicine-use.md",
-      "topics": ["合理用药", "抗菌药物", "普通感冒"],
+      "topics": ["合理用药", "抗菌药物", "普通感冒", "剩余药品", "规范用药", "自行停药"],
       "reference_urls": [
         "https://www.nhc.gov.cn/xcs/c100123/202405/73a4927142f34152abed875634a3c13b.shtml"
       ]

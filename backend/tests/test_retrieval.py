@@ -578,6 +578,47 @@ async def test_knowledge_search_api_returns_verifiable_citation(
     }
 
 
+async def test_knowledge_search_api_returns_empty_items_for_weak_evidence(
+    profile_context, monkeypatch
+):
+    client, _, (user, _) = profile_context
+
+    async def fake_search(_db, _query: str, *, top_k: int):
+        assert top_k == 3
+        return RetrievalResult(
+            query_redacted=False,
+            model="test",
+            version="test",
+            items=[
+                RetrievalCitation(
+                    chunk_id=uuid4(),
+                    document_id=uuid4(),
+                    source_key="developer_prototype_knowledge",
+                    organization="项目开发者",
+                    title="相似但不够相关的资料",
+                    canonical_url="https://prototype.invalid/weak",
+                    section_title=None,
+                    version_label="test",
+                    published_at=None,
+                    content="不应作为当前查询证据。",
+                    similarity=0.55,
+                    trust_level="prototype",
+                    vector_similarity=0.55,
+                )
+            ],
+        )
+
+    monkeypatch.setattr(knowledge_route, "search_knowledge", fake_search)
+    client.cookies.set(ACCESS_COOKIE, create_access_token(user.id))
+    response = await client.post(
+        "/api/v1/knowledge/search",
+        json={"query": "未覆盖问题", "topK": 3},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["items"] == []
+
+
 def test_medical_retrieval_evaluation_set_has_required_coverage():
     path = Path(__file__).resolve().parents[1] / "docs" / "medical_retrieval_evaluation.json"
     payload = json.loads(path.read_text(encoding="utf-8"))

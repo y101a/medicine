@@ -808,8 +808,9 @@ def test_results_file_round_trips_into_an_offline_sweep(tmp_path: Path):
     outcome = run_relevance_gate_sweep(args)
 
     assert outcome.mode == "sweep"
-    assert outcome.gates_evaluated == 7 * 5 * 4
+    assert outcome.gates_evaluated == 51 * 13
     assert outcome.selected is not None
+    assert outcome.selected["thresholds"]["keywordOnly"] == 0.2
     assert outcome.sweep["eligibleCount"] >= 1
 
 

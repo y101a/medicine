@@ -91,3 +91,17 @@ def test_prototype_manifest_uses_only_local_markdown_files():
         content = load_markdown(directory / entry.file)
         assert "未经医学专业审核" in content
         assert len(chunk_markdown(content)) >= 2
+
+
+def test_medicine_use_source_covers_leftovers_and_stopping_early():
+    """检索门槛不能靠降阈值救漏召回，语料本身要覆盖这两种常见口语表达。"""
+    directory = Path(__file__).resolve().parents[1] / "data" / "prototype_knowledge"
+    manifest = load_manifest(directory)
+    medicine = next(entry for entry in manifest.documents if entry.slug == "medicine-use")
+    content = (directory / medicine.file).read_text(encoding="utf-8")
+
+    assert {"剩余药品", "规范用药", "自行停药"}.issubset(set(medicine.topics))
+    assert "上次治疗剩下的药" in content
+    assert "这次症状差不多" in content
+    assert "不要因为吃了两天" in content
+    assert "自行提前停药" in content
