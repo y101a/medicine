@@ -25,9 +25,7 @@ router = APIRouter(prefix="/health-records", tags=["健康记录"])
 
 
 @router.get("/settings", response_model=HealthRecordSettingsOut, summary="采集开关与首次通知状态")
-async def read_health_record_settings(
-    user: CurrentUser, db: DbSession
-) -> HealthRecordSettingsOut:
+async def read_health_record_settings(user: CurrentUser, db: DbSession) -> HealthRecordSettingsOut:
     return await service.settings_out(db, user.id)
 
 

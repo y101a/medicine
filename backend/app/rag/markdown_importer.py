@@ -45,9 +45,7 @@ class DocumentReviewMetadata(BaseModel):
     legal_reviewed_by: str = Field(min_length=2, max_length=200)
     medical_reviewed_at: datetime
     medical_reviewed_by: str = Field(min_length=2, max_length=200)
-    content_mode: Literal["licensed_full_text", "original_summary"] = (
-        "licensed_full_text"
-    )
+    content_mode: Literal["licensed_full_text", "original_summary"] = "licensed_full_text"
     verbatim_quotes: list[str] = Field(default_factory=list, max_length=10)
     metadata: dict[str, object] = Field(default_factory=dict)
 
@@ -284,17 +282,13 @@ async def import_markdown_document(
         chunk_count = len(
             list(
                 await db.scalars(
-                    select(KnowledgeChunk).where(
-                        KnowledgeChunk.document_id == duplicate.id
-                    )
+                    select(KnowledgeChunk).where(KnowledgeChunk.document_id == duplicate.id)
                 )
             )
         )
         return ImportResult(duplicate.id, chunk_count, True, duplicate.supersedes_document_id)
 
-    idempotency_key = _sha256(
-        f"{metadata.source_key}\n{metadata.canonical_url}\n{content_hash}"
-    )
+    idempotency_key = _sha256(f"{metadata.source_key}\n{metadata.canonical_url}\n{content_hash}")
     job = await db.scalar(
         select(IngestionJob).where(IngestionJob.idempotency_key == idempotency_key)
     )

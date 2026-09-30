@@ -270,9 +270,7 @@ async def build_health_context(db: AsyncSession, user_id: UUID) -> str | None:
     return render_health_context(json.dumps(entries, ensure_ascii=False))
 
 
-async def extraction_model(
-    db: AsyncSession, user_id: UUID
-) -> ModelConfig | None:
+async def extraction_model(db: AsyncSession, user_id: UUID) -> ModelConfig | None:
     return await preferred_model_for_user(db, user_id)
 
 

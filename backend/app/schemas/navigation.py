@@ -53,4 +53,3 @@ class HospitalNavigationResponse(BaseModel):
     count: int
     items: list[HospitalNavigationOut]
     notice: str
-

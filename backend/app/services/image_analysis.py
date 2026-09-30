@@ -255,11 +255,7 @@ def _render(payload: VisionPayload, model: str) -> ImageAnalysis:
         ocr = payload.ocr_text.strip()
         if not ocr:
             raise AppError(422, "IMAGE_NO_TEXT", "未识别到清晰文字，请换一张更清楚的报告图片")
-        text = (
-            "报告图片文字提取（仅转录，不代表诊断）：\n"
-            + ocr[:20_000]
-            + f"\n图片质量：{suffix}"
-        )
+        text = "报告图片文字提取（仅转录，不代表诊断）：\n" + ocr[:20_000] + f"\n图片质量：{suffix}"
     elif category == "medication_leaflet":
         ocr = payload.ocr_text.strip()
         if not ocr:
@@ -423,9 +419,7 @@ async def analyze_image(
             except (KeyError, IndexError, TypeError, ValueError, ValidationError) as exc:
                 will_retry = attempt < MAX_PROVIDER_ATTEMPTS
                 validation_errors = (
-                    _validation_error_summary(exc)
-                    if isinstance(exc, ValidationError)
-                    else None
+                    _validation_error_summary(exc) if isinstance(exc, ValidationError) else None
                 )
                 logger.warning(
                     "Medical image provider returned an invalid response: "

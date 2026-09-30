@@ -73,7 +73,16 @@ BROAD_TOPIC_ALIASES = {
     ),
 }
 BROAD_OVERVIEW_CUES = (
-    "有哪些", "有什么病", "常见", "类型", "分类", "种类", "包括", "是什么", "介绍", "科普",
+    "有哪些",
+    "有什么病",
+    "常见",
+    "类型",
+    "分类",
+    "种类",
+    "包括",
+    "是什么",
+    "介绍",
+    "科普",
 )
 THYROID_COVERAGE_GROUPS = (
     ("甲状腺功能亢进", "甲亢"),
@@ -127,9 +136,12 @@ def generic_topic(patient_text: str) -> str | None:
         return exact
     normalized = re.sub(r"[\s？?。！!]+", "", patient_text)
     return next(
-        (topic for topic, aliases in BROAD_TOPIC_ALIASES.items()
-         if any(alias in normalized for alias in aliases)
-         and (normalized in aliases or any(cue in normalized for cue in BROAD_OVERVIEW_CUES))),
+        (
+            topic
+            for topic, aliases in BROAD_TOPIC_ALIASES.items()
+            if any(alias in normalized for alias in aliases)
+            and (normalized in aliases or any(cue in normalized for cue in BROAD_OVERVIEW_CUES))
+        ),
         None,
     )
 
@@ -248,7 +260,7 @@ async def search_generic_topic(topic: str) -> list[SearchHit]:
             key=lambda hit: topic_coverage_count(topic, [hit.title, hit.excerpt]),
             reverse=True,
         )
-    return hits[:web_hit_limit(topic)]
+    return hits[: web_hit_limit(topic)]
 
 
 async def save_search_prototypes(db: AsyncSession, topic: str, hits: list[SearchHit]) -> None:
@@ -285,9 +297,8 @@ async def save_search_prototypes(db: AsyncSession, topic: str, hits: list[Search
     now = datetime.now(UTC)
     expires = (now + timedelta(days=30)).isoformat()
     for hit in hits:
-        if (
-            trusted_organization(hit.url) != hit.organization
-            or not topic_matches_text(topic, hit.title + hit.excerpt)
+        if trusted_organization(hit.url) != hit.organization or not topic_matches_text(
+            topic, hit.title + hit.excerpt
         ):
             continue
         fingerprint = hashlib.sha256(hit.excerpt.encode("utf-8")).hexdigest()

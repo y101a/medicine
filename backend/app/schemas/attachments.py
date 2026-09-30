@@ -22,20 +22,12 @@ class AttachmentOut(BaseModel):
     preview: str = Field(max_length=201)
     status: Literal["ready"] = "ready"
     created_at: datetime = Field(serialization_alias="createdAt")
-    image_category: ImageCategory | None = Field(
-        default=None, serialization_alias="imageCategory"
-    )
-    mime_type: Literal["image/webp"] | None = Field(
-        default=None, serialization_alias="mimeType"
-    )
+    image_category: ImageCategory | None = Field(default=None, serialization_alias="imageCategory")
+    mime_type: Literal["image/webp"] | None = Field(default=None, serialization_alias="mimeType")
     image_width: int | None = Field(default=None, serialization_alias="width")
     image_height: int | None = Field(default=None, serialization_alias="height")
-    image_available: bool | None = Field(
-        default=None, serialization_alias="imageAvailable"
-    )
-    image_expires_at: datetime | None = Field(
-        default=None, serialization_alias="imageExpiresAt"
-    )
+    image_available: bool | None = Field(default=None, serialization_alias="imageAvailable")
+    image_expires_at: datetime | None = Field(default=None, serialization_alias="imageExpiresAt")
 
 
 class AttachmentList(BaseModel):
@@ -49,15 +41,7 @@ class MessageAttachmentOut(BaseModel):
     display_name: str = Field(serialization_alias="displayName", min_length=1, max_length=120)
     kind: AttachmentKindValue | None = None
     status: Literal["ready", "deleted"]
-    image_category: ImageCategory | None = Field(
-        default=None, serialization_alias="imageCategory"
-    )
-    mime_type: Literal["image/webp"] | None = Field(
-        default=None, serialization_alias="mimeType"
-    )
-    image_available: bool | None = Field(
-        default=None, serialization_alias="imageAvailable"
-    )
-    image_expires_at: datetime | None = Field(
-        default=None, serialization_alias="imageExpiresAt"
-    )
+    image_category: ImageCategory | None = Field(default=None, serialization_alias="imageCategory")
+    mime_type: Literal["image/webp"] | None = Field(default=None, serialization_alias="mimeType")
+    image_available: bool | None = Field(default=None, serialization_alias="imageAvailable")
+    image_expires_at: datetime | None = Field(default=None, serialization_alias="imageExpiresAt")

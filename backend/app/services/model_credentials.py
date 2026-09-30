@@ -126,9 +126,7 @@ def credential_out(row: UserModelCredential) -> ModelCredentialOut:
     )
 
 
-async def list_credentials(
-    db: AsyncSession, user_id: UUID
-) -> list[ModelCredentialOut]:
+async def list_credentials(db: AsyncSession, user_id: UUID) -> list[ModelCredentialOut]:
     rows = (
         await db.scalars(
             select(UserModelCredential)
@@ -180,9 +178,7 @@ async def put_credential(
     return credential_out(row)
 
 
-async def delete_credential(
-    db: AsyncSession, user_id: UUID, provider: str
-) -> None:
+async def delete_credential(db: AsyncSession, user_id: UUID, provider: str) -> None:
     get_provider_definition(provider)
     await db.execute(
         delete(UserModelCredential).where(
@@ -193,15 +189,9 @@ async def delete_credential(
     await db.commit()
 
 
-async def available_models_for_user(
-    db: AsyncSession, user_id: UUID
-) -> list[ModelConfig]:
+async def available_models_for_user(db: AsyncSession, user_id: UUID) -> list[ModelConfig]:
     rows = (
-        await db.scalars(
-            select(UserModelCredential).where(
-                UserModelCredential.user_id == user_id
-            )
-        )
+        await db.scalars(select(UserModelCredential).where(UserModelCredential.user_id == user_id))
     ).all()
     user_keys = {row.provider: row for row in rows}
     settings = get_settings()
@@ -224,16 +214,10 @@ async def available_models_for_user(
     return models
 
 
-async def get_model_for_user(
-    db: AsyncSession, user_id: UUID, model_id: str
-) -> ModelConfig:
+async def get_model_for_user(db: AsyncSession, user_id: UUID, model_id: str) -> ModelConfig:
     get_model_definition(model_id)
     model = next(
-        (
-            item
-            for item in await available_models_for_user(db, user_id)
-            if item.id == model_id
-        ),
+        (item for item in await available_models_for_user(db, user_id) if item.id == model_id),
         None,
     )
     if model is None:
@@ -241,8 +225,6 @@ async def get_model_for_user(
     return model
 
 
-async def preferred_model_for_user(
-    db: AsyncSession, user_id: UUID
-) -> ModelConfig | None:
+async def preferred_model_for_user(db: AsyncSession, user_id: UUID) -> ModelConfig | None:
     models = await available_models_for_user(db, user_id)
     return models[0] if models else None

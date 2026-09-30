@@ -141,9 +141,7 @@ async def vectorize_document(
             vectors.extend(batch.vectors)
             if total_tokens is not None:
                 total_tokens = (
-                    total_tokens + batch.total_tokens
-                    if batch.total_tokens is not None
-                    else None
+                    total_tokens + batch.total_tokens if batch.total_tokens is not None else None
                 )
 
         async with db.begin_nested():

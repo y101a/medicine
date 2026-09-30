@@ -14,9 +14,7 @@ from app.core.config import get_settings
 from app.models import IngestionJob, KnowledgeChunk, KnowledgeDocument, KnowledgeSource
 from app.rag.markdown_importer import chunk_markdown, load_markdown
 
-DEFAULT_PROTOTYPE_DIRECTORY = (
-    Path(__file__).resolve().parents[2] / "data" / "prototype_knowledge"
-)
+DEFAULT_PROTOTYPE_DIRECTORY = Path(__file__).resolve().parents[2] / "data" / "prototype_knowledge"
 PROTOTYPE_SOURCE_KEY = "developer_prototype_knowledge"
 PROTOTYPE_SOURCE_URL = "https://prototype.invalid/medical-knowledge"
 
@@ -88,9 +86,7 @@ async def seed_prototype_knowledge(
     manifest = load_manifest(resolved_directory)
 
     source = await db.scalar(
-        select(KnowledgeSource).where(
-            KnowledgeSource.source_key == PROTOTYPE_SOURCE_KEY
-        )
+        select(KnowledgeSource).where(KnowledgeSource.source_key == PROTOTYPE_SOURCE_KEY)
     )
     if source is None:
         source = KnowledgeSource(

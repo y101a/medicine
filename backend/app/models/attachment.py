@@ -68,9 +68,7 @@ class Attachment(Base):
             "kind IN ('pdf', 'docx', 'pptx', 'txt', 'md', 'image')",
             name="kind_supported",
         ),
-        CheckConstraint(
-            "byte_size BETWEEN 1 AND 31457280", name="byte_size_supported"
-        ),
+        CheckConstraint("byte_size BETWEEN 1 AND 31457280", name="byte_size_supported"),
         CheckConstraint(
             "page_count IS NULL OR page_count BETWEEN 1 AND 100",
             name="page_count_supported",

@@ -108,7 +108,7 @@ def is_identity_only_question(text: str) -> bool:
         return False
     for greeting in ("你好", "您好", "请问", "嗨", "hello", "hi"):
         if normalized.startswith(greeting):
-            normalized = normalized[len(greeting):]
+            normalized = normalized[len(greeting) :]
             break
     found = False
     while normalized:
@@ -116,15 +116,17 @@ def is_identity_only_question(text: str) -> bool:
         if part is None:
             return False
         found = True
-        normalized = normalized[len(part):]
+        normalized = normalized[len(part) :]
     return found
 
 
 def history_for_model(history: list[dict[str, str]]) -> list[dict[str, str]]:
     # An identity-only question does not need prior health context. In old chats,
     # earlier assistants may have identified themselves as a different model.
-    if history and history[-1]["role"] == "user" and is_identity_only_question(
-        history[-1]["content"]
+    if (
+        history
+        and history[-1]["role"] == "user"
+        and is_identity_only_question(history[-1]["content"])
     ):
         return history[-1:]
     return history
@@ -165,9 +167,7 @@ async def stream_chat(
         f"{SYSTEM_PROMPT}\n\n{model_identity_instruction(model)}\n\n{format_instruction}"
     )
     if rag_context:
-        system_content += "\n\n" + RAG_CONTEXT_INSTRUCTION.format(
-            rag_context=rag_context
-        )
+        system_content += "\n\n" + RAG_CONTEXT_INSTRUCTION.format(rag_context=rag_context)
     # health_context 已是渲染好的系统提示附加段（含“不得推断病因、不得降低红旗
     # 警惕”等限制），由 app.ai.health_context.render_health_context 生成。
     if health_context:

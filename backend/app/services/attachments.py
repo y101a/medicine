@@ -209,9 +209,7 @@ async def list_attachments(
         attachment_id: _preview(decrypt_sensitive(ciphertext))
         for attachment_id, ciphertext in first_chunks
     }
-    return AttachmentList(
-        items=[_attachment_out(row, previews.get(row.id, "")) for row in rows]
-    )
+    return AttachmentList(items=[_attachment_out(row, previews.get(row.id, "")) for row in rows])
 
 
 async def delete_attachment(

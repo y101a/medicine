@@ -29,9 +29,7 @@ class TriageAssessment:
             "triage_route": self.route,
             "triage_rule_version": self.rule_version,
             "triage_rule_ids": list(self.matched_rule_ids),
-            "triage_result": (
-                self.result.model_dump(mode="json") if self.result else None
-            ),
+            "triage_result": (self.result.model_dump(mode="json") if self.result else None),
         }
 
 
@@ -206,26 +204,17 @@ def _allergy_emergency(sentences: list[str]) -> bool:
     return has_allergy and has_airway_problem
 
 
-def evaluate_triage(
-    content: str, assessed_at: datetime | None = None
-) -> TriageAssessment:
-    sentences = [
-        part.strip() for part in SPLIT_SENTENCE.split(_normalize(content)) if part.strip()
-    ]
+def evaluate_triage(content: str, assessed_at: datetime | None = None) -> TriageAssessment:
+    sentences = [part.strip() for part in SPLIT_SENTENCE.split(_normalize(content)) if part.strip()]
     matched_ids: list[str] = []
     reasons: list[str] = []
     for rule in RED_FLAG_RULES:
-        matched = any(
-            _active_term(sentence, term) for sentence in sentences for term in rule.terms
-        )
+        matched = any(_active_term(sentence, term) for sentence in sentences for term in rule.terms)
         if rule.id == "acute_chest_pain" and not matched:
-            matched = any(
-                _active_pattern(sentence, CHEST_PAIN_PATTERN) for sentence in sentences
-            )
+            matched = any(_active_pattern(sentence, CHEST_PAIN_PATTERN) for sentence in sentences)
         if rule.id == "pregnancy_emergency" and not matched:
             matched = any(
-                _active_pattern(sentence, PREGNANCY_EMERGENCY_PATTERN)
-                for sentence in sentences
+                _active_pattern(sentence, PREGNANCY_EMERGENCY_PATTERN) for sentence in sentences
             )
         if matched:
             matched_ids.append(rule.id)

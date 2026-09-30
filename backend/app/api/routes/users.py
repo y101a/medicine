@@ -82,9 +82,7 @@ async def delete_me(
     response_model=ModelCredentialList,
     summary="列出当前用户已配置的模型密钥",
 )
-async def get_my_model_credentials(
-    current_user: CurrentUser, db: DbSession
-) -> ModelCredentialList:
+async def get_my_model_credentials(current_user: CurrentUser, db: DbSession) -> ModelCredentialList:
     return ModelCredentialList(items=await list_credentials(db, current_user.id))
 
 

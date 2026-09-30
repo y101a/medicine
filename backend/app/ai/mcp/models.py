@@ -35,9 +35,7 @@ class AmapPoiResult(BaseModel):
     department: str
     count: int
     pois: list[AmapPoi]
-    notice: str = Field(
-        default="结果来自公开 POI，可能过期；就诊前请向机构核实科室、时间和资质。"
-    )
+    notice: str = Field(default="结果来自公开 POI，可能过期；就诊前请向机构核实科室、时间和资质。")
 
 
 class HospitalRoute(BaseModel):
@@ -59,7 +57,6 @@ class NearbyHospitalResult(BaseModel):
     hospitals: list[HospitalRoute]
     notice: str = Field(
         default=(
-            "按高德预计路线时间排序，仅供就医查找参考；最近不等于最适合。"
-            "危急情况请立即拨打 120。"
+            "按高德预计路线时间排序，仅供就医查找参考；最近不等于最适合。危急情况请立即拨打 120。"
         )
     )

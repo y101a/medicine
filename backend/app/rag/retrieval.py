@@ -108,9 +108,8 @@ def _fusion_score(
         return float(keyword_score or 0.0)
     if mode == "vector":
         return float(vector_similarity or 0.0)
-    return (
-        HYBRID_VECTOR_WEIGHT * float(vector_similarity or 0.0)
-        + HYBRID_KEYWORD_WEIGHT * float(keyword_score or 0.0)
+    return HYBRID_VECTOR_WEIGHT * float(vector_similarity or 0.0) + HYBRID_KEYWORD_WEIGHT * float(
+        keyword_score or 0.0
     )
 
 
@@ -171,14 +170,10 @@ async def search_knowledge(
     else:
         # Keep the operator threshold aligned with MIN_KEYWORD_SCORE so PostgreSQL can
         # use the pg_trgm GIN indexes instead of ranking every eligible row.
-        await db.execute(
-            text(f"SET LOCAL pg_trgm.word_similarity_threshold = {MIN_KEYWORD_SCORE}")
-        )
+        await db.execute(text(f"SET LOCAL pg_trgm.word_similarity_threshold = {MIN_KEYWORD_SCORE}"))
         keyword_match = or_(
             literal(keyword_query).bool_op("<%")(KnowledgeDocument.title),
-            literal(keyword_query).bool_op("<%")(
-                func.coalesce(KnowledgeChunk.section_title, "")
-            ),
+            literal(keyword_query).bool_op("<%")(func.coalesce(KnowledgeChunk.section_title, "")),
             literal(keyword_query).bool_op("<%")(KnowledgeChunk.content),
         )
         keyword_score = func.greatest(
@@ -218,14 +213,10 @@ async def search_knowledge(
                 status_code = 504 if exc.code == "EMBEDDING_TIMEOUT" else 502
                 raise RetrievalError(status_code, exc.code, str(exc)) from exc
             if len(embedding_batch.vectors) != 1:
-                raise RetrievalError(
-                    502, "EMBEDDING_RESPONSE_INVALID", "查询向量数量不一致"
-                )
+                raise RetrievalError(502, "EMBEDDING_RESPONSE_INVALID", "查询向量数量不一致")
             query_vector = embedding_batch.vectors[0]
             if len(query_vector) != settings.embedding_dimensions:
-                raise RetrievalError(
-                    502, "EMBEDDING_DIMENSION_MISMATCH", "查询向量维度不一致"
-                )
+                raise RetrievalError(502, "EMBEDDING_DIMENSION_MISMATCH", "查询向量维度不一致")
 
             distance = KnowledgeChunk.embedding.cosine_distance(query_vector).label(
                 "cosine_distance"
@@ -335,20 +326,12 @@ async def search_knowledge(
                     max(-1.0, min(1.0, float(compatibility_similarity))),
                     6,
                 ),
-                trust_level=(
-                    "approved"
-                    if document.review_status == "approved"
-                    else "prototype"
-                ),
+                trust_level=("approved" if document.review_status == "approved" else "prototype"),
                 keyword_score=(
-                    round(float(keyword_relevance), 6)
-                    if keyword_relevance is not None
-                    else None
+                    round(float(keyword_relevance), 6) if keyword_relevance is not None else None
                 ),
                 vector_similarity=(
-                    round(float(vector_relevance), 6)
-                    if vector_relevance is not None
-                    else None
+                    round(float(vector_relevance), 6) if vector_relevance is not None else None
                 ),
                 rerank_score=round(float(candidate["rerank_score"]), 8),
             )

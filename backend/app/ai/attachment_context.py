@@ -40,12 +40,12 @@ def _response_guidance(categories: set[str | None]) -> str:
         )
     guidance.extend(
         [
-        "不能只给泛化的就医提醒，也不能把能力限制当作回答主体。若用户文字没有明确急症信号，"
-        "先回答其问题，再按以下顺序组织：①说明附件中能确认的事实；②解释与问题相关的术语、"
-        "数值或可见事实；③给出 2 至 4 条与现有事实直接相关的低风险、可逆、非药物居家处理或"
-        "观察方法；④分别写清可居家观察、普通门诊和需要立即就医的具体触发条件。",
-        "居家建议必须有条件地给出，不得为了凑数量而套用；不得推荐具体药名、剂量、侵入性操作、"
-        "自行停药/加药，或把未经确认的信息写成事实。",
+            "不能只给泛化的就医提醒，也不能把能力限制当作回答主体。若用户文字没有明确急症信号，"
+            "先回答其问题，再按以下顺序组织：①说明附件中能确认的事实；②解释与问题相关的术语、"
+            "数值或可见事实；③给出 2 至 4 条与现有事实直接相关的低风险、可逆、非药物居家处理或"
+            "观察方法；④分别写清可居家观察、普通门诊和需要立即就医的具体触发条件。",
+            "居家建议必须有条件地给出，不得为了凑数量而套用；不得推荐具体药名、剂量、侵入性操作、"
+            "自行停药/加药，或把未经确认的信息写成事实。",
         ]
     )
     if "report" in categories:
@@ -196,5 +196,5 @@ async def build_attachment_context(
     categories = {entry["imageCategory"] for entry in rendered if entry["sourceKind"] == "image"}
     return ATTACHMENT_CONTEXT_INSTRUCTION.format(
         response_guidance=_response_guidance(categories),
-        attachment_context=json.dumps(rendered, ensure_ascii=False, separators=(",", ":"))
+        attachment_context=json.dumps(rendered, ensure_ascii=False, separators=(",", ":")),
     )

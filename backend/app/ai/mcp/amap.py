@@ -327,9 +327,7 @@ async def find_nearby_hospitals(
         if not isinstance(raw_pois, list):
             raise ExternalToolError("AMAP_RESPONSE_INVALID")
         candidates = [
-            value
-            for item in raw_pois
-            if (value := _candidate(item, hospitals_only=True))
+            value for item in raw_pois if (value := _candidate(item, hospitals_only=True))
         ][:limit]
         routes: list[HospitalRoute] = []
         for hospital in candidates:
@@ -404,8 +402,7 @@ async def find_nearby_hospitals(
             )
         )
         notice = (
-            "按高德预计路线时间排序，仅供就医查找参考；最近不等于最适合。"
-            "危急情况请立即拨打 120。"
+            "按高德预计路线时间排序，仅供就医查找参考；最近不等于最适合。危急情况请立即拨打 120。"
         )
         if routes and all(item.route_duration_seconds is None for item in routes):
             notice = (

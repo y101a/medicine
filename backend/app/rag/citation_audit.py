@@ -3,9 +3,7 @@
 import re
 from typing import Any
 
-SOURCE_MARKER = re.compile(
-    r"\[\s*来源\s*([0-9]+)\s*\]|【\s*来源\s*([0-9]+)\s*】"
-)
+SOURCE_MARKER = re.compile(r"\[\s*来源\s*([0-9]+)\s*\]|【\s*来源\s*([0-9]+)\s*】")
 UNNUMBERED_SOURCE_CLAIM = re.compile(
     r"(?:根据|依据|参考)(?:本轮|上述|这些)?(?:检索)?(?:资料|来源|文献)"
     r"|(?:资料|文献|研究)(?:显示|表明|指出)"
@@ -13,7 +11,8 @@ UNNUMBERED_SOURCE_CLAIM = re.compile(
 
 
 def audit_answer_citations(
-    content: str, sources: list[dict[str, Any]],
+    content: str,
+    sources: list[dict[str, Any]],
 ) -> tuple[str, list[dict[str, Any]]]:
     """Keep only cited evidence and remove references to absent source numbers.
 
@@ -42,8 +41,7 @@ def audit_answer_citations(
     citations = [item for item in sources if item["reference_number"] in used]
     if invalid:
         checked += (
-            "\n\n（回答中有无法对应本轮资料的引用，已标为未核实；"
-            "相关表述不能视为有资料支持。）"
+            "\n\n（回答中有无法对应本轮资料的引用，已标为未核实；相关表述不能视为有资料支持。）"
         )
     elif sources and not citations and UNNUMBERED_SOURCE_CLAIM.search(checked):
         checked += (
