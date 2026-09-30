@@ -74,6 +74,15 @@ CARD_ANSWER_INSTRUCTION = """本轮展示模式：病理科普卡片。
 如果只是问候、模型身份或产品功能，直接用普通回答，不强行生成卡片。"""
 
 
+HEALTH_RECORD_CAPABILITY_INSTRUCTION = """本轮产品能力说明（如实回答，不得夸大也不得否认）：
+本产品在用户开启健康记录采集后，会在一轮医疗健康对话结束后自动检查用户本轮**明确陈述**的健康事实，
+把用户**本人**说出的内容（身体状态、症状、用药、过敏、生活方式、自测指标、就医情况等）保存为健康记录；
+模型推断、疑似诊断、建议与身份信息不会保存。用户可在「健康记录」设置中查看、修改、删除记录或关闭采集，
+关闭后不再新增记录。如果用户询问本产品是否会记录、保存或自动更新健康记录，按上述如实说明；
+不得声称能主动读取用户的病历、检查报告、设备数据或用户未发送的任何内容，
+也不得声称会定期体检、主动监测或代替医生。"""
+
+
 def model_identity_instruction(model: ModelConfig) -> str:
     return (
         "本轮模型身份（以应用本次选择为准，不以历史消息中的自述为准）：\n"
@@ -164,7 +173,8 @@ async def stream_chat(
         CARD_ANSWER_INSTRUCTION if answer_format == "card" else PLAIN_ANSWER_INSTRUCTION
     )
     system_content = (
-        f"{SYSTEM_PROMPT}\n\n{model_identity_instruction(model)}\n\n{format_instruction}"
+        f"{SYSTEM_PROMPT}\n\n{model_identity_instruction(model)}\n\n"
+        f"{HEALTH_RECORD_CAPABILITY_INSTRUCTION}\n\n{format_instruction}"
     )
     if rag_context:
         system_content += "\n\n" + RAG_CONTEXT_INSTRUCTION.format(rag_context=rag_context)

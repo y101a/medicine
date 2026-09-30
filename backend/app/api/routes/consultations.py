@@ -172,6 +172,22 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
     def encode(event: dict) -> str:
         return json.dumps(event, ensure_ascii=False, default=str) + "\n"
 
+    def schedule_health_extraction() -> None:
+        """回答落库后由服务端派发一次健康记录抽取（本轮已完成）。
+
+        放在 finally 里：正常、被中止、服务异常三条路径都算“这一轮结束了”，
+        而抽取本身异步执行、自带独立会话与异常兜底，绝不向聊天主流程抛出。
+        """
+
+        try:
+            health_service.schedule_conversation_extraction(
+                user_id=user.id,
+                user_text=user_text,
+                message_id=user_message_id,
+            )
+        except Exception:  # noqa: BLE001 - 兜底：抽取调度失败不得影响对话
+            pass
+
     async def generate():
         parts: list[str] = []
         pending = ""
@@ -339,6 +355,8 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
             message = exc.message if hasattr(exc, "message") else "AI 回答生成失败，请稍后重试"
             code = exc.code if hasattr(exc, "code") else "AI_GENERATION_FAILED"
             yield encode({"type": "error", "code": code, "message": message})
+        finally:
+            schedule_health_extraction()
 
     return StreamingResponse(
         generate(),

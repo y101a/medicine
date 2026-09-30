@@ -46,11 +46,11 @@ async def submit_health_record_onboarding(
 @router.post("/extract", summary="按单条助手回答增量更新健康记录")
 async def extract_health_records(
     payload: HealthRecordExtractRequest, user: CurrentUser, db: DbSession
-) -> dict[str, int]:
-    stored = await service.extract_from_message(
+) -> dict[str, object]:
+    outcome = await service.extract_from_message(
         db, user.id, payload.consultation_id, payload.message_id
     )
-    return {"stored": stored}
+    return outcome.as_payload()
 
 
 @router.get("", response_model=HealthRecordList, summary="健康记录列表")

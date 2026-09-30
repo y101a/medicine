@@ -78,13 +78,15 @@ def authenticate(client: AsyncClient, user: User) -> None:
 
 
 async def add_exchange(
-    db: AsyncSession, user: User, text: str, *, medical: bool = True
+    db: AsyncSession, user: User, text: str, *, medical: bool = False
 ) -> tuple[Message, Message]:
-    """建立一次真实形态的问答：用户消息不带标记，助手回答带。
+    """建立一次真实形态的问答：用户消息不带标记，助手回答带检索门控的判定结果。
 
+    助手标记默认 ``False``，因为线上对「我最近总口渴」这类自述的真实取值就是
+    ``retrieval_gate_reason == "non_medical_content"``——旧实现据此跳过抽取，正是本次
+    修复的缺陷。所以这里默认成这个“难”的取值：抽取是否发生不得取决于它。
     线上只有助手构造器会写 ``is_medical_content``（见 ``app/services/consultations.py``），
-    用户消息始终是模型默认的 False。旧版辅助函数直接给**用户**消息置 True，那是线上造不出来
-    的状态，因此提取链路实际不生效却一直有测试通过。
+    用户消息始终是模型默认的 False。
     """
     consultation = Consultation(
         user_id=user.id,
@@ -273,14 +275,18 @@ async def test_extraction_stores_conversation_facts_once(health_context, monkeyp
 
     result = await client.post(f"{API}/extract", json=payload)
     assert result.status_code == 200
-    assert result.json() == {"stored": 1}
+    assert result.json() == {"stored": 1, "status": "stored", "reason": None}
     # 抽取文本必须来自助手回答之前的那条用户提问。
     assert calls == ["我最近总口渴"]
     items = (await client.get(API)).json()["items"]
     assert [item["content"] for item in items] == ["最近经常口渴"]
     assert items[0]["source"] == "conversation"
 
-    assert (await client.post(f"{API}/extract", json=payload)).json() == {"stored": 0}
+    assert (await client.post(f"{API}/extract", json=payload)).json() == {
+        "stored": 0,
+        "status": "skipped",
+        "reason": "already-extracted",
+    }
     assert len(calls) == 1
 
 
@@ -297,10 +303,14 @@ async def test_extraction_skips_small_talk_and_foreign_messages(health_context, 
         service, "extraction_model", AsyncMock(return_value=object())
     )
 
-    _, chat = await add_exchange(db, first, "你好", medical=False)
+    _, chat = await add_exchange(db, first, "你好")
     authenticate(client, first)
     payload = {"consultationId": str(chat.consultation_id), "messageId": str(chat.id)}
-    assert (await client.post(f"{API}/extract", json=payload)).json() == {"stored": 0}
+    assert (await client.post(f"{API}/extract", json=payload)).json() == {
+        "stored": 0,
+        "status": "skipped",
+        "reason": "social-only",
+    }
     assert calls == []
 
     _, medical = await add_exchange(db, first, "我最近总口渴")
@@ -310,8 +320,10 @@ async def test_extraction_skips_small_talk_and_foreign_messages(health_context, 
     assert calls == []
 
 
-async def test_extraction_is_driven_by_the_assistant_flag(health_context, monkeypatch):
-    """判定在助手回答上：传用户消息 id 被拒，助手未标记为医疗内容则不抽取。"""
+async def test_extraction_is_decided_by_the_user_message_not_the_assistant_flag(
+    health_context, monkeypatch
+):
+    """判定在**用户消息**上：助手标记既不能阻止，也不能强行触发。"""
     client, db, (user, _) = health_context
     authenticate(client, user)
     question, answer = await add_exchange(db, user, "我最近总口渴")
@@ -334,16 +346,59 @@ async def test_extraction_is_driven_by_the_assistant_flag(health_context, monkey
     assert (await client.post(f"{API}/extract", json=user_payload)).status_code == 404
     assert calls == []
 
-    # 即使把用户消息强行标为医疗内容，只要助手回答没有这个标记就不抽取。
-    question.is_medical_content = True
+    # 助手回答没有被标成医疗内容（线上真实取值），抽取照样发生。
     answer.is_medical_content = False
     await db.flush()
     answer_payload = {
         "consultationId": str(answer.consultation_id),
         "messageId": str(answer.id),
     }
-    assert (await client.post(f"{API}/extract", json=answer_payload)).json() == {"stored": 0}
-    assert calls == []
+    assert (await client.post(f"{API}/extract", json=answer_payload)).json()["stored"] == 1
+    assert calls == ["我最近总口渴"]
+
+    # 反过来：把一条问候强行标成医疗内容，也不得抽出任何记录。
+    _, greeting = await add_exchange(db, user, "你好", medical=True)
+    greeting_payload = {
+        "consultationId": str(greeting.consultation_id),
+        "messageId": str(greeting.id),
+    }
+    assert (await client.post(f"{API}/extract", json=greeting_payload)).json() == {
+        "stored": 0,
+        "status": "skipped",
+        "reason": "social-only",
+    }
+    assert calls == ["我最近总口渴"]
+
+
+async def test_bodily_observation_is_stored_without_inferring_a_disease(
+    health_context, monkeypatch
+):
+    """「脸上红红的」这类体感描述要能落库，但模型给的疑似结论必须被丢弃。"""
+    client, db, (user, _) = health_context
+    authenticate(client, user)
+    _, answer = await add_exchange(db, user, "最近感觉身体状态不错：脸上红红的")
+
+    async def fake_extract(user_text, model, *, existing_facts=None):
+        return [
+            ExtractedFact(
+                category=HealthRecordCategory.GENERAL_STATUS, content="近期身体状态不错"
+            ),
+            ExtractedFact(category=HealthRecordCategory.SYMPTOM, content="脸部发红"),
+            ExtractedFact(category=HealthRecordCategory.OTHER, content="疑似过敏反应"),
+        ]
+
+    monkeypatch.setattr(service, "extract_health_facts", fake_extract)
+    monkeypatch.setattr(
+        service, "extraction_model", AsyncMock(return_value=object())
+    )
+    payload = {"consultationId": str(answer.consultation_id), "messageId": str(answer.id)}
+
+    result = await client.post(f"{API}/extract", json=payload)
+
+    assert result.json() == {"stored": 2, "status": "stored", "reason": None}
+    items = (await client.get(API)).json()["items"]
+    assert sorted(item["content"] for item in items) == ["脸部发红", "近期身体状态不错"]
+    assert {item["source"] for item in items} == {"conversation"}
 
 
 async def test_extraction_respects_disabled_collection(health_context, monkeypatch):
@@ -363,7 +418,11 @@ async def test_extraction_respects_disabled_collection(health_context, monkeypat
     await client.patch(f"{API}/settings", json={"collectionEnabled": False})
 
     payload = {"consultationId": str(answer.consultation_id), "messageId": str(answer.id)}
-    assert (await client.post(f"{API}/extract", json=payload)).json() == {"stored": 0}
+    assert (await client.post(f"{API}/extract", json=payload)).json() == {
+        "stored": 0,
+        "status": "skipped",
+        "reason": "collection-disabled",
+    }
     assert calls == []
     assert (await client.get(API)).json() == {"items": []}
 

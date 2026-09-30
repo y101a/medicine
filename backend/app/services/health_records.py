@@ -4,10 +4,14 @@ Boundary: only facts the user stated themselves are stored. Model output is trea
 a restatement of the user's own words, and record data never feeds red-flag triage.
 """
 
+import asyncio
 import hashlib
 import json
+import logging
 import unicodedata
+from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Literal
 from uuid import UUID, uuid4
 
 from sqlalchemy import func, select
@@ -16,10 +20,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.health_context import render_health_context
+from app.ai.health_eligibility import evaluate_health_extraction_eligibility
 from app.ai.health_extract import extract_health_facts, is_safe_fact
 from app.ai.registry import ModelConfig
 from app.core.errors import AppError
 from app.core.security import decrypt_sensitive, encrypt_sensitive
+from app.db.session import SessionLocal
 from app.models import (
     Consultation,
     HealthRecord,
@@ -43,6 +49,26 @@ from app.services.model_credentials import preferred_model_for_user
 MAX_LIST_ITEMS = 200
 MAX_CONTEXT_RECORDS = 20
 MAX_CONTEXT_CHARS = 1200
+MAX_CONCURRENT_EXTRACTIONS = 4
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class ExtractionOutcome:
+    """Observable result of one extraction attempt.
+
+    ``reason`` carries a controlled code (eligibility reason, ``collection-disabled``,
+    ``already-extracted``, ``no-model``, or the AppError code). Neither the health text
+    nor any credential is ever logged or returned.
+    """
+
+    status: Literal["stored", "skipped", "failed"]
+    stored: int = 0
+    reason: str | None = None
+
+    def as_payload(self) -> dict[str, object]:
+        return {"stored": self.stored, "status": self.status, "reason": self.reason}
 
 
 def _normalized(value: str) -> str:
@@ -286,21 +312,60 @@ async def _existing_fact_texts(db: AsyncSession, user_id: UUID, limit: int = 20)
 
 async def extract_and_store(
     db: AsyncSession, user_id: UUID, user_text: str, message_id: UUID
-) -> int:
-    """Best-effort extraction; never raises so the chat path cannot be broken."""
+) -> ExtractionOutcome:
+    """Best-effort extraction of one user message; never raises so chat cannot break.
+
+    资格判定只看**这条用户消息本身**（`app.ai.health_eligibility`），不复用 RAG 的
+    `medical_content` 门控：那个门控回答的是“要不要检索医学知识”，会把「我最近总口渴」
+    「脸上红红的」这类真实自述判成非医疗内容，于是采集开着也什么都存不下来。
+    """
 
     row = await get_or_create_settings(db, user_id)
-    if not row.collection_enabled or row.last_extracted_message_id == message_id:
-        return 0
+    if not row.collection_enabled:
+        return ExtractionOutcome("skipped", reason="collection-disabled")
+    if row.last_extracted_message_id == message_id:
+        return ExtractionOutcome("skipped", reason="already-extracted")
+    decision = evaluate_health_extraction_eligibility(user_text)
+    if not decision.eligible:
+        logger.info(
+            "health_record_extraction_skipped code=ineligible reason=%s message_id=%s",
+            decision.reason,
+            message_id,
+        )
+        return ExtractionOutcome("skipped", reason=decision.reason)
+    # `last_extracted_message_id` 只记得最近一条：重触发**较早**的消息时它会失配，
+    # 于是白跑一次模型调用（记录靠 content_hash 兜住，但幂等不成立）。记录上的
+    # `source_message_id` 是持久证据，两者合起来才算真的“这条消息已处理过”。
+    stored_before = await db.scalar(
+        select(func.count())
+        .select_from(HealthRecord)
+        .where(
+            HealthRecord.user_id == user_id,
+            HealthRecord.source_message_id == message_id,
+        )
+    )
+    if stored_before:
+        return ExtractionOutcome("skipped", reason="already-extracted")
     model = await extraction_model(db, user_id)
     if model is None:
-        return 0
+        logger.warning("health_record_extraction_failed code=no-model message_id=%s", message_id)
+        return ExtractionOutcome("failed", reason="no-model")
     try:
         facts = await extract_health_facts(
             user_text, model, existing_facts=await _existing_fact_texts(db, user_id)
         )
-    except AppError:
-        return 0
+    except AppError as exc:
+        logger.warning(
+            "health_record_extraction_failed code=%s message_id=%s", exc.code, message_id
+        )
+        return ExtractionOutcome("failed", reason=exc.code)
+    except Exception as exc:  # noqa: BLE001 - best effort, report only the type, never content
+        logger.warning(
+            "health_record_extraction_failed code=unexpected error_type=%s message_id=%s",
+            type(exc).__name__,
+            message_id,
+        )
+        return ExtractionOutcome("failed", reason="unexpected")
     stored = 0
     for fact in facts:
         created = await _upsert_fact(
@@ -314,18 +379,18 @@ async def extract_and_store(
         stored += 1 if created else 0
     row.last_extracted_message_id = message_id
     await db.commit()
-    return stored
+    logger.info("health_record_extraction_stored stored=%d message_id=%s", stored, message_id)
+    return ExtractionOutcome("stored", stored=stored)
 
 
 async def extract_from_message(
     db: AsyncSession, user_id: UUID, consultation_id: UUID, message_id: UUID
-) -> int:
+) -> ExtractionOutcome:
     """message_id 是助手回答；抽取文本取它之前最近的一条用户消息。
 
-    医疗内容判定记在**助手**消息上：线上只有助手构造器会写 `is_medical_content`
-    （见 `app/services/consultations.py`），用户消息始终是模型默认的 False。因此必须先
-    定位助手回答、在它身上判定，再回溯对应的用户提问——长期记忆只记录用户自述的事实。
-    回溯写法与病理卡片生成取原始提问一致。
+    助手消息只用来**定位**对应的用户提问。是否值得抽取由那条用户消息本身的资格判定
+    决定（`app.ai.health_eligibility`），与 `messages.is_medical_content` 无关——该标记
+    由检索门控写入，用于决定要不要检索知识，不是“用户是否陈述了个人健康事实”。
     """
 
     answer = await db.scalar(
@@ -339,8 +404,6 @@ async def extract_from_message(
     )
     if answer is None or answer.role != "assistant":
         raise AppError(404, "HEALTH_EXTRACT_SOURCE_NOT_FOUND", "找不到可用于更新的助手回答")
-    if not answer.is_medical_content:
-        return 0
     question = await db.scalar(
         select(Message)
         .where(
@@ -352,7 +415,97 @@ async def extract_from_message(
         .limit(1)
     )
     if question is None:
-        return 0
+        return ExtractionOutcome("skipped", reason="no-user-message")
     return await extract_and_store(
         db, user_id, decrypt_sensitive(question.content_ciphertext), question.id
     )
+
+
+EXTRACTION_SESSION_FACTORY = SessionLocal
+"""Session factory used by the server-side trigger.
+
+The answer route cannot hand over its own request session: FastAPI closes yield
+dependencies when the response finishes, so extraction runs on a session of its own.
+Tests point this at the transactional test session so background extraction stays inside
+the same rollback scope as the request.
+"""
+
+EXTRACTION_SCHEDULING_ENABLED = True
+"""Server-side trigger switch. Production keeps it on.
+
+The test suite turns it off (see ``tests/conftest.py``): a detached task opens its own
+session and may use real model credentials, which must never happen inside the test
+process. Tests that do cover the trigger turn it back on and point
+``EXTRACTION_SESSION_FACTORY`` at their transactional session.
+"""
+
+_extraction_semaphore: asyncio.Semaphore | None = None
+_inflight_extractions: set[UUID] = set()
+_scheduled_extractions: set[asyncio.Task[None]] = set()
+
+
+def _extraction_semaphore_guard() -> asyncio.Semaphore:
+    global _extraction_semaphore
+    if _extraction_semaphore is None:
+        _extraction_semaphore = asyncio.Semaphore(MAX_CONCURRENT_EXTRACTIONS)
+    return _extraction_semaphore
+
+
+async def _run_scheduled_extraction(
+    user_id: UUID, user_text: str, message_id: UUID
+) -> None:
+    try:
+        async with _extraction_semaphore_guard():
+            async with EXTRACTION_SESSION_FACTORY() as session:
+                await extract_and_store(session, user_id, user_text, message_id)
+    except Exception as exc:  # noqa: BLE001 - detached task must never surface anywhere
+        logger.warning(
+            "health_record_extraction_failed code=scheduled-task error_type=%s message_id=%s",
+            type(exc).__name__,
+            message_id,
+        )
+    finally:
+        _inflight_extractions.discard(message_id)
+
+
+def schedule_conversation_extraction(
+    *, user_id: UUID, user_text: str, message_id: UUID | None
+) -> asyncio.Task[None] | None:
+    """Schedule extraction for one finished turn. Best effort; never raises.
+
+    这是「自动更新」的真实触发点：由服务端在回答落库后立刻派发，因此浏览器关闭、
+    路由切换或前端请求失败都不会造成漏采。前端仍可调用 `POST /health-records/extract`
+    作为幂等兜底（同一条消息由 `last_extracted_message_id` 去重）。没有任务队列，所以
+    这是**尽力而为**：进程在任务完成前退出，该轮就丢一次（不影响聊天与既有记录）。
+    """
+
+    if message_id is None:
+        return None
+    if not EXTRACTION_SCHEDULING_ENABLED:
+        return None
+    decision = evaluate_health_extraction_eligibility(user_text)
+    if not decision.eligible:
+        logger.info(
+            "health_record_extraction_skipped code=ineligible reason=%s message_id=%s",
+            decision.reason,
+            message_id,
+        )
+        return None
+    if message_id in _inflight_extractions:
+        return None
+    try:
+        task = asyncio.create_task(_run_scheduled_extraction(user_id, user_text, message_id))
+    except RuntimeError:
+        # No running loop (e.g. calling from a sync context in a test): skip quietly.
+        return None
+    _inflight_extractions.add(message_id)
+    _scheduled_extractions.add(task)
+    task.add_done_callback(_scheduled_extractions.discard)
+    return task
+
+
+async def drain_scheduled_extractions() -> None:
+    """Test seam: await every extraction scheduled by the server-side trigger."""
+
+    while _scheduled_extractions:
+        await asyncio.gather(*list(_scheduled_extractions), return_exceptions=True)

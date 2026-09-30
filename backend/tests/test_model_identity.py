@@ -86,6 +86,72 @@ async def test_each_provider_request_uses_its_own_identity_and_route(
         assert "先直接回答用户实际问的内容" not in system_content
 
 
+@pytest.mark.parametrize("answer_format", ("plain", "card"))
+async def test_system_prompt_states_the_health_record_capability(
+    monkeypatch, answer_format
+) -> None:
+    """产品功能提问必须得到符合真实实现的说明，而不是“不会自动更新”。
+
+    实现事实：采集开启时，每轮对话结束后由服务端检查用户**明确陈述**的健康事实并保存；
+    用户可在设置中查看、修改、删除或关闭采集。因此这段能力说明必须常驻系统提示。
+    """
+
+    definition = MODEL_DEFINITIONS[0]
+    model = ModelConfig(
+        id=definition.id,
+        name=definition.name,
+        provider=definition.provider,
+        provider_name=definition.provider_name,
+        description=definition.description,
+        base_url=f"https://{definition.provider}.example/v1",
+        api_key=SecretStr("test-key"),
+        extra_payload=definition.extra_payload,
+    )
+    requests: list[httpx.Request] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(
+            200,
+            headers={"Content-Type": "text/event-stream"},
+            content='data: {"choices":[{"delta":{"content":"ok"}}]}\n\ndata: [DONE]\n\n',
+        )
+
+    original_client = httpx.AsyncClient
+    transport = httpx.MockTransport(respond)
+    monkeypatch.setattr(
+        provider.httpx,
+        "AsyncClient",
+        lambda **kwargs: original_client(transport=transport, **kwargs),
+    )
+    monkeypatch.setattr(
+        provider,
+        "get_settings",
+        lambda: SimpleNamespace(ai_timeout_seconds=10),
+    )
+
+    [
+        chunk
+        async for chunk in provider.stream_chat(
+            [{"role": "user", "content": "你会自动定期更新健康记录吗"}],
+            model,
+            answer_format,
+        )
+    ]
+
+    system_content = json.loads(requests[0].content)["messages"][0]["content"]
+    assert provider.HEALTH_RECORD_CAPABILITY_INSTRUCTION in system_content
+    for fragment in (
+        "开启健康记录采集",
+        "一轮医疗健康对话结束后自动检查",
+        "明确陈述",
+        "查看、修改、删除记录或关闭采集",
+        "不得声称能主动读取用户的病历",
+        "也不得声称会定期体检、主动监测或代替医生",
+    ):
+        assert fragment in system_content
+
+
 @pytest.mark.parametrize(
     ("question", "expected"),
     [

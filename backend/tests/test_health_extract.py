@@ -96,6 +96,16 @@ def test_prompt_carries_categories_and_existing_facts():
     assert "绝不能记录" in prompt
 
 
+def test_prompt_restricts_facts_to_the_user_and_rejects_product_questions():
+    """第二层防线的前提：提示词本身必须禁止记录他人情况与产品功能提问。"""
+
+    prompt = build_extraction_prompt("我朋友最近总口渴，你会自动更新记录吗")
+
+    assert "只记录用户**本人**（第一人称）的事实" in prompt
+    assert "他人的情况" in prompt
+    assert "产品功能、隐私、账号类提问" in prompt
+
+
 def test_prompt_truncates_overlong_message():
     prompt = build_extraction_prompt("啊" * 5000)
     assert "啊" * 1200 in prompt

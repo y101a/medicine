@@ -59,14 +59,39 @@
    - **关闭采集**：写 `noticeSeen=true` 且 `collectionEnabled=false`，当场停止采集。
 3. 之后不再打扰用户，采集默认进行，用户可随时在「健康记录」页关闭。
 
-## 自动更新（对话提取）
+## 自动更新（对话提取，2026-09-30 修正）
 
-- 触发方式：一次回答结束后，前端调用 `POST /health-records/extract`。项目当前没有任务队列/定时器（Redis 等按需引入），因此「定期更新」由对话事件驱动，而不是调度器。
-- 后端自行判定是否值得提取：`messageId` 传的是**该轮助手回答**，因为医疗内容判定记在助手消息上（`messages.is_medical_content` 线上只有助手构造器会写，用户消息始终为假）。该回答不是医疗内容（问候、闲聊、产品功能提问）时直接返回 `stored: 0`，不产生模型调用；是医疗内容时再回溯它之前最近的一条用户消息作为抽取文本。
-- 幂等：`last_extracted_message_id` 保证同一条消息只提取一次；`content_hash` 唯一约束兜底。
-- 失败处理：提取是**尽力而为**，任何 provider 报错都被吞掉并返回 0，绝不影响对话主流程。
-- 成本：每次有效提取会额外发起一次非流式模型调用（`temperature=0`、`max_tokens=600`、优先使用 `available_models()` 中成本最低的兜底模型）。闲聊被过滤可显著降低调用量。
-- 人工修改后的记录来源改为 `user`，表示它已是用户确认过的内容。
+**触发方式**：服务端在**回答完成链路**里派发，前端不再承担主责。`POST /consultations/{id}/stream`
+的生成器在 `finally` 中调用 `health_records.schedule_conversation_extraction()`，因此正常完成、
+用户中止、服务异常三条路径都会触发；任务用**自己的会话**（`EXTRACTION_SESSION_FACTORY`）、
+有界并发与同消息去重，浏览器关闭、路由切换或前端请求失败都不会造成漏采。前端原有的
+fire-and-forget 调用保留为**幂等兜底**。项目没有任务队列/定时器（Redis 等按需引入），
+所以「定期更新」依旧是对话事件驱动，而不是调度器。
+
+**抽取资格**（本次修复的核心）：判定只看**那条用户消息本身**，用独立模块
+`app/ai/health_eligibility.py`，**不再**复用 RAG 的 `medical_content` / `retrieval_gate_reason`，
+也不看 `messages.is_medical_content`。原因：检索门控回答的是「这个提问要不要检索医学知识」，
+它把「我最近总口渴」「最近感觉身体状态不错：脸上红红的」这类真实自述判成 `non_medical_content`
+（`app/ai/graph/retrieval_gate.py` 的症状词表里没有“口渴/脸上发红”），于是采集开着也什么都存不下来。
+新判定按**表述框架**而不是症状白名单区分：用户本人的自述（体感、身体部位、症状、用药、过敏、
+生活方式、自测指标、就医、长期情况）→ 抽取；问候寒暄、纯疾病知识问答、模型身份、产品功能提问、
+他人情况、以及“我记录里有没有…”这类查询 → 直接 `stored: 0`，且**不产生模型调用**。
+
+**双层过滤**不变：提示词禁止记录推断、建议、身份信息与他人情况，`_upsert_fact` 在
+`source is CONVERSATION` 时再用 `is_safe_fact` 过滤一次。
+
+**幂等**：`last_extracted_message_id` 只记最近一条，因此再加一道**记录级**判定——
+该消息若已存在 `source_message_id` 相同的记录，直接返回 `already-extracted`，不重新调用模型；
+`content_hash` 唯一约束继续兜住语义重复。
+
+**失败处理与可观察性**：提取仍是**尽力而为**，任何 provider 报错都被吞掉并绝不影响对话主流程；
+但不再是“完全不可观察”：失败会写受控日志（`health_record_extraction_*`，只带状态码、消息 id 与
+异常类型，**不含健康明文与密钥**），`POST /extract` 也会返回 `status`/`reason`。
+
+**成本**：只有通过资格判定的消息才会发起一次非流式模型调用（`temperature=0`、`max_tokens=600`、
+优先使用 `available_models()` 中成本最低的兜底模型）；问候与纯知识问答被过滤可显著降低调用量。
+
+人工修改后的记录来源改为 `user`，表示它已是用户确认过的内容。
 
 ## 在回答中的使用限制
 
@@ -93,7 +118,7 @@
 | POST | `` | 手动新增（来源 `user`），重复内容返回既有记录 |
 | PATCH | `/{record_id}` | 修改分类或内容；修改后来源变为 `user` |
 | DELETE | `/{record_id}` | 删除，返回 204 |
-| POST | `/extract` | 按 `consultationId` + **助手回答的** `messageId` 增量更新，返回 `{"stored": n}` |
+| POST | `/extract` | 幂等兜底：按 `consultationId` + **助手回答的** `messageId` 定位该轮用户消息并抽取，返回 `{"stored": n, "status": "stored\|skipped\|failed", "reason": <受控码>}`。`skipped` 的 `reason` 取资格判定原因（如 `social-only`、`product-capability`、`general-knowledge-question`）或 `collection-disabled`、`already-extracted`；`failed` 取 provider 错误码 |
 
 ## 隐私与数据安全
 
@@ -106,11 +131,21 @@
 ## 已知限制
 
 - 没有定时调度，只能由对话事件触发（见上）。
+- 抽取任务脱离请求事务且没有队列：进程若在任务完成前退出，该轮就丢一次（不影响聊天与既有记录）。
+  这是「没有任务队列」下最实用的取舍；要更强保证需引入队列，或把抽取并进回答事务（会拖慢流结束）。
+- **端到端未覆盖真实浏览器断连**：测试用直接关闭生成器来验证同一个 `finally` 分支，真实断网/断连重试
+  没有做浏览器级验收。前端 store 仍会吞掉 `/extract` 的异常（服务端触发已是主责，故不再依赖它），
+  健康记录页也不会在对话结束后自动刷新列表——用户需要进入页面重新拉取。
+- 资格判定是**面向召回**的中文规则屏（体感/部位/症状/用药/过敏/生活方式/自测/就医词表 + 框架判断），
+  英文自述不识别；“家属情况”与本人自述混写在同一句时，屏只保证整句不被丢掉，具体条目由抽取器提示词
+  与 `is_safe_fact` 过滤，无法从规则层保证 100% 不写入他人事实。
+- 模型能力回答靠系统提示（`HEALTH_RECORD_CAPABILITY_INSTRUCTION`）保证，属于**提示级**约束：
+  测试只断言该说明确实进入系统提示，无法机器验证模型一定按它回答。
+- 提取依赖模型质量：模型可能漏抽或改写过度，用户需自行核对并修改。
+- 同一事实若换一种说法表述，`content_hash` 无法识别，可能产生相近的两条记录（提示中已要求模型参考「已有记录」去重，属于尽力而为）。
 - 图表已实现（2026-09-17）：`frontend/src/components/HealthRecordCharts.vue` 按需引入
   ECharts 6.1.0（Bar + Pie，只注册用到的图表与组件，避免整包进主包），范围**明确限定为
   记录条数与分类构成**；不做症状时间线、不做严重度趋势，也不对图表作任何医学判读。
-- 提取依赖模型质量：模型可能漏抽或改写过度，用户需自行核对并修改。
-- 同一事实若换一种说法表述，`content_hash` 无法识别，可能产生相近的两条记录（提示中已要求模型参考「已有记录」去重，属于尽力而为）。
 
 ## 接入状态（2026-09-16 已全部完成）
 
@@ -139,16 +174,23 @@
 
 | 文件 | 数量 | 是否需要数据库 |
 | --- | --- | --- |
-| `backend/tests/test_health_extract.py` | 27 | 否（提取解析、推理与身份信息拦截、提示词、上下文边界、schema 契约） |
-| `backend/tests/test_health_records.py` | 17 | 是（默认采集、跳过语义、关闭采集、越权隔离、去重、编辑删除、提取幂等与门控、上下文上限） |
+| `backend/tests/test_health_extract.py` | 28 | 否（提取解析、推理与身份信息拦截、提示词（含“只记本人/拒绝产品功能提问”）、上下文边界、schema 契约） |
+| `backend/tests/test_health_records.py` | 19 | 是（默认采集、跳过语义、关闭采集、越权隔离、去重、编辑删除、提取幂等与资格判定、上下文上限） |
+| `backend/tests/test_health_extraction_eligibility.py` | 40 | 否（资格判定边界：真实自述可抽、问候/知识问答/身份/产品功能/他人情况不抽，以及与 RAG 门控解耦的结构性断言） |
+| `backend/tests/test_health_record_auto_extraction.py` | 11 | 是（服务端回答完成链路落库、生成器被关闭/抽取失败仍完成、幂等（含较早消息重触发）、关闭采集不调用模型、失败可观察且不泄明文） |
 | `backend/tests/test_health_record_triage_independence.py` | 5 | 否（红旗预检结构上读不到健康记录；自述病史不削弱升级） |
 | `backend/tests/test_health_context_injection.py` | 2 | 否（注入确实进入系统提示词；未提供时不得出现任何相关文本） |
+| `backend/tests/test_model_identity.py` | 18 | 否（原 16：各服务商身份与展示模式路由；本任务 +2：产品能力说明确实进入系统提示） |
 | `frontend/src/components/HealthRecordNoticeDialog.test.ts` | 6 | 否 |
 | `frontend/src/stores/healthRecords.test.ts` | 11 | 否（含首次通知弹出、看过不再弹出、关闭采集后不打扰、同会话只检查一次） |
 | `frontend/src/views/healthRecordView.test.ts` | 6 | 否 |
 | `frontend/src/layouts/WorkspaceLayout.test.ts` | 4 | 否（登录后自动检查并弹窗、已看过不弹、导航入口、离开工作区清理状态） |
 
-健康记录相关合计：后端 51 项、前端 27 项。
+健康记录相关合计：后端 105 项（另含 `test_model_identity.py` 里新增的 2 项能力说明用例）、前端 27 项。
 
-迁移 `20260916_0013` 已应用。最近一次全量实测：**后端 192 项、前端 63 项全部通过**，
-Ruff 与 `vue-tsc --noEmit` 均无问题。**尚未执行浏览器级端到端验收。**
+迁移 `20260916_0013` 已应用，**本次修复未新增迁移**（不加表/列/约束）。最近一次全量实测：
+**后端 444 项全部通过**（基线 389，本任务 +55），`ruff check app tests` 全绿；
+前端 `vitest run` 245 项中 244 通过（唯一失败是 `settings.test.ts` 的 5s 超时，隔离复跑 13/13 通过，
+属负载抖动）、`npm run build` exit 0（内含 `vue-tsc -b`）。开发库真实链路验证：服务端触发与接口
+两条路径都落下 `source=conversation` 的记录（只替换模型网络出口，未发起付费调用），验证后已清除
+占位数据。**仍未做浏览器级“真实断连”验收**（见已知限制）。
