@@ -37,6 +37,9 @@ class DocumentGenerationOut(BaseModel):
     formats: list[DocumentFormat]
     title: str | None = None
     model: str
+    template_mode: Literal["default", "builtin", "uploaded"] = Field(
+        serialization_alias="templateMode"
+    )
     files: list[GeneratedDocumentFileOut] = Field(default_factory=list)
     source_count: int = Field(default=0, serialization_alias="sourceCount", ge=0)
     error_code: str | None = Field(default=None, serialization_alias="errorCode")

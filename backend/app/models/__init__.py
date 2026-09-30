@@ -11,6 +11,7 @@ from app.models.generated_document import (
     GeneratedDocument,
     GeneratedDocumentDeletionJob,
     GeneratedDocumentFile,
+    GeneratedDocumentTemplate,
 )
 from app.models.generated_image import GeneratedImage, GeneratedImageDeliveryLog
 from app.models.health_record import (
@@ -49,6 +50,7 @@ __all__ = [
     "GeneratedDocument",
     "GeneratedDocumentDeletionJob",
     "GeneratedDocumentFile",
+    "GeneratedDocumentTemplate",
     "ImageDeletionJob",
     "IngestionJob",
     "KnowledgeChunk",

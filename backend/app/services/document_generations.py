@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import json
 import secrets
 from collections import defaultdict
@@ -19,10 +21,12 @@ from app.models import (
     Consultation,
     GeneratedDocument,
     GeneratedDocumentFile,
+    GeneratedDocumentTemplate,
     Message,
     MessageAttachment,
     User,
 )
+from app.rag.relevance import filter_citations, production_relevance_gate
 from app.rag.retrieval import RetrievalError, search_knowledge
 from app.schemas.document_generations import (
     CreateDocumentGeneration,
@@ -51,6 +55,7 @@ from app.services.generated_document_storage import (
     store_generated_document,
 )
 from app.services.generated_document_validation import validate_generated_document
+from app.services.presentation_template import validate_presentation_template
 
 NOTICE_VERSION = "document-generation-v1"
 ACTIVE_STATUSES = ("queued", "generating", "rendering")
@@ -97,6 +102,7 @@ def _out(
         formats=row.requested_formats,
         title=title,
         model=row.model,
+        template_mode=row.template_mode,
         files=_files_out(files, available=available),
         source_count=row.source_count,
         error_code=row.error_code,
@@ -200,11 +206,28 @@ async def _enforce_limits(db: AsyncSession, user_id: UUID, now: datetime) -> Non
         )
 
 
+async def _assert_template_retry_matches(
+    db: AsyncSession, row: GeneratedDocument, template_bytes: bytes | None
+) -> None:
+    if template_bytes is None:
+        return
+    uploaded = await db.get(GeneratedDocumentTemplate, row.id)
+    digest = hashlib.sha256(template_bytes).hexdigest()
+    if uploaded is None or uploaded.content_sha256 != digest:
+        raise AppError(
+            409,
+            "DOCUMENT_GENERATION_TEMPLATE_CONFLICT",
+            "本轮消息已创建不同的文档任务；如需更换模板，请重新发送生成请求",
+        )
+
+
 async def create(
     db: AsyncSession,
     user_id: UUID,
     consultation_id: UUID,
     payload: CreateDocumentGeneration,
+    *,
+    template_bytes: bytes | None = None,
 ) -> DocumentGenerationOut:
     existing = await db.scalar(
         select(GeneratedDocument).where(
@@ -213,6 +236,7 @@ async def create(
         )
     )
     if existing is not None:
+        await _assert_template_retry_matches(db, existing, template_bytes)
         files = await _files_by_generation(db, [existing.id])
         return _out(existing, files[existing.id])
     existing_source = await db.scalar(
@@ -222,6 +246,7 @@ async def create(
         )
     )
     if existing_source is not None:
+        await _assert_template_retry_matches(db, existing_source, template_bytes)
         files = await _files_by_generation(db, [existing_source.id])
         return _out(existing_source, files[existing_source.id])
     if not payload.notice_accepted or payload.notice_version != NOTICE_VERSION:
@@ -238,6 +263,7 @@ async def create(
         )
     )
     if existing is not None:
+        await _assert_template_retry_matches(db, existing, template_bytes)
         files = await _files_by_generation(db, [existing.id])
         return _out(existing, files[existing.id])
     active = await db.scalar(
@@ -254,6 +280,10 @@ async def create(
         consultation_id,
         payload.source_message_id,
     )
+    if template_bytes is not None:
+        if "pptx" not in request.formats:
+            raise AppError(422, "PPT_TEMPLATE_NOT_APPLICABLE", "上传模板仅用于 PPT 生成")
+        await asyncio.to_thread(validate_presentation_template, template_bytes)
     now = datetime.now(UTC)
     await _enforce_limits(db, user_id, now)
     settings = get_settings()
@@ -265,21 +295,57 @@ async def create(
         requested_formats=list(request.formats),
         status="queued",
         model=settings.document_generation_model,
+        template_mode="uploaded"
+        if template_bytes is not None
+        else "builtin"
+        if request.template_requested
+        else "default",
         created_at=now,
         updated_at=now,
     )
     db.add(row)
     await db.flush()
-    await add_audit_log(
-        db,
-        actor_user_id=user_id,
-        action="consent",
-        resource_type="generated_document",
-        resource_id=row.id,
-        outcome=AUDIT_OUTCOME_SUCCESS,
-        reason_code="DOCUMENT_GENERATION_NOTICE_V1",
-    )
-    await db.commit()
+    template_key: str | None = None
+    try:
+        if template_bytes is not None:
+            stored_template = await store_generated_document(
+                template_bytes, row.id, "pptx-template"
+            )
+            template_key = stored_template.storage_key
+            db.add(
+                GeneratedDocumentTemplate(
+                    generation_id=row.id,
+                    storage_key=stored_template.storage_key,
+                    file_key_ciphertext=stored_template.key_ciphertext,
+                    byte_size=len(template_bytes),
+                    content_sha256=stored_template.content_sha256,
+                )
+            )
+        await add_audit_log(
+            db,
+            actor_user_id=user_id,
+            action="consent",
+            resource_type="generated_document",
+            resource_id=row.id,
+            outcome=AUDIT_OUTCOME_SUCCESS,
+            reason_code="DOCUMENT_GENERATION_NOTICE_V1",
+        )
+        if template_bytes is not None:
+            await add_audit_log(
+                db,
+                actor_user_id=user_id,
+                action="consent",
+                resource_type="generated_document",
+                resource_id=row.id,
+                outcome=AUDIT_OUTCOME_SUCCESS,
+                reason_code="PPT_TEMPLATE_UPLOAD_V1",
+            )
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        if template_key:
+            await remove_generated_document(template_key)
+        raise
     await db.refresh(row)
     return _out(row, [])
 
@@ -289,7 +355,11 @@ async def _expire(
     row: GeneratedDocument,
     files: list[GeneratedDocumentFile],
 ) -> None:
+    template = await db.get(GeneratedDocumentTemplate, row.id)
     keys = [item.storage_key for item in files]
+    if template is not None:
+        keys.append(template.storage_key)
+        await db.delete(template)
     await enqueue_document_deletions(db, keys, "GENERATED_DOCUMENT_EXPIRED")
     await db.execute(
         delete(GeneratedDocumentFile).where(GeneratedDocumentFile.generation_id == row.id)
@@ -400,12 +470,20 @@ async def remove(db: AsyncSession, user_id: UUID, generation_id: UUID) -> list[s
         raise AppError(404, "DOCUMENT_GENERATION_NOT_FOUND", "文档生成任务不存在")
     grouped = await _files_by_generation(db, [row.id])
     keys = [item.storage_key for item in grouped[row.id]]
+    template = await db.get(GeneratedDocumentTemplate, row.id)
+    if template is not None:
+        keys.append(template.storage_key)
     if row.status in ACTIVE_STATUSES:
         row.status = "cancelled"
         row.cancelled_at = datetime.now(UTC)
         row.lease_owner = None
         row.lease_expires_at = None
         row.updated_at = row.cancelled_at
+        if template is not None:
+            await enqueue_document_deletions(
+                db, [template.storage_key], "GENERATED_DOCUMENT_CANCELLED"
+            )
+            await db.delete(template)
     else:
         await enqueue_document_deletions(db, keys, "GENERATED_DOCUMENT_DELETED")
         await db.delete(row)
@@ -427,7 +505,7 @@ async def storage_keys_for_consultation(
     user_id: UUID,
     consultation_id: UUID,
 ) -> list[str]:
-    return list(
+    files = list(
         await db.scalars(
             select(GeneratedDocumentFile.storage_key)
             .join(GeneratedDocument, GeneratedDocument.id == GeneratedDocumentFile.generation_id)
@@ -437,16 +515,39 @@ async def storage_keys_for_consultation(
             )
         )
     )
+    templates = list(
+        await db.scalars(
+            select(GeneratedDocumentTemplate.storage_key)
+            .join(
+                GeneratedDocument, GeneratedDocument.id == GeneratedDocumentTemplate.generation_id
+            )
+            .where(
+                GeneratedDocument.user_id == user_id,
+                GeneratedDocument.consultation_id == consultation_id,
+            )
+        )
+    )
+    return files + templates
 
 
 async def storage_keys_for_user(db: AsyncSession, user_id: UUID) -> list[str]:
-    return list(
+    files = list(
         await db.scalars(
             select(GeneratedDocumentFile.storage_key)
             .join(GeneratedDocument, GeneratedDocument.id == GeneratedDocumentFile.generation_id)
             .where(GeneratedDocument.user_id == user_id)
         )
     )
+    templates = list(
+        await db.scalars(
+            select(GeneratedDocumentTemplate.storage_key)
+            .join(
+                GeneratedDocument, GeneratedDocument.id == GeneratedDocumentTemplate.generation_id
+            )
+            .where(GeneratedDocument.user_id == user_id)
+        )
+    )
+    return files + templates
 
 
 async def _mark_failed(
@@ -468,6 +569,11 @@ async def _mark_failed(
         return
     if stored_keys:
         await enqueue_document_deletions(db, stored_keys, "DOCUMENT_GENERATION_ROLLBACK")
+    template = await db.get(GeneratedDocumentTemplate, generation_id)
+    template_keys = [template.storage_key] if template is not None else []
+    if template is not None:
+        await enqueue_document_deletions(db, template_keys, "DOCUMENT_GENERATION_FAILED")
+        await db.delete(template)
     if row.status != "cancelled":
         row.status = "failed"
         row.error_code = error.code
@@ -484,7 +590,7 @@ async def _mark_failed(
         reason_code=error.code,
     )
     await db.commit()
-    await process_document_deletion_jobs_best_effort(db, storage_keys=stored_keys)
+    await process_document_deletion_jobs_best_effort(db, storage_keys=stored_keys + template_keys)
 
 
 async def process_one(db: AsyncSession, generation_id: UUID) -> bool:
@@ -520,15 +626,16 @@ async def process_one(db: AsyncSession, generation_id: UUID) -> bool:
             retrieval = await search_knowledge(db, topic, top_k=8, mode="hybrid")
         except RetrievalError as exc:
             raise AppError(exc.status_code, exc.code, str(exc)) from exc
-        if not retrieval.items:
+        citations = filter_citations(retrieval.items, production_relevance_gate())
+        if not citations:
             raise AppError(
                 422,
                 "DOCUMENT_EVIDENCE_INSUFFICIENT",
                 "当前知识库缺少足够的可引用资料，暂时不能生成该科普文档",
             )
         await db.commit()
-        snapshots = source_snapshots(retrieval.items)
-        plan = await generate_content_plan(topic, retrieval.items)
+        snapshots = source_snapshots(citations)
+        plan = await generate_content_plan(topic, citations)
 
         locked = await db.scalar(
             select(GeneratedDocument).where(GeneratedDocument.id == generation_id).with_for_update()
@@ -544,7 +651,20 @@ async def process_one(db: AsyncSession, generation_id: UUID) -> bool:
         if "docx" in locked.requested_formats:
             rendered.append(("docx", render_docx(plan, snapshots), None))
         if "pptx" in locked.requested_formats:
-            pptx_bytes, slides = render_pptx(plan, snapshots)
+            template = await db.get(GeneratedDocumentTemplate, locked.id)
+            template_bytes = (
+                await load_generated_document(
+                    template.storage_key, template.file_key_ciphertext, locked.id, "pptx-template"
+                )
+                if template is not None
+                else None
+            )
+            pptx_bytes, slides = render_pptx(
+                plan,
+                snapshots,
+                template_mode="builtin" if request.template_requested else "default",
+                template_bytes=template_bytes,
+            )
             rendered.append(("pptx", pptx_bytes, slides))
 
         settings = get_settings()

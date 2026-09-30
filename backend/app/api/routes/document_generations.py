@@ -1,11 +1,13 @@
 """Authenticated AI educational DOCX/PPTX generation endpoints."""
 
+from typing import Annotated
 from urllib.parse import quote
 from uuid import UUID
 
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, File, Form, Response, UploadFile, status
 
 from app.api.dependencies import CurrentUser, DbSession
+from app.core.errors import AppError
 from app.schemas.document_generations import (
     CreateDocumentGeneration,
     DocumentGenerationList,
@@ -29,6 +31,47 @@ async def create_document_generation(
     response: Response,
 ) -> DocumentGenerationOut:
     result = await service.create(db, current_user.id, consultation_id, payload)
+    response.headers["Cache-Control"] = "no-store"
+    return result
+
+
+@router.post(
+    "/consultations/{consultation_id}/document-generations/with-template",
+    response_model=DocumentGenerationOut,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def create_document_generation_with_template(
+    consultation_id: UUID,
+    current_user: CurrentUser,
+    db: DbSession,
+    response: Response,
+    client_request_id: Annotated[UUID, Form(alias="clientRequestId")],
+    source_message_id: Annotated[UUID, Form(alias="sourceMessageId")],
+    notice_accepted: Annotated[bool, Form(alias="noticeAccepted")],
+    notice_version: Annotated[str, Form(alias="noticeVersion")],
+    template_notice_accepted: Annotated[bool, Form(alias="templateNoticeAccepted")],
+    file: Annotated[UploadFile, File()],
+) -> DocumentGenerationOut:
+    if not template_notice_accepted:
+        raise AppError(
+            422,
+            "PPT_TEMPLATE_NOTICE_REQUIRED",
+            "上传前请确认：模板原件加密保存，供本次生成使用；任务删除或到期后删除",
+        )
+    if not file.filename or not file.filename.lower().endswith(".pptx"):
+        raise AppError(415, "PPT_TEMPLATE_TYPE_NOT_ALLOWED", "仅支持 .pptx 模板")
+    content = await file.read(10 * 1024 * 1024 + 1)
+    payload = CreateDocumentGeneration.model_validate(
+        {
+            "clientRequestId": client_request_id,
+            "sourceMessageId": source_message_id,
+            "noticeAccepted": notice_accepted,
+            "noticeVersion": notice_version,
+        }
+    )
+    result = await service.create(
+        db, current_user.id, consultation_id, payload, template_bytes=content
+    )
     response.headers["Cache-Control"] = "no-store"
     return result
 

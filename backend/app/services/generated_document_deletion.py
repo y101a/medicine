@@ -10,7 +10,11 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import GeneratedDocumentDeletionJob, GeneratedDocumentFile
+from app.models import (
+    GeneratedDocumentDeletionJob,
+    GeneratedDocumentFile,
+    GeneratedDocumentTemplate,
+)
 from app.services.generated_document_storage import (
     list_generated_document_keys,
     remove_generated_document,
@@ -148,6 +152,13 @@ async def reconcile_orphaned_generated_documents(
         await db.scalars(
             select(GeneratedDocumentFile.storage_key).where(
                 GeneratedDocumentFile.storage_key.in_(candidates)
+            )
+        )
+    )
+    live_keys.update(
+        await db.scalars(
+            select(GeneratedDocumentTemplate.storage_key).where(
+                GeneratedDocumentTemplate.storage_key.in_(candidates)
             )
         )
     )

@@ -30,10 +30,15 @@ _FORBIDDEN = re.compile(
     r"(?:诊断证明|疾病证明|病历证明|医院公章|医生签名|处方|药方|用药剂量|"
     r"手术同意书|医学鉴定|假条|伪造|冒充)"
 )
+_TEMPLATE_REQUEST = re.compile(r"(?:模板|套版)")
+_TEMPLATE_NEGATED = re.compile(r"(?:不要|不用|无需|不需要|不使用|别用).{0,6}(?:模板|套版)")
 _STRIP = re.compile(
+    r"(?:帮我|请)(?=(?:使用|采用|套用|按|用))|"
     r"(?:帮我|请|想要?|能不能|可以)?(?:生成|制作|创建|做|整理成)|"
     r"(?:一份|一个|一套)|(?:PPTX?|Word|DOCX|文档|演示文稿|幻灯片)|"
-    r"(?:关于|主题是|主题为)",
+    r"(?:关于|主题是|主题为)|"
+    r"(?:不要|不用|无需|不需要|不使用|别用).{0,6}(?:模板|套版)|"
+    r"(?:使用|采用|套用|按|用)?(?:内置|默认)?(?:模板|套版)",
     re.IGNORECASE,
 )
 
@@ -44,6 +49,7 @@ MAX_REQUEST_CHARS = 500
 class DocumentGenerationRequest:
     formats: tuple[DocumentFormat, ...]
     topic: str
+    template_requested: bool = False
 
 
 def medical_document_generation_request(content: str) -> DocumentGenerationRequest | None:
@@ -64,7 +70,14 @@ def medical_document_generation_request(content: str) -> DocumentGenerationReque
     topic = re.sub(r"\s+", " ", _STRIP.sub(" ", normalized)).strip(" ，,。.!！?？：:")
     if len(topic) < 2:
         return None
-    return DocumentGenerationRequest(formats=tuple(formats), topic=topic[:300])
+    template_requested = bool(
+        "pptx" in formats
+        and _TEMPLATE_REQUEST.search(normalized)
+        and not _TEMPLATE_NEGATED.search(normalized)
+    )
+    return DocumentGenerationRequest(
+        formats=tuple(formats), topic=topic[:300], template_requested=template_requested
+    )
 
 
 def request_contains_forbidden_document(content: str) -> bool:

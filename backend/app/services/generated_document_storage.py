@@ -43,7 +43,7 @@ def _path(storage_key: str) -> Path:
 
 
 def _aad(generation_id: UUID, format: str) -> bytes:
-    if format not in {"docx", "pptx"}:
+    if format not in {"docx", "pptx", "pptx-template"}:
         raise ValueError("Invalid generated document format")
     return f"generated-document-v1:{generation_id}:{format}".encode("ascii")
 
@@ -53,7 +53,8 @@ def _store(content: bytes, generation_id: UUID, format: str) -> StoredGeneratedD
     nonce = secrets.token_bytes(12)
     encrypted = nonce + AESGCM(key).encrypt(nonce, content, _aad(generation_id, format))
     token = secrets.token_hex(16)
-    storage_key = f"files/{generation_id.hex[:2]}/{token}.bin"
+    prefix = "templates" if format == "pptx-template" else "files"
+    storage_key = f"{prefix}/{generation_id.hex[:2]}/{token}.bin"
     target = _path(storage_key)
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_suffix(".tmp")

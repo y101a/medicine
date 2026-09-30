@@ -37,6 +37,9 @@ class GeneratedDocument(Base):
     requested_formats: Mapped[list[str]] = mapped_column(ARRAY(String(8)), nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="queued")
     model: Mapped[str] = mapped_column(String(128), nullable=False)
+    template_mode: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="default", server_default="default"
+    )
     title_ciphertext: Mapped[str | None] = mapped_column(Text)
     content_plan_ciphertext: Mapped[str | None] = mapped_column(Text)
     source_snapshot_ciphertext: Mapped[str | None] = mapped_column(Text)
@@ -72,6 +75,9 @@ class GeneratedDocument(Base):
         ),
         CheckConstraint("source_count >= 0", name="source_count_nonnegative"),
         CheckConstraint("attempt_count >= 0", name="attempt_count_nonnegative"),
+        CheckConstraint(
+            "template_mode IN ('default', 'builtin', 'uploaded')", name="template_mode_supported"
+        ),
         CheckConstraint(
             "(status = 'completed' AND title_ciphertext IS NOT NULL "
             "AND content_plan_ciphertext IS NOT NULL "
@@ -142,6 +148,23 @@ class GeneratedDocumentFile(Base):
             unique=True,
         ),
     )
+
+
+class GeneratedDocumentTemplate(Base):
+    __tablename__ = "generated_document_templates"
+
+    generation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("generated_documents.id", ondelete="CASCADE"), primary_key=True
+    )
+    storage_key: Mapped[str] = mapped_column(String(160), nullable=False, unique=True)
+    file_key_ciphertext: Mapped[str] = mapped_column(Text, nullable=False)
+    byte_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (CheckConstraint("byte_size > 0", name="byte_size_positive"),)
 
 
 class GeneratedDocumentDeletionJob(Base):
