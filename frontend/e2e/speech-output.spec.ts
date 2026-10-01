@@ -296,6 +296,9 @@ test.describe('语音输出的入口与请求契约', () => {
       'GET /speech/presets': { status: 404, body: { message: 'e2e 未配置该接口' } },
     })
 
+    await expect(page.locator('.speech-preset-select'), '模式关闭时不常驻占用底栏').toHaveCount(0)
+    await page.locator('.speech-mode-button').click()
+    await expect(page.locator('.speech-settings-panel'), '开启后向上展开语音设置').toBeVisible()
     await expect(page.locator('.speech-presets-notice'), '要说明方言列表暂时拿不到').toContainText('普通话')
     await expect(page.locator('.speech-preset-select'), '兜底只留普通话').toContainText('普通话·自然女声')
     await expect(page.locator('.speech-preset-select'), '不得自己编一个方言').not.toContainText('广东话')
@@ -319,8 +322,25 @@ test.describe('语音对话模式与生命周期', () => {
 
     const mode = page.locator('.speech-mode-button')
     await expect(mode, '默认必须关闭（公共电脑不能自己出声）').toHaveAttribute('aria-pressed', 'false')
+    await expect(page.locator('.speech-settings-panel'), '关闭时不应显示音色与语速').toHaveCount(0)
     await mode.click()
     await settle(page, 400)
+    await expect(mode).toHaveAttribute('aria-pressed', 'true')
+    await expect(mode).toHaveAttribute('aria-expanded', 'true')
+    await expect(page.locator('.speech-settings-panel'), '首次开启同时向上展开设置').toBeVisible()
+    await expect(page.locator('.speech-preset-select')).toBeVisible()
+    await expect(page.locator('.speech-rate-select')).toBeVisible()
+
+    await mode.click()
+    await expect(mode, '收起设置不应误关语音模式').toHaveAttribute('aria-pressed', 'true')
+    await expect(page.locator('.speech-settings-panel')).toHaveCount(0)
+    await mode.click()
+    await page.locator('.speech-mode-disable').click()
+    await expect(mode, '只能用面板里的明确入口关闭模式').toHaveAttribute('aria-pressed', 'false')
+    await expect(page.locator('.speech-settings-panel')).toHaveCount(0)
+
+    // 再次开启后刷新，仍应按公共电脑安全规则回到关闭。
+    await mode.click()
     await expect(mode).toHaveAttribute('aria-pressed', 'true')
 
     await page.reload()
@@ -404,11 +424,15 @@ test.describe('可访问性与窄屏', () => {
     await page.setViewportSize({ width: 375, height: 720 })
     await settle(page, 600)
 
+    await expect(page.locator('.speech-preset-select'), '关闭时选择器不应常驻').toHaveCount(0)
+    await page.locator('.speech-mode-button').click()
+    await expect(page.locator('.speech-settings-panel'), '开启后上拉面板应可见').toBeVisible()
+
     // 工作区是桌面优先（`min-width: 1000px`，ADR-011），窄屏整页会横向溢出，
     // 所以只量「控件是否溢出它自己的容器」，而不是量视口。
     for (const [label, child, parent] of [
       ['朗读控件', answerPair(page).locator('.speech-control'), answerPair(page).locator('.assistant-message')],
-      ['音色/语速选择', page.locator('.speech-prefs'), page.locator('.composer')],
+      ['音色/语速上拉面板', page.locator('.speech-settings-panel'), page.locator('.composer')],
     ] as const) {
       const childBox = await child.boundingBox()
       const parentBox = await parent.boundingBox()
@@ -421,8 +445,8 @@ test.describe('可访问性与窄屏', () => {
     }
 
     await expect(page.locator('.speech-mode-button'), '模式开关仍可见').toBeVisible()
-    await expect(page.locator('.speech-preset-select'), '音色选择仍可见').toBeVisible()
-    await expect(page.locator('.speech-rate-select'), '语速选择仍可见').toBeVisible()
+    await expect(page.locator('.speech-preset-select'), '开启后音色选择可见').toBeVisible()
+    await expect(page.locator('.speech-rate-select'), '开启后语速选择可见').toBeVisible()
 
     await answerPair(page).getByRole('button', { name: '朗读' }).click()
     await settle(page, 800)

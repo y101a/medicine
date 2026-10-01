@@ -155,6 +155,8 @@ const {
  * **只在当前页面内存里**，不写 localStorage——刷新即回到关闭，避免公共电脑突然出声（§6.3）。
  */
 const speechMode = ref(false)
+/** 音色与语速属于语音对话模式的低频设置，只在耳机按钮上方的面板中按需显示。 */
+const speechSettingsVisible = ref(false)
 
 /** 只有「已完成且确实有正文」的助手回答才有朗读入口：用户消息、未完成、已停止的都没有。 */
 function canSpeakMessage(message: Message): boolean {
@@ -186,9 +188,19 @@ function consumePendingSpeech() {
 
 watch(pendingSpeech, consumePendingSpeech)
 
-function toggleSpeechMode() {
-  speechMode.value = !speechMode.value
-  if (!speechMode.value) stopSpeech()
+function toggleSpeechSettings() {
+  if (!speechMode.value) {
+    speechMode.value = true
+    speechSettingsVisible.value = true
+    return
+  }
+  speechSettingsVisible.value = !speechSettingsVisible.value
+}
+
+function disableSpeechMode() {
+  speechMode.value = false
+  speechSettingsVisible.value = false
+  stopSpeech()
 }
 
 /**
@@ -1235,19 +1247,6 @@ onBeforeRouteUpdate(canLeave)
                 <div class="model-option"><span>{{ model.name }}</span><small>{{ model.providerName }}</small></div>
               </el-option>
             </el-select>
-            <!-- 音色/语速：与模型选择器同处一行设置位（低频偏好，不压在输入框中间）。
-                 选项文案自带「普通话·自然女声」「标准语速」这类说明，所以不再加文字标签。
-                 用原生 select：不值得为它引入组件库控件，也避免抢走「输入区第一个 ElSelect」
-                 这类既有定位（那条断言指向模型选择器）。 -->
-            <span class="speech-prefs">
-              <select v-model="speechPreset" class="speech-preset-select" aria-label="选择朗读音色" title="朗读音色">
-                <option v-for="item in speechPresets" :key="item.id" :value="item.id">{{ item.label }}</option>
-              </select>
-              <select v-model="speechRate" class="speech-rate-select" aria-label="选择朗读语速" title="朗读语速">
-                <option v-for="item in SPEECH_RATE_OPTIONS" :key="item.value" :value="item.value">{{ item.label }}</option>
-              </select>
-              <span v-if="speechPresetsNotice" class="speech-presets-notice">{{ speechPresetsNotice }}</span>
-            </span>
             <span>{{ draft.length }}/{{ DRAFT_LIMIT }}</span>
             <span v-if="nearDraftLimit" class="limit-hint">已接近 {{ DRAFT_LIMIT }} 字上限，可分多次发送</span>
             <span v-if="voiceState === 'requesting'" class="voice-status">等待麦克风授权…</span>
@@ -1256,22 +1255,52 @@ onBeforeRouteUpdate(canLeave)
             <button v-if="voiceState === 'recording'" class="voice-cancel" type="button" @click="cancelRecording">取消</button>
             <!-- 动作按钮整组不拆行：窗口很窄时让「设置」与「动作」分成两行，而不是把发送键单独挤到下一行。 -->
             <div class="send-actions">
-            <!-- 语音对话模式开关：按常见 agent 的位置放在输入框的动作按钮区（这里取最左，
-                 与豆包那类「输入框左侧语音通话入口」一致），开启态常亮而不是靠文案表达状态。
-                 放最左还有一个原因：既有测试锁死了「附件紧邻麦克风」「麦克风紧邻发送」两处相邻关系，
-                 开关插在它们中间会破坏那条布局契约。模式必须由用户主动点击开启，
-                 仍是按键录音 + 回答自动朗读，**不是持续监听**（契约 §6.3）。 -->
-            <button
-              class="speech-mode-button"
-              :class="{ active: speechMode }"
-              type="button"
-              :aria-pressed="speechMode"
-              :aria-label="speechMode ? '关闭语音对话模式' : '开启语音对话模式'"
-              :title="speechMode
-                ? '语音对话模式已开启：回答完成后自动朗读，点此关闭'
-                : '开启语音对话模式：每条科普回答完成后自动朗读（仍是按键录音，不是持续监听）'"
-              @click="toggleSpeechMode"
-            ><el-icon :size="18"><Headset /></el-icon></button>
+            <!-- 语音模式首次点击即开启并向上展开设置；开启后耳机只负责展开/收起，避免用户
+                 为了改音色误把模式关掉。真正的关闭动作放在面板内并明确标注。 -->
+            <div class="speech-mode-menu">
+              <button
+                class="speech-mode-button"
+                :class="{ active: speechMode }"
+                type="button"
+                :aria-pressed="speechMode"
+                :aria-expanded="speechSettingsVisible"
+                aria-controls="speech-settings-panel"
+                :aria-label="speechMode
+                  ? (speechSettingsVisible ? '收起语音设置' : '打开语音设置')
+                  : '开启语音对话模式并设置音色与语速'"
+                :title="speechMode
+                  ? (speechSettingsVisible ? '收起语音设置（模式保持开启）' : '语音对话模式已开启，点此设置音色与语速')
+                  : '开启语音对话模式：回答完成后自动朗读'"
+                @click="toggleSpeechSettings"
+              ><el-icon :size="18"><Headset /></el-icon></button>
+              <div
+                v-if="speechMode && speechSettingsVisible"
+                id="speech-settings-panel"
+                class="speech-settings-panel"
+                role="dialog"
+                aria-label="语音对话设置"
+                @keydown.esc="speechSettingsVisible = false"
+              >
+                <div class="speech-settings-header">
+                  <div><strong>语音对话模式</strong><small>回答完成后自动朗读</small></div>
+                  <button type="button" class="speech-mode-disable" @click="disableSpeechMode">关闭模式</button>
+                </div>
+                <label class="speech-setting-field">
+                  <span>音色</span>
+                  <select v-model="speechPreset" class="speech-preset-select" aria-label="选择朗读音色">
+                    <option v-for="item in speechPresets" :key="item.id" :value="item.id">{{ item.label }}</option>
+                  </select>
+                </label>
+                <label class="speech-setting-field">
+                  <span>语速</span>
+                  <select v-model="speechRate" class="speech-rate-select" aria-label="选择朗读语速">
+                    <option v-for="item in SPEECH_RATE_OPTIONS" :key="item.value" :value="item.value">{{ item.label }}</option>
+                  </select>
+                </label>
+                <span v-if="speechPresetsNotice" class="speech-presets-notice" role="status">{{ speechPresetsNotice }}</span>
+                <small class="speech-settings-note">仍需按麦克风说话，不会持续监听。</small>
+              </div>
+            </div>
             <button
               class="attach-button"
               type="button"
@@ -1335,7 +1364,7 @@ h1 { font-size: 34px; font-weight: 600; letter-spacing: 1px; color: #253c52; mar
 .suggestions strong { font-size: 14px; color: #3d556b; font-weight: 550; }
 .suggestions span { color: #8b99a7; font-size: 11px; margin-top: 8px; line-height: 1.7; }
 .composer-area { width: min(880px, calc(100% - 80px)); margin: 0 auto; padding: 16px 0 22px; }
-.composer { padding: 18px 20px 12px; border: 1px solid #dce5ed; border-radius: 18px; box-shadow: 0 5px 24px rgb(34 67 97 / 5%); background: #fff; }
+.composer { position: relative; padding: 18px 20px 12px; border: 1px solid #dce5ed; border-radius: 18px; box-shadow: 0 5px 24px rgb(34 67 97 / 5%); background: #fff; }
 .composer:focus-within { border-color: #8cb9de; box-shadow: 0 0 0 3px #f1f7fc; }
 textarea { display: block; width: 100%; min-height: 70px; max-height: 200px; resize: vertical; border: none; outline: none; font: inherit; font-size: 14px; line-height: 1.8; color: #324e67; background: transparent; }
 textarea::placeholder { color: #99a5b0; }
@@ -1346,19 +1375,32 @@ textarea::placeholder { color: #99a5b0; }
 /* 动作按钮整组不拆：窄窗口下宁可「设置一行、动作一行」，也不把发送键单独挤下去。 */
 .send-actions { display: flex; align-items: center; gap: 12px; flex-wrap: nowrap; }
 .model-select { width: 190px; }
-/* 朗读偏好：与模型选择器同一行设置位，不抢输入框中间的位置，也不单独占一行。 */
-.speech-prefs { display: inline-flex; align-items: center; gap: 6px; }
-.speech-preset-select, .speech-rate-select { padding: 4px 6px; border: 1px solid #d7e3ee; border-radius: 9px;
-  background: #fff; color: #4b7ea6; font-size: 11px; cursor: pointer; }
-.speech-preset-select { width: 108px; }
-.speech-rate-select { width: 80px; }
-.speech-presets-notice { color: #bf7a15; font-size: 11px; }
 .speech-mode-hint { color: #1f6396; font-weight: 600; }
-/* 语音对话开关：与附件/麦克风同尺寸的图标按钮，开启态常亮。 */
+/* 音色和语速收进耳机按钮的上拉设置，不再常驻占用输入框底栏。 */
+.speech-mode-menu { display: inline-flex; }
 .speech-mode-button { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid #d7e3ee;
   border-radius: 10px; background: #fff; color: #4b7ea6; cursor: pointer; }
 .speech-mode-button:hover { border-color: #9cc3e0; background: #f4faff; }
+.speech-mode-button:focus-visible, .speech-mode-disable:focus-visible,
+.speech-preset-select:focus-visible, .speech-rate-select:focus-visible { outline: 2px solid #4b91c4; outline-offset: 2px; }
 .speech-mode-button.active { border-color: #7fb3d8; background: #e8f3fd; color: #1f6396; }
+.speech-settings-panel { position: absolute; z-index: 30; right: 20px; bottom: 60px; width: min(280px, calc(100% - 40px));
+  box-sizing: border-box; padding: 14px; border: 1px solid #cfe0ee; border-radius: 13px; background: #fff;
+  box-shadow: 0 12px 32px rgb(38 74 104 / 16%); color: #405c73; }
+.speech-settings-panel::after { position: absolute; right: 126px; bottom: -6px; width: 10px; height: 10px;
+  border-right: 1px solid #cfe0ee; border-bottom: 1px solid #cfe0ee; background: #fff; content: ''; transform: rotate(45deg); }
+.speech-settings-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.speech-settings-header div { display: grid; gap: 3px; }
+.speech-settings-header strong { color: #315a79; font-size: 13px; }
+.speech-settings-header small, .speech-settings-note { color: #8a9aaa; font-size: 11px; line-height: 1.5; }
+.speech-mode-disable { border: none; padding: 2px 0; background: transparent; color: #6c879c; font-size: 11px; cursor: pointer; }
+.speech-mode-disable:hover { color: #286b9d; }
+.speech-setting-field { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: center; gap: 8px; margin-top: 8px;
+  color: #70879a; font-size: 12px; }
+.speech-preset-select, .speech-rate-select { width: 100%; min-width: 0; padding: 7px 9px; border: 1px solid #d7e3ee;
+  border-radius: 9px; background: #fff; color: #416681; font-size: 12px; cursor: pointer; }
+.speech-presets-notice { display: block; margin-top: 8px; color: #bf7a15; font-size: 11px; line-height: 1.5; }
+.speech-settings-note { display: block; margin-top: 10px; }
 .model-option { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .model-option small { color: #93a1ae; }
 .model-error, .voice-tip, .voice-notice { margin-bottom: 12px; }
