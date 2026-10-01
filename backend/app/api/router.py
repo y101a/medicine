@@ -12,6 +12,7 @@ from app.api.routes import (
     models,
     navigation,
     phone_verification,
+    speech,
     users,
     voice,
 )
@@ -30,6 +31,7 @@ api_router.include_router(knowledge.router)
 api_router.include_router(navigation.router)
 api_router.include_router(health_records.router)
 api_router.include_router(voice.router)
+api_router.include_router(speech.router)
 
 
 @api_router.get("/health", tags=["系统"])

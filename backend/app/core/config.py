@@ -82,6 +82,21 @@ class Settings(BaseSettings):
     asr_max_bytes: int = Field(default=2 * 1024 * 1024, ge=64 * 1024, le=2 * 1024 * 1024)
     asr_max_seconds: float = Field(default=60, ge=1, le=60)
 
+    # Server-controlled speech synthesis. The native Beijing MaaS endpoint is
+    # deliberately separate from the OpenAI-compatible QWEN_BASE_URL.
+    tts_api_key: SecretStr | None = None
+    tts_base_url: str = "https://dashscope.aliyuncs.com/api/v1"
+    tts_model: str = "qwen-audio-3.1-tts-flash"
+    tts_timeout_seconds: float = Field(default=45, ge=5, le=90)
+    tts_max_text_chars: int = Field(default=4000, ge=100, le=10_000)
+    tts_max_audio_bytes: int = Field(
+        default=10 * 1024 * 1024,
+        ge=256 * 1024,
+        le=30 * 1024 * 1024,
+    )
+    tts_limit_10m: int = Field(default=10, ge=1, le=100)
+    tts_limit_daily: int = Field(default=50, ge=1, le=500)
+
     # Server-controlled medical image analysis. User model credentials are never used.
     image_analysis_api_key: SecretStr | None = None
     image_analysis_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
@@ -231,6 +246,35 @@ class Settings(BaseSettings):
     def validate_asr_model(cls, value: str) -> str:
         if value.strip() != "qwen3-asr-flash":
             raise ValueError("当前只允许 qwen3-asr-flash 语音识别模型")
+        return value.strip()
+
+    @field_validator("tts_base_url")
+    @classmethod
+    def validate_tts_base_url(cls, value: str) -> str:
+        normalized = value.strip().rstrip("/")
+        parsed = urlparse(normalized)
+        hostname = (parsed.hostname or "").lower()
+        allowed_host = hostname == "dashscope.aliyuncs.com" or hostname.endswith(
+            ".cn-beijing.maas.aliyuncs.com"
+        )
+        if (
+            parsed.scheme != "https"
+            or not allowed_host
+            or parsed.username
+            or parsed.password
+            or parsed.port not in {None, 443}
+            or parsed.query
+            or parsed.fragment
+            or parsed.path != "/api/v1"
+        ):
+            raise ValueError("TTS_BASE_URL 必须是阿里云百炼北京地域 HTTPS 原生接口地址")
+        return normalized
+
+    @field_validator("tts_model")
+    @classmethod
+    def validate_tts_model(cls, value: str) -> str:
+        if value.strip() != "qwen-audio-3.1-tts-flash":
+            raise ValueError("当前只允许 qwen-audio-3.1-tts-flash 语音合成模型")
         return value.strip()
 
     @field_validator("image_analysis_base_url")

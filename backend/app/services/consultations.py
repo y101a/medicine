@@ -36,6 +36,7 @@ from app.services.image_deletion import (
     process_image_deletion_jobs_best_effort,
 )
 from app.services.image_generation_intent import medical_image_generation_prompt
+from app.services.speech_intent import speech_output_request
 
 
 def summary(row: Consultation) -> ConsultationOut:
@@ -65,6 +66,21 @@ def message_out(
         if row.role == "user" and triage is None and not attachments
         else None
     )
+    image_request = bool(
+        row.role == "user"
+        and triage is None
+        and not attachments
+        and document_request is None
+        and medical_image_generation_prompt(stored_content)
+    )
+    speech_request = (
+        speech_output_request(stored_content)
+        if row.role == "user"
+        and triage is None
+        and document_request is None
+        and not image_request
+        else None
+    )
     return MessageOut(
         id=row.id,
         role=row.role,
@@ -76,14 +92,9 @@ def message_out(
         generation_status=row.generation_status,
         answer_format=row.answer_format,
         medical_content=row.is_medical_content,
-        image_generation_intent=bool(
-            row.role == "user"
-            and triage is None
-            and not attachments
-            and document_request is None
-            and medical_image_generation_prompt(stored_content)
-        ),
+        image_generation_intent=image_request,
         document_generation_intent=document_request is not None,
+        speech_output_intent=speech_request,
         source_message_id=row.source_message_id,
         follow_up=follow_up,
         triage=triage,

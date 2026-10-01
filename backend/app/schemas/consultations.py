@@ -5,6 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.schemas.attachments import MessageAttachmentOut
+from app.schemas.speech import SpeechOutputIntent
 
 
 class FollowUpOption(BaseModel):
@@ -156,6 +157,10 @@ class MessageOut(BaseModel):
     document_generation_intent: bool = Field(
         default=False,
         serialization_alias="documentGenerationIntent",
+    )
+    speech_output_intent: SpeechOutputIntent | None = Field(
+        default=None,
+        serialization_alias="speechOutputIntent",
     )
     source_message_id: UUID | None = Field(default=None, serialization_alias="sourceMessageId")
     follow_up: FollowUpCard | None = Field(default=None, serialization_alias="followUp")

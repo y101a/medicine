@@ -91,6 +91,66 @@ MIME、文件名或前端上报时长。单次上限 2 MB、60 秒，按账户 1
 `VOICE_PROVIDER_FAILED`、`VOICE_PROVIDER_INVALID_RESPONSE`；504
 `VOICE_PROVIDER_TIMEOUT`。
 
+## AI 语音输出
+
+语音输出不会重新生成医学内容，只把已经保存并显示的助手文字回答转换为临时 MP3。文字回答
+始终是主结果；TTS 失败不修改消息，也不影响咨询、红旗分流、检索、引用或健康记录。
+
+| 方法与路径 | 用途 |
+| --- | --- |
+| `GET /speech/presets` | 返回稳定的产品音色/方言枚举；不暴露供应商 voice、模型或指令 |
+| `POST /consultations/{consultation_id}/messages/{message_id}/speech` | 朗读一条已完成的助手消息 |
+
+合成请求为：
+
+~~~json
+{
+  "speechPreset": "mandarin_female",
+  "rate": 1.0
+}
+~~~
+
+`speechPreset` 必须来自预设列表；`rate` 仅允许 `0.8`、`1.0`、`1.2`。成功响应为
+`audio/mpeg`，设置 `Cache-Control: no-store` 和内联文件名。消息必须属于当前用户和路径中的
+咨询，角色必须为 `assistant`，且 `generationStatus=completed`。客户端不能提交待朗读文本、
+供应商 voice 或自由指令；后端重新解密消息并把 Markdown 转成可朗读文本，移除代码块、URL
+和 `[来源N]` 标记，但保留紧急提醒、剂量/单位及安全免责声明。清洗后最多 4000 字，超长不
+静默截断。
+
+后端固定使用服务端 `TTS_API_KEY`，未单独配置时回落到服务端 `QWEN_API_KEY`，绝不使用用户
+保存的聊天模型 Key。模型固定 `qwen-audio-3.1-tts-flash`；请求只发往北京地域百炼原生
+HTTPS API。供应商返回的 24 小时临时 OSS URL 不返回浏览器：后端只接受北京地域百炼结果
+域名和公网地址，将官方响应里的 HTTP 地址强制升级成 HTTPS，禁止重定向，验证大小、MIME
+与 MP3 文件头后在内存中转发。音频不落盘、不入数据库，临时 URL、正文、音频与密钥不进日志。
+
+普通话提供自然男女声；方言白名单为上海话、广东话、东北话、重庆话、陕西话、云南话、宁波话、
+甘肃话。产品枚举由后端映射到兼容音色和受控指令，不支持声音复刻或客户端任意角色/情绪指令。
+
+`POST /consultations/{id}/messages` 对明确的“请用语音回答”“朗读出来”或白名单方言回答请求
+返回：
+
+~~~json
+{
+  "speechOutputIntent": {
+    "requested": true,
+    "speechPreset": "cantonese"
+  }
+}
+~~~
+
+未命中时为 `null`。否定、功能询问、示例/假设句、图片或文档生成请求、紧急分流均不触发。
+无指定预设时 `speechPreset` 为 `null`，由前端使用当前用户偏好或预设列表中的默认值。该判定
+是本地确定性规则，不调用模型、不产生费用。
+
+每用户 10 分钟最多 10 次、UTC 自然日最多 50 次，额度由 PostgreSQL 审计记录共享；同一用户
+同一消息并发合成由 PostgreSQL advisory lock 拦截。审计只保存用户、消息、动作、结果和受控
+错误码；应用日志只保存 preset、字符数、字节数、耗时和本地 request id。
+
+稳定错误码：404 `SPEECH_MESSAGE_NOT_FOUND`；409 `SPEECH_MESSAGE_NOT_READY`、
+`SPEECH_MESSAGE_BUSY`；422 `SPEECH_MESSAGE_UNSUPPORTED`、`SPEECH_PRESET_UNSUPPORTED`、
+`SPEECH_TEXT_TOO_LONG`；429 `SPEECH_RATE_LIMITED`；503 `SPEECH_NOT_CONFIGURED`；
+502 `SPEECH_SERVICE_UNAVAILABLE`；504 `SPEECH_SERVICE_TIMEOUT`。
+
 ## 用户自带模型 API Key
 
 设置页只允许配置模型注册表中的四个服务商：`deepseek`、`qwen`、`kimi`、
