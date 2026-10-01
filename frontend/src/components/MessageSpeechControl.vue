@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { CircleClose, Loading, RefreshRight, VideoPause, VideoPlay } from '@element-plus/icons-vue'
 import type { SpeechPlaybackState } from '../types/speech'
 
 /**
@@ -51,58 +52,72 @@ const playTitle = computed(() => (props.presetLabel
   <div class="speech-control">
     <button
       v-if="state === 'idle' || state === 'ready'"
-      class="speech-button primary"
+      class="speech-button speech-icon-button primary"
       type="button"
       :aria-label="playTitle"
       :title="playTitle"
       @click="emit('play')"
-    >{{ playLabel }}</button>
+    >
+      <el-icon v-if="error" :size="16" aria-hidden="true"><RefreshRight /></el-icon>
+      <svg v-else class="speech-output-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 9v6h4l5 4V5L8 9H4Z" />
+        <path d="M16 8.2a5 5 0 0 1 0 7.6M18.7 5.5a8.8 8.8 0 0 1 0 13" />
+      </svg>
+      <span class="visually-hidden">{{ playLabel }}</span>
+    </button>
     <template v-else>
       <button
         v-if="state === 'loading'"
-        class="speech-button"
+        class="speech-button speech-icon-button"
         type="button"
         disabled
         aria-label="正在生成语音"
         title="正在生成语音"
-      >正在生成语音…</button>
+      ><el-icon class="is-loading" :size="16" aria-hidden="true"><Loading /></el-icon><span class="visually-hidden">正在生成语音</span></button>
       <button
         v-else-if="state === 'playing'"
-        class="speech-button"
+        class="speech-button speech-icon-button"
         type="button"
         aria-label="暂停朗读"
         title="暂停朗读"
         @click="emit('pause')"
-      >暂停</button>
+      ><el-icon :size="16" aria-hidden="true"><VideoPause /></el-icon><span class="visually-hidden">暂停</span></button>
       <button
         v-else
-        class="speech-button"
+        class="speech-button speech-icon-button"
         type="button"
         aria-label="继续朗读"
         title="继续朗读"
         @click="emit('resume')"
-      >继续</button>
+      ><el-icon :size="16" aria-hidden="true"><VideoPlay /></el-icon><span class="visually-hidden">继续</span></button>
       <button
-        class="speech-button"
+        class="speech-button speech-icon-button"
         type="button"
         aria-label="停止朗读"
         title="停止朗读"
         @click="emit('stop')"
-      >停止</button>
+      ><el-icon :size="16" aria-hidden="true"><CircleClose /></el-icon><span class="visually-hidden">停止</span></button>
     </template>
     <span class="speech-status" role="status" aria-live="polite">{{ statusText }}</span>
   </div>
 </template>
 
 <style scoped>
-.speech-control { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-.speech-button { padding: 4px 11px; border: 1px solid #d7e3ee; border-radius: 9px; background: #fff;
-  color: #4b7ea6; font-size: 12px; cursor: pointer; transition: border-color .15s, background .15s; }
-.speech-button:hover:not(:disabled) { border-color: #9cc3e0; background: #f4faff; }
-.speech-button:disabled { border-color: #e6ecf2; background: #f3f6f9; color: #b3c1cd; cursor: default; }
-.speech-button.primary { border-color: #cfe2f2; background: #f2f8fe; }
+.speech-control { display: inline-flex; align-items: center; gap: 6px; margin: 10px 6px 0 0; vertical-align: top; }
+.speech-icon-button { display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0;
+  border: 1px solid #d7e3ee; border-radius: 9px; background: #fff; color: #4b7ea6; cursor: pointer;
+  transition: border-color .15s, background .15s, color .15s; }
+.speech-icon-button:hover:not(:disabled) { border-color: #9cc3e0; background: #f4faff; color: #286b9d; }
+.speech-icon-button:focus-visible { outline: 2px solid #4b91c4; outline-offset: 2px; }
+.speech-icon-button:disabled { border-color: #e6ecf2; background: #f3f6f9; color: #aab9c6; cursor: default; }
+.speech-icon-button.primary { border-color: #cfe2f2; background: #f2f8fe; }
+.speech-output-icon { width: 18px; height: 18px; fill: currentColor; }
+.speech-output-icon path:last-child { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
 .speech-status { color: #7b8fa1; font-size: 12px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 @media (prefers-reduced-motion: reduce) {
-  .speech-button { transition: none; }
+  .speech-icon-button { transition: none; }
+  .is-loading { animation: none; }
 }
 </style>

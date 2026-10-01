@@ -298,6 +298,13 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 
 ### 7.2 工作报告（最新在最上）
 
+### 2026-10-01 Codex 压缩助手回答下方操作区
+
+- 改动：`MessageSpeechControl.vue` 把朗读、重试、加载、暂停、继续、停止改为 32px 图标按钮；`PathologyCardOffer.vue` 把整块“是否生成”提示改为 32px 卡片图标。两组件改为相邻 `inline-flex`，在不改 `HomeView.vue` 的情况下自然排成一行；保留 `title`、`aria-label`、键盘焦点、读屏文字、状态短句和降低动态效果。
+- 并发边界：发现 DSH 正在修改 `HomeView.vue` 与 `consultations.test.ts` 后完全避开这两个文件；未改触发条件、接口、播放器或卡片生成逻辑，无迁移、无数据库操作。
+- 验证：`npm run build` exit 0；语音输出专项 **17 passed**；卡片入口目标用例 **1 passed**；语音+咨询两文件合跑 **58 passed + 1 个既有联网提示用例超时**，该无关用例隔离复跑 **1 passed**；`git diff --check` 无空白错误。
+- 下一步：浏览器中确认两个图标在真实回答底部的视觉间距与提示文字；真实 TTS 试听仍按上一条报告单独验收。
+
 ### 2026-10-01 DSH 语音输出（TTS）前端
 
 - 改动：新增 `frontend/src/types/speech.ts`（十个产品预设的类型、三档语速、4000 字上限、`SpeechOutputIntent`、列表不可用时的**只普通话**兜底）、`api/speech.ts`（预设与鉴权 Blob 合成；在服务端 `extra="forbid"` 下**只发** `{speechPreset, rate}`）、`stores/speechPreference.ts`（预设/语速按用户记忆到 localStorage，**语音对话模式刻意不持久化**）、`composables/useSpeechOutput.ts`（整页**单播放器**状态机 `idle→loading→playing↔paused→idle`，加自动播放被拦时的 `ready`；Object URL 回收、抢占与取消、长度预检、`getCurrentInstance()` 守卫的卸载释放）、`composables/pendingSpeech.ts`（新会话首条消息会 `router.replace` 重挂载组件，把这次自动朗读交给新实例，避免播放刚起步就被卸载取消）、`components/MessageSpeechControl.vue`（朗读/暂停/继续/停止；`role="status"` + `aria-live="polite"`；尊重 `prefers-reduced-motion`）。`HomeView.vue` 接线：已完成且有正文的助手回答才有朗读入口、`speechOutputIntent` 命中或语音模式开启时**文字先显示完**再自动朗读、模式开关与音色/语速选择（用**原生 `select`**，避免抢走既有测试「输入区第一个 `ElSelect`」的定位假设）、开始录音/停止生成/离开页面时停播。`types/consultations.ts` 加 `speechOutputIntent`；新增单测 **17 项**与 e2e **10 项**；`BROWSER_ACCEPTANCE.md` 增第 17 条人工清单并**明写本轮未做**。
