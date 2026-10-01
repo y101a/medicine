@@ -1,4 +1,5 @@
 import type { SpeechOutputIntent } from './speech'
+import type { PrivateKnowledgeCitation, PrivateKnowledgeSelection } from './privateKnowledge'
 
 export interface Consultation {
   id: string
@@ -49,6 +50,8 @@ export interface Message {
   triage?: TriageResult | null
   citations?: MessageCitation[]
   attachments?: MessageAttachment[]
+  privateKnowledgeCollections?: PrivateKnowledgeSelection[]
+  privateKnowledgeCitations?: PrivateKnowledgeCitation[]
   createdAt: string
 }
 

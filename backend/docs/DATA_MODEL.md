@@ -96,6 +96,18 @@ pdf/docx/pptx/txt/md/image。文档原件不保存，只记录真实内容嗅探
 落盘后、数据库提交前崩溃形成的无主密文。
 `audit_logs.actor_user_id` 使用 `SET NULL`，只保留受控代码组成的最小化审计记录。
 
+## private_knowledge_* 与消息私人引用
+
+私人知识使用独立的 `private_knowledge_collections`、`private_knowledge_documents`、
+`private_knowledge_chunks`、`private_knowledge_search_terms`，不与公共 `knowledge_*` 或会话
+`attachments` 混表。名称、说明、文件名和正文块均加密；名称唯一、内容幂等与搜索词项使用带
+用户域前缀的 HMAC，不可跨用户比较。
+
+`message_private_knowledge_selections` 保存用户消息明确选择的最多 3 个库；
+`message_private_knowledge_citations` 保存助手实际引用的最多 5 个私人文档定位。集合或文档删除时
+外键置空形成墓碑，消息历史不保留正文、知识库名或文档名快照。账号删除由用户外键级联清除全部
+私人知识、选择和引用。
+
 ## generated_images
 
 AI 医学科普配图的异步任务与加密成品。`user_id`、`consultation_id`、

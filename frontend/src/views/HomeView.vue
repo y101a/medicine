@@ -8,6 +8,8 @@ import { modelsApi } from '../api/models'
 import { useConsultationsStore } from '../stores/consultations'
 import { useAuthStore } from '../stores/auth'
 import { useHealthRecordsStore } from '../stores/healthRecords'
+import { usePrivateKnowledgeStore } from '../stores/privateKnowledge'
+import { privateKnowledgeErrorMessage } from '../types/privateKnowledgeUi'
 import { ApiError, getApiErrorMessage } from '../api/http'
 import type { AiModel, AnswerFormat, FollowUpAnswers, FollowUpCard, Message } from '../types/consultations'
 import { Top, ChatDotRound, Compass, Document, CloseBold, Microphone, Paperclip, Headset } from '@element-plus/icons-vue'
@@ -16,6 +18,8 @@ import AssistantAnswerCard from '../components/AssistantAnswerCard.vue'
 import StructuredFollowUpCard from '../components/StructuredFollowUpCard.vue'
 import EmergencyTriageCard from '../components/EmergencyTriageCard.vue'
 import ReferenceSources from '../components/ReferenceSources.vue'
+import PrivateKnowledgeReferences from '../components/PrivateKnowledgeReferences.vue'
+import PrivateKnowledgeSelector from '../components/PrivateKnowledgeSelector.vue'
 import MessageAttachments from '../components/MessageAttachments.vue'
 import HospitalNavigator from '../components/HospitalNavigator.vue'
 import PathologyCardOffer from '../components/PathologyCardOffer.vue'
@@ -55,6 +59,9 @@ const router = useRouter()
 const recent = useConsultationsStore()
 const auth = useAuthStore()
 const healthRecords = useHealthRecordsStore()
+const privateKnowledge = usePrivateKnowledgeStore()
+// 每次进入或切换会话都从空选择开始，绝不沿用上一会话的私人资料授权。
+const selectedPrivateKnowledgeIds = ref<string[]>([])
 const draft = ref(typeof route.query.prompt === 'string' && !route.params.id ? route.query.prompt : '')
 const messages = ref<Message[]>([])
 const loading = ref(false)
@@ -613,6 +620,7 @@ async function load(older = false) {
 }
 onMounted(() => {
   void loadModels()
+  void privateKnowledge.load()
   // 音色/方言白名单只在服务端维护，拉不到时前端退回「只普通话」的最小兜底（契约 §3.1）。
   void loadSpeechPresets()
   // 接手上一实例排队的自动朗读：新会话首条消息的 `router.replace` 会重新挂载本组件。
@@ -711,7 +719,9 @@ async function generateAnswer(
       return
     }
 
-    const message = getApiErrorMessage(caught)
+    // 私人知识库的受控错误码（`PRIVATE_KNOWLEDGE_SELECTION_INVALID`、`INDEX_NOT_READY` 等）
+    // 走中文映射；其余错误这个函数原样回落全局出口，行为不变。
+    const message = privateKnowledgeErrorMessage(caught)
     const hasPartialAnswer = Boolean(placeholder.content)
     if (!hasPartialAnswer) {
       messages.value = messages.value.filter(item => item.id !== placeholder.id)
@@ -785,13 +795,22 @@ async function sendContent(content: string, clearDraft = false) {
     }
     // 附件只在主发送时带上：追问与卡片生成不重复引用同一份文档。
     const attachmentIds = clearDraft ? attachments.value.map(item => item.id) : []
-    const message = await consultationsApi.send(cid, pending.content, pending.id, attachmentIds)
+    const privateKnowledgeCollectionIds = clearDraft ? selectedPrivateKnowledgeIds.value : []
+    const message = await consultationsApi.send(
+      cid,
+      pending.content,
+      pending.id,
+      attachmentIds,
+      privateKnowledgeCollectionIds,
+    )
     if (auth.user?.id !== userId) return
     if (!messages.value.some(item => item.id === message.id)) messages.value.push(message)
     if (clearDraft) {
       draft.value = ''
       // 文档已经挂在消息上，草稿区不再重复显示，避免下次发送误带旧文档。
       resetAttachments()
+      // 授权只对这一条消息生效；发送成功后立即清空，避免下一轮意外继续检索。
+      selectedPrivateKnowledgeIds.value = []
     }
     pending = null
     void recent.load()
@@ -1111,6 +1130,12 @@ onBeforeRouteUpdate(canLeave)
             <div v-if="message.attachments?.length" class="user-attachments">
               <MessageAttachments :items="message.attachments" />
             </div>
+            <div v-if="message.privateKnowledgeCollections?.length" class="user-private-knowledge">
+              <span>本次允许检索：</span>
+              <b v-for="item in message.privateKnowledgeCollections" :key="item.id || item.name">
+                {{ item.name }}<template v-if="item.status === 'deleted'">（已删除）</template>
+              </b>
+            </div>
             <EmergencyTriageCard v-if="message.triage" :triage="message.triage" />
             <!-- 命中的文档生成任务挂在这条用户消息下；服务端也按 sourceMessageId 恢复（方案 §8.1）。 -->
             <GeneratedDocumentCard
@@ -1146,6 +1171,10 @@ onBeforeRouteUpdate(canLeave)
               <ReferenceSources
                 v-if="!message.followUp && message.citations?.length"
                 :citations="message.citations"
+              />
+              <PrivateKnowledgeReferences
+                v-if="!message.followUp && message.privateKnowledgeCitations?.length"
+                :citations="message.privateKnowledgeCitations"
               />
               <!-- 语音输出（契约 §6.2）：只在已完成且有正文的助手回答上出现，用户消息没有入口。
                    播放器是整页单例，所以「继续」走同一条播放调用——同一条消息已有音频时不会重新合成。 -->
@@ -1255,6 +1284,12 @@ onBeforeRouteUpdate(canLeave)
             <button v-if="voiceState === 'recording'" class="voice-cancel" type="button" @click="cancelRecording">取消</button>
             <!-- 动作按钮整组不拆行：窗口很窄时让「设置」与「动作」分成两行，而不是把发送键单独挤到下一行。 -->
             <div class="send-actions">
+            <PrivateKnowledgeSelector
+              v-model="selectedPrivateKnowledgeIds"
+              :collections="privateKnowledge.collections"
+              :loading="privateKnowledge.loading"
+              :disabled="saving || generating || !ready"
+            />
             <!-- 语音模式首次点击即开启并向上展开设置；开启后耳机只负责展开/收起，避免用户
                  为了改音色误把模式关掉。真正的关闭动作放在面板内并明确标注。 -->
             <div class="speech-mode-menu">
@@ -1429,6 +1464,9 @@ textarea::placeholder { color: #99a5b0; }
 .attachment-remove:hover { color: #c0492f; }
 .composer.dragging { border-color: #8cb9de; background: #f7fbff; }
 .user-attachments { display: flex; justify-content: flex-end; }
+.user-private-knowledge { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 6px; margin-top: 8px;
+  color: #7c8f9f; font-size: 10px; }
+.user-private-knowledge b { padding: 2px 7px; border-radius: 999px; background: #eef7fd; color: #39749f; font-weight: 500; }
 .send-button { display: grid; place-items: center; width: 34px; height: 34px; border: none; border-radius: 10px; background: #237ac2; color: white; cursor: pointer; }
 .send-button:disabled { background: #e8eef4; color: #a2b3c3; cursor: default; }
 .composer-meta { display: flex; justify-content: space-between; gap: 12px; margin-top: 12px; color: #9ba7b3; font-size: 10px; line-height: 1.7; }

@@ -5,6 +5,10 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.schemas.attachments import MessageAttachmentOut
+from app.schemas.private_knowledge import (
+    MessagePrivateKnowledgeCitationOut,
+    MessagePrivateKnowledgeSelectionOut,
+)
 from app.schemas.speech import SpeechOutputIntent
 
 
@@ -103,6 +107,11 @@ class CreateConsultation(BaseModel):
 class CreateMessage(CreateConsultation):
     content: str = Field(min_length=1, max_length=2000)
     attachment_ids: list[UUID] = Field(default_factory=list, alias="attachmentIds", max_length=5)
+    private_knowledge_collection_ids: list[UUID] = Field(
+        default_factory=list,
+        alias="privateKnowledgeCollectionIds",
+        max_length=3,
+    )
 
     @field_validator("content", mode="before")
     @classmethod
@@ -114,6 +123,13 @@ class CreateMessage(CreateConsultation):
     def unique_attachment_ids(cls, value: list[UUID]) -> list[UUID]:
         if len(value) != len(set(value)):
             raise ValueError("附件不能重复选择")
+        return value
+
+    @field_validator("private_knowledge_collection_ids")
+    @classmethod
+    def unique_private_knowledge_collection_ids(cls, value: list[UUID]) -> list[UUID]:
+        if len(value) != len(set(value)):
+            raise ValueError("知识库不能重复选择")
         return value
 
 
@@ -167,6 +183,14 @@ class MessageOut(BaseModel):
     triage: TriageResult | None = None
     citations: list[MessageCitation] = Field(default_factory=list)
     attachments: list[MessageAttachmentOut] = Field(default_factory=list)
+    private_knowledge_collections: list[MessagePrivateKnowledgeSelectionOut] = Field(
+        default_factory=list,
+        serialization_alias="privateKnowledgeCollections",
+    )
+    private_knowledge_citations: list[MessagePrivateKnowledgeCitationOut] = Field(
+        default_factory=list,
+        serialization_alias="privateKnowledgeCitations",
+    )
     created_at: datetime = Field(serialization_alias="createdAt")
 
 

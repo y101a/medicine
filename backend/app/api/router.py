@@ -12,6 +12,7 @@ from app.api.routes import (
     models,
     navigation,
     phone_verification,
+    private_knowledge,
     speech,
     users,
     voice,
@@ -24,6 +25,7 @@ api_router.include_router(image_generations.router)
 api_router.include_router(document_generations.router)
 api_router.include_router(auth.router)
 api_router.include_router(phone_verification.router)
+api_router.include_router(private_knowledge.router)
 api_router.include_router(users.router)
 api_router.include_router(consultations.router)
 api_router.include_router(models.router)

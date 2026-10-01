@@ -536,5 +536,15 @@ DOCX 和一份 PPTX；DOCX 的 `pageCount` 固定返回 `null`（Office 分页�
 
 `DELETE /users/me`，请求为 `{"currentPassword":"当前密码"}`。密码错误返回 422
 `ACCOUNT_PASSWORD_INVALID`；每个用户每 10 分钟最多尝试 5 次。成功返回 204、清除认证
-Cookie，并通过数据库级联永久删除用户的会话、消息、健康记录、模型密钥、附件及加密分块；
+Cookie，并通过数据库级联永久删除用户的会话、消息、健康记录、模型密钥、附件、私人知识库及加密分块；
 头像文件同步删除。最小化审计事件保留，但用户外键变为 `null`，不保留附件名或正文。
+
+## 用户专属知识库
+
+`/private-knowledge` 提供当前用户独占的知识库、文档与受控搜索接口。集合列表和文档列表统一
+返回 `{items:[...]}`；上传为 multipart `file + noticeAccepted + noticeVersion`，通知版本固定
+`private-knowledge-upload-v1`。咨询消息可选传最多 3 个不同的
+`privateKnowledgeCollectionIds`，未传或空数组时不执行私人检索。
+
+私人检索响应和流式 `start.privateKnowledge.sources` 不含正文；助手消息只保存并返回实际引用的
+`privateKnowledgeCitations`。详情、错误码和隐私边界见 `docs/PRIVATE_KNOWLEDGE.md`。

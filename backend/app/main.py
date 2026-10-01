@@ -78,6 +78,13 @@ app.add_middleware(
 )
 app.add_middleware(
     AttachmentUploadBodyLimitMiddleware,
+    max_file_bytes=settings.attachment_max_bytes,
+    path_pattern=rf"{settings.api_v1_prefix}/private-knowledge/collections/[^/]+/documents",
+    error_code="PRIVATE_KNOWLEDGE_DOCUMENT_TOO_LARGE",
+    resource_label="文档",
+)
+app.add_middleware(
+    AttachmentUploadBodyLimitMiddleware,
     max_file_bytes=settings.image_max_bytes,
     path_pattern=rf"{settings.api_v1_prefix}/consultations/[^/]+/images",
     error_code="IMAGE_TOO_LARGE",

@@ -18,6 +18,10 @@ from app.ai.follow_up import (
 from app.ai.generated_image_context import build_generated_image_context
 from app.ai.graph import render_rag_context, run_consultation_generation
 from app.ai.graph.retrieval_gate import evaluate_retrieval_gate
+from app.ai.private_knowledge_context import (
+    audit_private_citations,
+    build_private_knowledge_context,
+)
 from app.api.dependencies import CurrentUser, DbSession
 from app.core.config import get_settings
 from app.core.errors import AppError
@@ -132,6 +136,8 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
     health_context = await health_service.build_health_context(db, user.id)
     attachment_context = None
     attachment_refs = []
+    private_knowledge_context = None
+    private_knowledge_snapshots: list[dict[str, object]] = []
     if user_message_id is not None:
         settings = get_settings()
         attachment_context = await build_attachment_context(
@@ -144,6 +150,16 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
         )
         refs = await attachment_service.message_attachment_refs(db, [user_message_id])
         attachment_refs = refs.get(user_message_id, [])
+        (
+            private_knowledge_context,
+            private_knowledge_snapshots,
+        ) = await build_private_knowledge_context(
+            db,
+            user_id=user.id,
+            message_id=user_message_id,
+            question=user_text,
+            max_chars=10_000,
+        )
     generated_image_context = await build_generated_image_context(
         db,
         user_id=user.id,
@@ -153,7 +169,12 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
     private_context = (
         "\n\n".join(
             item
-            for item in (health_context, attachment_context, generated_image_context)
+            for item in (
+                health_context,
+                attachment_context,
+                generated_image_context,
+                private_knowledge_context,
+            )
             if item
         )
         or None
@@ -218,6 +239,21 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
                 "attachmentsUsed": [
                     item.model_dump(by_alias=True, mode="json") for item in attachment_refs
                 ],
+                "privateKnowledge": {
+                    "status": "completed" if private_knowledge_snapshots else "empty",
+                    "sources": [
+                        {
+                            "referenceNumber": item["reference_number"],
+                            "collectionId": item["collection_id"],
+                            "collectionName": item["collection_name"],
+                            "documentId": item["document_id"],
+                            "documentName": item["document_name"],
+                            "locator": item["locator"],
+                            "similarity": item["similarity"],
+                        }
+                        for item in private_knowledge_snapshots
+                    ],
+                },
                 "retrieval": {
                     "status": graph_result["retrieval_status"],
                     "gateReason": graph_result["retrieval_gate_reason"],
@@ -295,8 +331,12 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
                 content = "".join(parts)
             if follow_up_payload is None:
                 content, verified_citations = audit_answer_citations(content, citation_snapshots)
+                content, verified_private_citations = audit_private_citations(
+                    content, private_knowledge_snapshots
+                )
             else:
                 verified_citations = []
+                verified_private_citations = []
             message = await service.append_assistant_message(
                 db,
                 user.id,
@@ -307,6 +347,7 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
                 model.id,
                 model.name,
                 citations=verified_citations,
+                private_knowledge_citations=verified_private_citations,
                 answer_format=answer_format,
                 medical_content=(graph_result["retrieval_gate_reason"] == "medical_content"),
                 source_message_id=source_message_id,
@@ -320,6 +361,9 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
                     checked, verified_citations = audit_answer_citations(
                         "".join(parts), citation_snapshots
                     )
+                    checked, verified_private_citations = audit_private_citations(
+                        checked, private_knowledge_snapshots
+                    )
                     await service.append_assistant_message(
                         db,
                         user.id,
@@ -331,6 +375,7 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
                         model.name,
                         generation_status="stopped",
                         citations=verified_citations,
+                        private_knowledge_citations=verified_private_citations,
                         answer_format=answer_format,
                         medical_content=(
                             graph_result["retrieval_gate_reason"] == "medical_content"
@@ -347,6 +392,9 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
                     checked, verified_citations = audit_answer_citations(
                         "".join(parts), citation_snapshots
                     )
+                    checked, verified_private_citations = audit_private_citations(
+                        checked, private_knowledge_snapshots
+                    )
                     await service.append_assistant_message(
                         db,
                         user.id,
@@ -358,6 +406,7 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
                         model.name,
                         generation_status="failed",
                         citations=verified_citations,
+                        private_knowledge_citations=verified_private_citations,
                         answer_format=answer_format,
                         medical_content=(
                             graph_result["retrieval_gate_reason"] == "medical_content"

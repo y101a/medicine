@@ -1,7 +1,26 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { consultationsApi } from './consultations'
+import http from './http'
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+})
+
+it('发送消息时只在显式选择后携带私人知识库 ID', async () => {
+  const post = vi.spyOn(http, 'post').mockResolvedValue({ data: {
+    id: 'm1', role: 'user', content: '解释指标', sequence: 1, createdAt: '2026-10-01T00:00:00Z',
+  } })
+  await consultationsApi.send('c1', '解释指标', 'r1', [], ['k1', 'k2'])
+  expect(post).toHaveBeenCalledWith('/consultations/c1/messages', {
+    content: '解释指标', clientRequestId: 'r1', privateKnowledgeCollectionIds: ['k1', 'k2'],
+  })
+
+  await consultationsApi.send('c1', '普通问题', 'r2')
+  expect(post).toHaveBeenLastCalledWith('/consultations/c1/messages', {
+    content: '普通问题', clientRequestId: 'r2',
+  })
+})
 
 it('读取流式 start 检索状态并保留回答消息，不把状态当正文', async () => {
   const lines = [

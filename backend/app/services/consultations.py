@@ -23,9 +23,14 @@ from app.schemas.consultations import (
     MessagePage,
     TriageResult,
 )
+from app.schemas.private_knowledge import (
+    MessagePrivateKnowledgeCitationOut,
+    MessagePrivateKnowledgeSelectionOut,
+)
 from app.services import attachments as attachment_service
 from app.services import document_generations as document_generation_service
 from app.services import image_generations as image_generation_service
+from app.services import private_knowledge as private_knowledge_service
 from app.services.document_generation_intent import medical_document_generation_request
 from app.services.generated_document_deletion import (
     enqueue_document_deletions,
@@ -52,6 +57,8 @@ def summary(row: Consultation) -> ConsultationOut:
 def message_out(
     row: Message,
     attachments: list[MessageAttachmentOut] | None = None,
+    private_knowledge_collections: list[MessagePrivateKnowledgeSelectionOut] | None = None,
+    private_knowledge_citations: list[MessagePrivateKnowledgeCitationOut] | None = None,
 ) -> MessageOut:
     stored_content = decrypt_sensitive(row.content_ciphertext)
     follow_up = parse_follow_up(stored_content)
@@ -75,10 +82,7 @@ def message_out(
     )
     speech_request = (
         speech_output_request(stored_content)
-        if row.role == "user"
-        and triage is None
-        and document_request is None
-        and not image_request
+        if row.role == "user" and triage is None and document_request is None and not image_request
         else None
     )
     return MessageOut(
@@ -100,6 +104,8 @@ def message_out(
         triage=triage,
         citations=citations,
         attachments=attachments or [],
+        private_knowledge_collections=private_knowledge_collections or [],
+        private_knowledge_citations=private_knowledge_citations or [],
         created_at=row.created_at,
     )
 
@@ -183,8 +189,22 @@ async def list_messages(db: AsyncSession, user_id: UUID, cid: UUID, before: int 
     rows = (await db.scalars(query.order_by(Message.sequence.desc()).limit(limit + 1))).all()
     visible = list(reversed(rows[:limit]))
     refs = await attachment_service.message_attachment_refs(db, [row.id for row in visible])
+    private_collections = await private_knowledge_service.message_selections(
+        db, [row.id for row in visible]
+    )
+    private_citations = await private_knowledge_service.message_citations(
+        db, [row.id for row in visible]
+    )
     return MessagePage(
-        items=[message_out(row, refs.get(row.id, [])) for row in visible],
+        items=[
+            message_out(
+                row,
+                refs.get(row.id, []),
+                private_collections.get(row.id, []),
+                private_citations.get(row.id, []),
+            )
+            for row in visible
+        ],
         has_more=len(rows) > limit,
     )
 
@@ -309,13 +329,22 @@ async def append_message(db: AsyncSession, user_id: UUID, cid: UUID, payload: Cr
         existing_attachment_ids = await attachment_service.attachment_ids_for_message(
             db, existing.id
         )
+        existing_collection_ids = await private_knowledge_service.collection_ids_for_message(
+            db, existing.id
+        )
         if (
             decrypt_sensitive(existing.content_ciphertext) != payload.content
             or existing_attachment_ids != payload.attachment_ids
+            or existing_collection_ids != payload.private_knowledge_collection_ids
         ):
             raise AppError(409, "REQUEST_CONFLICT", "该请求编号已用于其他消息")
         refs = await attachment_service.message_attachment_refs(db, [existing.id])
-        result = message_out(existing, refs.get(existing.id, []))
+        selections = await private_knowledge_service.message_selections(db, [existing.id])
+        result = message_out(
+            existing,
+            refs.get(existing.id, []),
+            selections.get(existing.id, []),
+        )
         await db.commit()
         return result
     conversation.message_count += 1
@@ -338,7 +367,13 @@ async def append_message(db: AsyncSession, user_id: UUID, cid: UUID, payload: Cr
     refs = await attachment_service.bind_message_attachments(
         db, user_id, cid, row.id, payload.attachment_ids
     )
-    result = message_out(row, refs)
+    selections = await private_knowledge_service.bind_message_selections(
+        db,
+        user_id=user_id,
+        message_id=row.id,
+        collection_ids=payload.private_knowledge_collection_ids,
+    )
+    result = message_out(row, refs, selections)
     await db.commit()
     return result
 
@@ -354,6 +389,7 @@ async def append_assistant_message(
     model_name: str,
     generation_status: str = "completed",
     citations: list[dict[str, Any]] | None = None,
+    private_knowledge_citations: list[dict[str, object]] | None = None,
     answer_format: str = "plain",
     medical_content: bool = False,
     source_message_id: UUID | None = None,
@@ -377,7 +413,12 @@ async def append_assistant_message(
         ):
             raise AppError(409, "REQUEST_CONFLICT", "该请求编号已用于其他模型")
         refs = await attachment_service.message_attachment_refs(db, [existing.id])
-        result = message_out(existing, refs.get(existing.id, []))
+        private_citations = await private_knowledge_service.message_citations(db, [existing.id])
+        result = message_out(
+            existing,
+            refs.get(existing.id, []),
+            private_knowledge_citations=private_citations.get(existing.id, []),
+        )
         await db.commit()
         return result
     if source_message_id is not None:
@@ -412,6 +453,11 @@ async def append_assistant_message(
     )
     db.add(row)
     await db.flush()
+    await private_knowledge_service.save_message_citations(
+        db,
+        message_id=row.id,
+        citations=private_knowledge_citations or [],
+    )
     if source_message_id is None:
         user_message_id = await db.scalar(
             select(Message.id)
@@ -426,7 +472,12 @@ async def append_assistant_message(
         if user_message_id is not None:
             await attachment_service.copy_message_attachments(db, user_message_id, row.id)
     refs = await attachment_service.message_attachment_refs(db, [row.id])
-    result = message_out(row, refs.get(row.id, []))
+    private_citation_refs = await private_knowledge_service.message_citations(db, [row.id])
+    result = message_out(
+        row,
+        refs.get(row.id, []),
+        private_knowledge_citations=private_citation_refs.get(row.id, []),
+    )
     await db.commit()
     return result
 

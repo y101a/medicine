@@ -32,6 +32,14 @@ from app.models.phone_verification import (
     PhoneVerificationChallenge,
     PhoneVerificationPurpose,
 )
+from app.models.private_knowledge import (
+    MessagePrivateKnowledgeCitation,
+    MessagePrivateKnowledgeSelection,
+    PrivateKnowledgeChunk,
+    PrivateKnowledgeCollection,
+    PrivateKnowledgeDocument,
+    PrivateKnowledgeSearchTerm,
+)
 from app.models.user import Gender, User, UserCredentials, UserRole, UserStatus
 
 __all__ = [
@@ -58,8 +66,14 @@ __all__ = [
     "KnowledgeSource",
     "Message",
     "MessageAttachment",
+    "MessagePrivateKnowledgeCitation",
+    "MessagePrivateKnowledgeSelection",
     "PhoneVerificationChallenge",
     "PhoneVerificationPurpose",
+    "PrivateKnowledgeChunk",
+    "PrivateKnowledgeCollection",
+    "PrivateKnowledgeDocument",
+    "PrivateKnowledgeSearchTerm",
     "UserModelCredential",
     "Gender",
     "User",

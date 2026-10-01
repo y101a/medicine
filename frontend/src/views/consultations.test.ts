@@ -769,7 +769,8 @@ describe('病历文档附件', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
     expect(consultationsApi.send).toHaveBeenCalledWith(
-      'c1', '帮我解释这份报告', expect.any(String), ['a1'],
+      // 第 5 个参数是 P3 的私人知识库选择（`privateKnowledgeCollectionIds`）；本用例没选库，所以是空数组。
+      'c1', '帮我解释这份报告', expect.any(String), ['a1'], [],
     )
     expect(wrapper.text()).not.toContain('血常规报告.pdf')
     wrapper.unmount()
@@ -789,6 +790,8 @@ describe('病历文档附件', () => {
       '请帮我解读上传的病历文档，解释其中的医学术语和指标，并在必要时给出就医分流建议；不要作出确诊。',
       expect.any(String),
       ['a1'],
+      // 同上：没有选私人知识库时第 5 个参数是空数组。
+      [],
     )
     wrapper.unmount()
   })
