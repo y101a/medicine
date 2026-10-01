@@ -1,0 +1,1410 @@
+{
+  "identity": {
+    "schemaVersion": 2,
+    "datasetSha256": "496f2dad5ee6eedf6226458d795aba36fdc0825a66ac30c4f59eadd5f88cdbe3",
+    "mode": "hybrid",
+    "topK": 3,
+    "split": "all",
+    "gate": {
+      "profile": "candidate-threshold",
+      "vector": 0.56,
+      "keyword": 0.2,
+      "keywordOnly": 0.2,
+      "webVector": 0.6
+    }
+  },
+  "retryCount": 0,
+  "cases": {
+    "headache_term": {
+      "case_id": "headache_term",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.733016,
+      "returned_slugs": [
+        "headache-dizziness"
+      ],
+      "returned_titles": [
+        "头痛与头晕科普原型"
+      ],
+      "returned_trust_levels": [
+        "prototype"
+      ],
+      "expected_slugs": [
+        "headache-dizziness"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "headache-dizziness",
+          "title": "头痛与头晕科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.733016,
+          "keyword_score": null,
+          "vector_similarity": 0.733016,
+          "rerank_score": 0.6230636,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "gastroesophageal-reflux",
+          "title": "胃食管反流常见表现原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.516692,
+          "keyword_score": 0.166667,
+          "vector_similarity": 0.516692,
+          "rerank_score": 0.4641883,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "headache-dizziness",
+          "title": "头痛与头晕科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.543234,
+          "keyword_score": null,
+          "vector_similarity": 0.543234,
+          "rerank_score": 0.46174887,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 2,
+      "gate_profile": "candidate-threshold"
+    },
+    "dizziness_term": {
+      "case_id": "dizziness_term",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.745348,
+      "returned_slugs": [
+        "headache-dizziness",
+        "headache-dizziness"
+      ],
+      "returned_titles": [
+        "头痛与头晕科普原型",
+        "头痛与头晕科普原型"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "headache-dizziness"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "headache-dizziness",
+          "title": "头痛与头晕科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.745348,
+          "keyword_score": 0.25,
+          "vector_similarity": 0.745348,
+          "rerank_score": 0.67104587,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "headache-dizziness",
+          "title": "头痛与头晕科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.472081,
+          "keyword_score": 0.222222,
+          "vector_similarity": 0.472081,
+          "rerank_score": 0.43460183,
+          "kept": true,
+          "reason": "keyword-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "headache-dizziness",
+          "title": "头痛与头晕科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.46183,
+          "keyword_score": 0.111111,
+          "vector_similarity": 0.46183,
+          "rerank_score": 0.40922219,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 1,
+      "gate_profile": "candidate-threshold"
+    },
+    "dizziness_plain": {
+      "case_id": "dizziness_plain",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "urgent",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.763945,
+      "returned_slugs": [
+        "headache-dizziness"
+      ],
+      "returned_titles": [
+        "头痛与头晕科普原型"
+      ],
+      "returned_trust_levels": [
+        "prototype"
+      ],
+      "expected_slugs": [
+        "headache-dizziness"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "headache-dizziness",
+          "title": "头痛与头晕科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.763945,
+          "keyword_score": 0.153846,
+          "vector_similarity": 0.763945,
+          "rerank_score": 0.67242989,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "emergency-warning",
+          "title": "紧急危险表现与求助原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.533544,
+          "keyword_score": null,
+          "vector_similarity": 0.533544,
+          "rerank_score": 0.45351247,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "headache-dizziness",
+          "title": "头痛与头晕科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.514465,
+          "keyword_score": null,
+          "vector_similarity": 0.514465,
+          "rerank_score": 0.43729504,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 2,
+      "gate_profile": "candidate-threshold"
+    },
+    "headache_danger": {
+      "case_id": "headache_danger",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "emergency",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.809452,
+      "returned_slugs": [
+        "headache-dizziness",
+        "emergency-warning",
+        "headache-dizziness"
+      ],
+      "returned_titles": [
+        "头痛与头晕科普原型",
+        "紧急危险表现与求助原型资料",
+        "头痛与头晕科普原型"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "headache-dizziness",
+        "emergency-warning"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "headache-dizziness",
+          "title": "头痛与头晕科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.809452,
+          "keyword_score": 0.230769,
+          "vector_similarity": 0.809452,
+          "rerank_score": 0.72264955,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "emergency-warning",
+          "title": "紧急危险表现与求助原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.638728,
+          "keyword_score": 0.153846,
+          "vector_similarity": 0.638728,
+          "rerank_score": 0.56599572,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "headache-dizziness",
+          "title": "头痛与头晕科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.573241,
+          "keyword_score": null,
+          "vector_similarity": 0.573241,
+          "rerank_score": 0.48725512,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        }
+      ],
+      "filtered_count": 0,
+      "gate_profile": "candidate-threshold"
+    },
+    "hematuria_term": {
+      "case_id": "hematuria_term",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "urgent",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.698249,
+      "returned_slugs": [
+        "hematuria-urinary-tract-infection",
+        "hematuria-urinary-tract-infection"
+      ],
+      "returned_titles": [
+        "血尿与尿路感染科普原型",
+        "血尿与尿路感染科普原型"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "hematuria-urinary-tract-infection"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "hematuria-urinary-tract-infection",
+          "title": "血尿与尿路感染科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.698249,
+          "keyword_score": 0.222222,
+          "vector_similarity": 0.698249,
+          "rerank_score": 0.62684513,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "hematuria-urinary-tract-infection",
+          "title": "血尿与尿路感染科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.563102,
+          "keyword_score": null,
+          "vector_similarity": 0.563102,
+          "rerank_score": 0.47863683,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "hematuria-urinary-tract-infection",
+          "title": "血尿与尿路感染科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.555525,
+          "keyword_score": null,
+          "vector_similarity": 0.555525,
+          "rerank_score": 0.47219644,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 1,
+      "gate_profile": "candidate-threshold"
+    },
+    "uti_term": {
+      "case_id": "uti_term",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.754503,
+      "returned_slugs": [
+        "hematuria-urinary-tract-infection",
+        "hematuria-urinary-tract-infection",
+        "hematuria-urinary-tract-infection"
+      ],
+      "returned_titles": [
+        "血尿与尿路感染科普原型",
+        "血尿与尿路感染科普原型",
+        "血尿与尿路感染科普原型"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "hematuria-urinary-tract-infection"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "hematuria-urinary-tract-infection",
+          "title": "血尿与尿路感染科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.754503,
+          "keyword_score": 0.416667,
+          "vector_similarity": 0.754503,
+          "rerank_score": 0.70382729,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "hematuria-urinary-tract-infection",
+          "title": "血尿与尿路感染科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.681992,
+          "keyword_score": 0.166667,
+          "vector_similarity": 0.681992,
+          "rerank_score": 0.60469282,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "hematuria-urinary-tract-infection",
+          "title": "血尿与尿路感染科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.641357,
+          "keyword_score": 0.333333,
+          "vector_similarity": 0.641357,
+          "rerank_score": 0.59515386,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        }
+      ],
+      "filtered_count": 0,
+      "gate_profile": "candidate-threshold"
+    },
+    "uti_plain": {
+      "case_id": "uti_plain",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "urgent",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.714121,
+      "returned_slugs": [
+        "hematuria-urinary-tract-infection",
+        "hematuria-urinary-tract-infection"
+      ],
+      "returned_titles": [
+        "血尿与尿路感染科普原型",
+        "血尿与尿路感染科普原型"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "hematuria-urinary-tract-infection"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "hematuria-urinary-tract-infection",
+          "title": "血尿与尿路感染科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.714121,
+          "keyword_score": 0.384615,
+          "vector_similarity": 0.714121,
+          "rerank_score": 0.66469544,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "hematuria-urinary-tract-infection",
+          "title": "血尿与尿路感染科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.571427,
+          "keyword_score": null,
+          "vector_similarity": 0.571427,
+          "rerank_score": 0.48571335,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "hematuria-urinary-tract-infection",
+          "title": "血尿与尿路感染科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.528586,
+          "keyword_score": null,
+          "vector_similarity": 0.528586,
+          "rerank_score": 0.4492977,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 1,
+      "gate_profile": "candidate-threshold"
+    },
+    "uti_danger": {
+      "case_id": "uti_danger",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "urgent",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.733251,
+      "returned_slugs": [
+        "hematuria-urinary-tract-infection",
+        "hematuria-urinary-tract-infection"
+      ],
+      "returned_titles": [
+        "血尿与尿路感染科普原型",
+        "血尿与尿路感染科普原型"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "hematuria-urinary-tract-infection"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "hematuria-urinary-tract-infection",
+          "title": "血尿与尿路感染科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.733251,
+          "keyword_score": null,
+          "vector_similarity": 0.733251,
+          "rerank_score": 0.62326319,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "hematuria-urinary-tract-infection",
+          "title": "血尿与尿路感染科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.630255,
+          "keyword_score": 0.153846,
+          "vector_similarity": 0.630255,
+          "rerank_score": 0.5587939,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "hematuria-urinary-tract-infection",
+          "title": "血尿与尿路感染科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.498315,
+          "keyword_score": null,
+          "vector_similarity": 0.498315,
+          "rerank_score": 0.42356771,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 1,
+      "gate_profile": "candidate-threshold"
+    },
+    "fever_term": {
+      "case_id": "fever_term",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.685295,
+      "returned_slugs": [
+        "pediatric-fever",
+        "pediatric-fever",
+        "pediatric-fever"
+      ],
+      "returned_titles": [
+        "儿童发热科普原型",
+        "儿童发热科普原型",
+        "儿童发热科普原型"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "pediatric-fever"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "pediatric-fever",
+          "title": "儿童发热科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.685295,
+          "keyword_score": 0.307692,
+          "vector_similarity": 0.685295,
+          "rerank_score": 0.62865464,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "pediatric-fever",
+          "title": "儿童发热科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.635739,
+          "keyword_score": 0.307692,
+          "vector_similarity": 0.635739,
+          "rerank_score": 0.58653205,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "pediatric-fever",
+          "title": "儿童发热科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.620761,
+          "keyword_score": 0.307692,
+          "vector_similarity": 0.620761,
+          "rerank_score": 0.57380036,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        }
+      ],
+      "filtered_count": 0,
+      "gate_profile": "candidate-threshold"
+    },
+    "fever_plain": {
+      "case_id": "fever_plain",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.818843,
+      "returned_slugs": [
+        "pediatric-fever",
+        "pediatric-fever",
+        "pediatric-fever"
+      ],
+      "returned_titles": [
+        "儿童发热科普原型",
+        "儿童发热科普原型",
+        "儿童发热科普原型"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "pediatric-fever"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "pediatric-fever",
+          "title": "儿童发热科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.818843,
+          "keyword_score": 0.25,
+          "vector_similarity": 0.818843,
+          "rerank_score": 0.73351662,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "pediatric-fever",
+          "title": "儿童发热科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.656699,
+          "keyword_score": null,
+          "vector_similarity": 0.656699,
+          "rerank_score": 0.55819447,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "pediatric-fever",
+          "title": "儿童发热科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.618998,
+          "keyword_score": null,
+          "vector_similarity": 0.618998,
+          "rerank_score": 0.52614814,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        }
+      ],
+      "filtered_count": 0,
+      "gate_profile": "candidate-threshold"
+    },
+    "fever_infant": {
+      "case_id": "fever_infant",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "urgent",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.761862,
+      "returned_slugs": [
+        "pediatric-fever",
+        "pediatric-fever"
+      ],
+      "returned_titles": [
+        "儿童发热科普原型",
+        "儿童发热科普原型"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "pediatric-fever"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "pediatric-fever",
+          "title": "儿童发热科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.761862,
+          "keyword_score": 0.2,
+          "vector_similarity": 0.761862,
+          "rerank_score": 0.67758304,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "pediatric-fever",
+          "title": "儿童发热科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.625265,
+          "keyword_score": null,
+          "vector_similarity": 0.625265,
+          "rerank_score": 0.53147546,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "hematuria-urinary-tract-infection",
+          "title": "血尿与尿路感染科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.549617,
+          "keyword_score": null,
+          "vector_similarity": 0.549617,
+          "rerank_score": 0.46717472,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 1,
+      "gate_profile": "candidate-threshold"
+    },
+    "fever_danger": {
+      "case_id": "fever_danger",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "emergency",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.680502,
+      "returned_slugs": [
+        "pediatric-fever",
+        "pediatric-fever",
+        "asthma"
+      ],
+      "returned_titles": [
+        "儿童发热科普原型",
+        "儿童发热科普原型",
+        "哮喘常见表现原型资料"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "pediatric-fever",
+        "emergency-warning"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "pediatric-fever",
+          "title": "儿童发热科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.680502,
+          "keyword_score": 0.3125,
+          "vector_similarity": 0.680502,
+          "rerank_score": 0.62530147,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "pediatric-fever",
+          "title": "儿童发热科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.602452,
+          "keyword_score": 0.214286,
+          "vector_similarity": 0.602452,
+          "rerank_score": 0.54422747,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "asthma",
+          "title": "哮喘常见表现原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.599197,
+          "keyword_score": 0.214286,
+          "vector_similarity": 0.599197,
+          "rerank_score": 0.54146032,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        }
+      ],
+      "filtered_count": 0,
+      "gate_profile": "candidate-threshold"
+    },
+    "hives_term": {
+      "case_id": "hives_term",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.766851,
+      "returned_slugs": [
+        "urticaria-eczema",
+        "urticaria-eczema",
+        "urticaria-eczema"
+      ],
+      "returned_titles": [
+        "荨麻疹与湿疹科普原型",
+        "荨麻疹与湿疹科普原型",
+        "荨麻疹与湿疹科普原型"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "urticaria-eczema"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "urticaria-eczema",
+          "title": "荨麻疹与湿疹科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.766851,
+          "keyword_score": 0.333333,
+          "vector_similarity": 0.766851,
+          "rerank_score": 0.70182351,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "urticaria-eczema",
+          "title": "荨麻疹与湿疹科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.518848,
+          "keyword_score": 0.333333,
+          "vector_similarity": 0.518848,
+          "rerank_score": 0.49102077,
+          "kept": true,
+          "reason": "keyword-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "urticaria-eczema",
+          "title": "荨麻疹与湿疹科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.408301,
+          "keyword_score": 0.333333,
+          "vector_similarity": 0.408301,
+          "rerank_score": 0.39705614,
+          "kept": true,
+          "reason": "keyword-at-or-above-threshold"
+        }
+      ],
+      "filtered_count": 0,
+      "gate_profile": "candidate-threshold"
+    },
+    "eczema_term": {
+      "case_id": "eczema_term",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.778355,
+      "returned_slugs": [
+        "urticaria-eczema"
+      ],
+      "returned_titles": [
+        "荨麻疹与湿疹科普原型"
+      ],
+      "returned_trust_levels": [
+        "prototype"
+      ],
+      "expected_slugs": [
+        "urticaria-eczema"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "urticaria-eczema",
+          "title": "荨麻疹与湿疹科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.778355,
+          "keyword_score": 0.285714,
+          "vector_similarity": 0.778355,
+          "rerank_score": 0.70445904,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "pediatric-fever",
+          "title": "儿童发热科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.431736,
+          "keyword_score": null,
+          "vector_similarity": 0.431736,
+          "rerank_score": 0.36697585,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "1745207692481_31763.pdf",
+          "title": "中华人民共和国国家卫生和计划生育委员会公报",
+          "source_key": "web_search_prototype",
+          "trust_level": "prototype",
+          "similarity": 0.429511,
+          "keyword_score": null,
+          "vector_similarity": 0.429511,
+          "rerank_score": 0.36508466,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 2,
+      "gate_profile": "candidate-threshold"
+    },
+    "eczema_plain": {
+      "case_id": "eczema_plain",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.696295,
+      "returned_slugs": [
+        "urticaria-eczema",
+        "urticaria-eczema"
+      ],
+      "returned_titles": [
+        "荨麻疹与湿疹科普原型",
+        "荨麻疹与湿疹科普原型"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "urticaria-eczema"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "urticaria-eczema",
+          "title": "荨麻疹与湿疹科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.696295,
+          "keyword_score": 0.142857,
+          "vector_similarity": 0.696295,
+          "rerank_score": 0.61327902,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "urticaria-eczema",
+          "title": "荨麻疹与湿疹科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.584403,
+          "keyword_score": null,
+          "vector_similarity": 0.584403,
+          "rerank_score": 0.49674226,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "urticaria-eczema",
+          "title": "荨麻疹与湿疹科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.556478,
+          "keyword_score": null,
+          "vector_similarity": 0.556478,
+          "rerank_score": 0.47300651,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 1,
+      "gate_profile": "candidate-threshold"
+    },
+    "hives_danger": {
+      "case_id": "hives_danger",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "emergency",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.749287,
+      "returned_slugs": [
+        "urticaria-eczema",
+        "emergency-warning",
+        "urticaria-eczema"
+      ],
+      "returned_titles": [
+        "荨麻疹与湿疹科普原型",
+        "紧急危险表现与求助原型资料",
+        "荨麻疹与湿疹科普原型"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "urticaria-eczema",
+        "emergency-warning"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "urticaria-eczema",
+          "title": "荨麻疹与湿疹科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.749287,
+          "keyword_score": 0.1875,
+          "vector_similarity": 0.749287,
+          "rerank_score": 0.6650189,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "emergency-warning",
+          "title": "紧急危险表现与求助原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.700048,
+          "keyword_score": 0.25,
+          "vector_similarity": 0.700048,
+          "rerank_score": 0.63254054,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "urticaria-eczema",
+          "title": "荨麻疹与湿疹科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.593024,
+          "keyword_score": null,
+          "vector_similarity": 0.593024,
+          "rerank_score": 0.50407055,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        }
+      ],
+      "filtered_count": 0,
+      "gate_profile": "candidate-threshold"
+    },
+    "unsupported_weather": {
+      "case_id": "unsupported_weather",
+      "case_type": "unsupported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": false,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": null,
+      "top_similarity": null,
+      "returned_slugs": [],
+      "returned_titles": [],
+      "returned_trust_levels": [],
+      "expected_slugs": [],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "1745207692481_31763.pdf",
+          "title": "中华人民共和国国家卫生和计划生育委员会公报",
+          "source_key": "web_search_prototype",
+          "trust_level": "prototype",
+          "similarity": 0.405719,
+          "keyword_score": null,
+          "vector_similarity": 0.405719,
+          "rerank_score": 0.34486097,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "urticaria-eczema",
+          "title": "荨麻疹与湿疹科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.402745,
+          "keyword_score": null,
+          "vector_similarity": 0.402745,
+          "rerank_score": 0.34233293,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "pediatric-fever",
+          "title": "儿童发热科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.391239,
+          "keyword_score": null,
+          "vector_similarity": 0.391239,
+          "rerank_score": 0.33255321,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 3,
+      "gate_profile": "candidate-threshold"
+    },
+    "unsupported_login": {
+      "case_id": "unsupported_login",
+      "case_type": "unsupported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": false,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": null,
+      "top_similarity": null,
+      "returned_slugs": [],
+      "returned_titles": [],
+      "returned_trust_levels": [],
+      "expected_slugs": [],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "emergency-warning",
+          "title": "紧急危险表现与求助原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.358076,
+          "keyword_score": null,
+          "vector_similarity": 0.358076,
+          "rerank_score": 0.3043644,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "hypertension",
+          "title": "高血压认识与随访原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.334188,
+          "keyword_score": null,
+          "vector_similarity": 0.334188,
+          "rerank_score": 0.28405979,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "emergency-warning",
+          "title": "紧急危险表现与求助原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.314781,
+          "keyword_score": null,
+          "vector_similarity": 0.314781,
+          "rerank_score": 0.26756359,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 3,
+      "gate_profile": "candidate-threshold"
+    },
+    "unsupported_wrist": {
+      "case_id": "unsupported_wrist",
+      "case_type": "unsupported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": false,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": null,
+      "top_similarity": null,
+      "returned_slugs": [],
+      "returned_titles": [],
+      "returned_trust_levels": [],
+      "expected_slugs": [],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "animal-bite",
+          "title": "动物咬伤处理原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.448135,
+          "keyword_score": null,
+          "vector_similarity": 0.448135,
+          "rerank_score": 0.38091506,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "emergency-warning",
+          "title": "紧急危险表现与求助原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.402573,
+          "keyword_score": null,
+          "vector_similarity": 0.402573,
+          "rerank_score": 0.34218734,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "headache-dizziness",
+          "title": "头痛与头晕科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.377281,
+          "keyword_score": null,
+          "vector_similarity": 0.377281,
+          "rerank_score": 0.32068872,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 3,
+      "gate_profile": "candidate-threshold"
+    },
+    "unsupported_tooth": {
+      "case_id": "unsupported_tooth",
+      "case_type": "unsupported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": false,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": null,
+      "top_similarity": null,
+      "returned_slugs": [],
+      "returned_titles": [],
+      "returned_trust_levels": [],
+      "expected_slugs": [],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "hematuria-urinary-tract-infection",
+          "title": "血尿与尿路感染科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.336732,
+          "keyword_score": null,
+          "vector_similarity": 0.336732,
+          "rerank_score": 0.28622245,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "hematuria-urinary-tract-infection",
+          "title": "血尿与尿路感染科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.335598,
+          "keyword_score": null,
+          "vector_similarity": 0.335598,
+          "rerank_score": 0.28525825,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "urticaria-eczema",
+          "title": "荨麻疹与湿疹科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.325508,
+          "keyword_score": null,
+          "vector_similarity": 0.325508,
+          "rerank_score": 0.27668215,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 3,
+      "gate_profile": "candidate-threshold"
+    }
+  }
+}
