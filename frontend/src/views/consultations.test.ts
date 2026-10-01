@@ -590,7 +590,9 @@ describe('应用内语音输入', () => {
 
   it('麦克风按钮紧邻发送键左侧，并带无障碍标签', async () => {
     const { wrapper } = await setup()
-    const labels = wrapper.findAll('.send-area > button')
+    // 动作按钮现在包在 .send-actions 里（窄窗口下整组换行，见 HomeView 的 .send-actions），
+    // 所以用后代选择器取按钮；要验的不变量没变：麦克风仍紧邻发送键左侧。
+    const labels = wrapper.findAll('.send-area button')
       .map(button => button.attributes('aria-label'))
     expect(labels).toContain('语音输入')
     expect(labels[labels.indexOf('发送消息') - 1]).toBe('语音输入')

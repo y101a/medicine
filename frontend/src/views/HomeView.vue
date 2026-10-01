@@ -10,7 +10,7 @@ import { useAuthStore } from '../stores/auth'
 import { useHealthRecordsStore } from '../stores/healthRecords'
 import { ApiError, getApiErrorMessage } from '../api/http'
 import type { AiModel, AnswerFormat, FollowUpAnswers, FollowUpCard, Message } from '../types/consultations'
-import { Top, ChatDotRound, Compass, Document, CloseBold, Microphone, Paperclip } from '@element-plus/icons-vue'
+import { Top, ChatDotRound, Compass, Document, CloseBold, Microphone, Paperclip, Headset } from '@element-plus/icons-vue'
 import medicalAiAvatar from '../assets/medical-ai-avatar.png'
 import AssistantAnswerCard from '../components/AssistantAnswerCard.vue'
 import StructuredFollowUpCard from '../components/StructuredFollowUpCard.vue'
@@ -1214,29 +1214,6 @@ onBeforeRouteUpdate(canLeave)
         <label class="sr-only" for="symptom-input">症状或健康问题</label>
         <textarea id="symptom-input" ref="input" v-model="draft" :maxlength="DRAFT_LIMIT" rows="3" :disabled="saving || generating || !ready"
           :placeholder="composerPlaceholder" @keydown="keydown"></textarea>
-        <!-- 语音输出偏好（契约 §6.3）：模式必须由用户主动点击开启；方言与语速只发产品枚举，
-             前端不认识供应商 voice/instruction，也不允许用户自定义。 -->
-        <div class="speech-prefs">
-          <button
-            class="speech-mode-button"
-            :class="{ active: speechMode }"
-            type="button"
-            :aria-pressed="speechMode"
-            :title="speechMode
-              ? '关闭语音对话模式'
-              : '开启语音对话模式：每条科普回答完成后自动朗读（仍是按键录音，不是持续监听）'"
-            @click="toggleSpeechMode"
-          >{{ speechMode ? '语音对话模式：已开启' : '语音对话模式' }}</button>
-          <!-- 用原生 select：音色/语速是低频偏好，不值得为它引入组件库控件，
-               也避免抢走「输入区第一个 ElSelect」这类既有定位（那条断言指向模型选择器）。 -->
-          <select v-model="speechPreset" class="speech-preset-select" aria-label="选择朗读音色">
-            <option v-for="item in speechPresets" :key="item.id" :value="item.id">{{ item.label }}</option>
-          </select>
-          <select v-model="speechRate" class="speech-rate-select" aria-label="选择朗读语速">
-            <option v-for="item in SPEECH_RATE_OPTIONS" :key="item.value" :value="item.value">{{ item.label }}</option>
-          </select>
-          <span v-if="speechPresetsNotice" class="speech-presets-notice">{{ speechPresetsNotice }}</span>
-        </div>
         <div class="composer-bottom">
           <HospitalNavigator />
           <div class="send-area">
@@ -1258,12 +1235,43 @@ onBeforeRouteUpdate(canLeave)
                 <div class="model-option"><span>{{ model.name }}</span><small>{{ model.providerName }}</small></div>
               </el-option>
             </el-select>
+            <!-- 音色/语速：与模型选择器同处一行设置位（低频偏好，不压在输入框中间）。
+                 选项文案自带「普通话·自然女声」「标准语速」这类说明，所以不再加文字标签。
+                 用原生 select：不值得为它引入组件库控件，也避免抢走「输入区第一个 ElSelect」
+                 这类既有定位（那条断言指向模型选择器）。 -->
+            <span class="speech-prefs">
+              <select v-model="speechPreset" class="speech-preset-select" aria-label="选择朗读音色" title="朗读音色">
+                <option v-for="item in speechPresets" :key="item.id" :value="item.id">{{ item.label }}</option>
+              </select>
+              <select v-model="speechRate" class="speech-rate-select" aria-label="选择朗读语速" title="朗读语速">
+                <option v-for="item in SPEECH_RATE_OPTIONS" :key="item.value" :value="item.value">{{ item.label }}</option>
+              </select>
+              <span v-if="speechPresetsNotice" class="speech-presets-notice">{{ speechPresetsNotice }}</span>
+            </span>
             <span>{{ draft.length }}/{{ DRAFT_LIMIT }}</span>
             <span v-if="nearDraftLimit" class="limit-hint">已接近 {{ DRAFT_LIMIT }} 字上限，可分多次发送</span>
             <span v-if="voiceState === 'requesting'" class="voice-status">等待麦克风授权…</span>
             <span v-else-if="voiceState === 'recording'" class="voice-status">录音中 {{ voiceSeconds }}s</span>
             <span v-else-if="voiceState === 'transcribing'" class="voice-status">正在识别…</span>
             <button v-if="voiceState === 'recording'" class="voice-cancel" type="button" @click="cancelRecording">取消</button>
+            <!-- 动作按钮整组不拆行：窗口很窄时让「设置」与「动作」分成两行，而不是把发送键单独挤到下一行。 -->
+            <div class="send-actions">
+            <!-- 语音对话模式开关：按常见 agent 的位置放在输入框的动作按钮区（这里取最左，
+                 与豆包那类「输入框左侧语音通话入口」一致），开启态常亮而不是靠文案表达状态。
+                 放最左还有一个原因：既有测试锁死了「附件紧邻麦克风」「麦克风紧邻发送」两处相邻关系，
+                 开关插在它们中间会破坏那条布局契约。模式必须由用户主动点击开启，
+                 仍是按键录音 + 回答自动朗读，**不是持续监听**（契约 §6.3）。 -->
+            <button
+              class="speech-mode-button"
+              :class="{ active: speechMode }"
+              type="button"
+              :aria-pressed="speechMode"
+              :aria-label="speechMode ? '关闭语音对话模式' : '开启语音对话模式'"
+              :title="speechMode
+                ? '语音对话模式已开启：回答完成后自动朗读，点此关闭'
+                : '开启语音对话模式：每条科普回答完成后自动朗读（仍是按键录音，不是持续监听）'"
+              @click="toggleSpeechMode"
+            ><el-icon :size="18"><Headset /></el-icon></button>
             <button
               class="attach-button"
               type="button"
@@ -1284,10 +1292,11 @@ onBeforeRouteUpdate(canLeave)
             ><el-icon :size="18"><Microphone /></el-icon></button>
             <button v-if="generating" class="stop-button" type="button" aria-label="停止生成" title="停止生成" @click="stopGeneration"><el-icon :size="15"><CloseBold /></el-icon></button>
             <button v-else class="send-button" type="submit" :disabled="(!draft.trim() && !attachments.length) || saving || loading || modelsLoading || !ready || voiceState !== 'idle' || attachmentUploading" aria-label="发送消息" title="发送消息"><el-icon :size="20"><Top /></el-icon></button>
+            </div>
           </div>
         </div>
       </form>
-      <div class="composer-meta"><span>仅提供健康科普与就医分流，不作确诊，不替代医生；上传的文档不会被用来下诊断。</span><span>可用输入法语音输入（如豆包输入法） · 也可点麦克风录音 · 回形针直接打开文件选择器，文档与图片按类型自动分流 · 每条回答可点「朗读」，也可直接说「请用语音回答」 · Enter 发送 · Shift + Enter 换行</span></div>
+      <div class="composer-meta"><span>仅提供健康科普与就医分流，不作确诊，不替代医生；上传的文档不会被用来下诊断。</span><span>可用输入法语音输入（如豆包输入法） · 也可点麦克风录音 · 回形针直接打开文件选择器，文档与图片按类型自动分流 · 默认只对你说「请用语音回答」的回答朗读，也可点每条回答下的「朗读」<template v-if="speechMode"> · <strong class="speech-mode-hint">语音对话模式已开启：回答完成后会自动朗读</strong></template> · Enter 发送 · Shift + Enter 换行</span></div>
     </div>
     <ImageUploadDialog
       v-model="imageDialogVisible"
@@ -1332,18 +1341,24 @@ textarea { display: block; width: 100%; min-height: 70px; max-height: 200px; res
 textarea::placeholder { color: #99a5b0; }
 .composer-bottom, .send-area { display: flex; align-items: center; gap: 12px; }
 .composer-bottom { justify-content: space-between; }
-.send-area { justify-content: flex-end; }
+/* 动作用一行放不下时（窗口较窄）在动作区内部换行，不把底栏整体拆成两段。 */
+.send-area { justify-content: flex-end; flex-wrap: wrap; }
+/* 动作按钮整组不拆：窄窗口下宁可「设置一行、动作一行」，也不把发送键单独挤下去。 */
+.send-actions { display: flex; align-items: center; gap: 12px; flex-wrap: nowrap; }
 .model-select { width: 190px; }
-.speech-prefs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
-.speech-mode-button { padding: 5px 10px; border: 1px solid #d7e3ee; border-radius: 9px; background: #fff;
-  color: #4b7ea6; font-size: 12px; cursor: pointer; }
-.speech-mode-button:hover { border-color: #9cc3e0; background: #f4faff; }
-.speech-mode-button.active { border-color: #9cc3e0; background: #eef6fe; color: #22628f; }
-.speech-preset-select, .speech-rate-select { padding: 5px 8px; border: 1px solid #d7e3ee; border-radius: 9px;
-  background: #fff; color: #4b7ea6; font-size: 12px; cursor: pointer; }
-.speech-preset-select { width: 148px; }
-.speech-rate-select { width: 110px; }
+/* 朗读偏好：与模型选择器同一行设置位，不抢输入框中间的位置，也不单独占一行。 */
+.speech-prefs { display: inline-flex; align-items: center; gap: 6px; }
+.speech-preset-select, .speech-rate-select { padding: 4px 6px; border: 1px solid #d7e3ee; border-radius: 9px;
+  background: #fff; color: #4b7ea6; font-size: 11px; cursor: pointer; }
+.speech-preset-select { width: 108px; }
+.speech-rate-select { width: 80px; }
 .speech-presets-notice { color: #bf7a15; font-size: 11px; }
+.speech-mode-hint { color: #1f6396; font-weight: 600; }
+/* 语音对话开关：与附件/麦克风同尺寸的图标按钮，开启态常亮。 */
+.speech-mode-button { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid #d7e3ee;
+  border-radius: 10px; background: #fff; color: #4b7ea6; cursor: pointer; }
+.speech-mode-button:hover { border-color: #9cc3e0; background: #f4faff; }
+.speech-mode-button.active { border-color: #7fb3d8; background: #e8f3fd; color: #1f6396; }
 .model-option { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .model-option small { color: #93a1ae; }
 .model-error, .voice-tip, .voice-notice { margin-bottom: 12px; }
