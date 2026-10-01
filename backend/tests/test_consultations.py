@@ -99,7 +99,10 @@ async def test_ownership_on_every_endpoint(profile_context):
     assert (await client.get(url)).json()["messageCount"] == 1
 
 
-async def test_stream_answer_is_incremental_and_persisted(profile_context, monkeypatch):
+@pytest.mark.parametrize("natural_card", [False, True])
+async def test_stream_answer_is_incremental_and_persisted(
+    profile_context, monkeypatch, natural_card
+):
     client, db, (user, _) = profile_context
     client.cookies.set(ACCESS_COOKIE, create_access_token(user.id))
     created = (
@@ -225,13 +228,20 @@ async def test_stream_answer_is_incremental_and_persisted(profile_context, monke
         yield "## 情况梳理\n持续头痛需要结合伴随表现判断。[来源1]"
 
     monkeypatch.setattr("app.ai.provider.stream_chat", fake_card_stream)
+    if natural_card:
+        await client.post(
+            url + "/messages",
+            json={"clientRequestId": str(uuid4()), "content": "把刚才的回答整理成卡片"},
+        )
     card_response = await client.post(
         url + "/stream",
         json={
             "clientRequestId": str(uuid4()),
             "modelId": selected_model.id,
-            "answerFormat": "card",
-            "sourceMessageId": events[-1]["message"]["id"],
+            **({} if natural_card else {
+                "answerFormat": "card",
+                "sourceMessageId": events[-1]["message"]["id"],
+            }),
         },
     )
     assert card_response.status_code == 200
@@ -255,7 +265,10 @@ async def test_stream_answer_is_incremental_and_persisted(profile_context, monke
     assert duplicate.json()["code"] == "PATHOLOGY_CARD_EXISTS"
 
     restored_with_card = (await client.get(url + "/messages")).json()["items"]
-    assert [item["role"] for item in restored_with_card] == ["user", "assistant", "assistant"]
+    assert [item["role"] for item in restored_with_card] == (
+        ["user", "assistant", "user", "assistant"] if natural_card
+        else ["user", "assistant", "assistant"]
+    )
     assert restored_with_card[-1]["sourceMessageId"] == events[-1]["message"]["id"]
 
 
@@ -504,8 +517,14 @@ async def test_invalid_message_not_saved(profile_context, extra):
         ("failed", "skipped", None),
     ],
 )
+@pytest.mark.parametrize("question,expected_format", [
+    ("甲状腺结节科普", "plain"),
+    ("帮我生成一张头痛科普卡片", "card"),
+    ("不要生成头痛卡片", "plain"),
+])
 async def test_stream_without_evidence_never_persists_fake_citations(
     profile_context, monkeypatch, local_status, web_status, web_error,
+    question, expected_format,
 ):
     client, _, (user, _) = profile_context
     client.cookies.set(ACCESS_COOKIE, create_access_token(user.id))
@@ -515,7 +534,7 @@ async def test_stream_without_evidence_never_persists_fake_citations(
     url = f"/api/v1/consultations/{created['id']}"
     await client.post(
         url + "/messages",
-        json={"clientRequestId": str(uuid4()), "content": "甲状腺结节科普"},
+        json={"clientRequestId": str(uuid4()), "content": question},
     )
     selected = ModelConfig(
         id="test-model", name="测试模型", provider="test",
@@ -544,6 +563,7 @@ async def test_stream_without_evidence_never_persists_fake_citations(
         }
 
     async def fake_stream(_history, _model, _answer_format, rag_context, health_context=None):
+        assert _answer_format == expected_format
         assert rag_context is None
         yield "目前没有可核验的参考资料，请咨询医生。"
 
@@ -563,6 +583,9 @@ async def test_stream_without_evidence_never_persists_fake_citations(
     assert events[0]["retrieval"]["webSearchErrorCode"] == web_error
     assert events[0]["retrieval"]["sources"] == []
     assert events[-1]["message"]["citations"] == []
+    assert events[-1]["message"]["answerFormat"] == expected_format
+    restored = (await client.get(url + "/messages")).json()["items"]
+    assert restored[-1]["answerFormat"] == expected_format
 
 
 async def test_committed_messages_survive_new_connection_and_concurrent_retry():

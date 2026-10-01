@@ -27,7 +27,7 @@
 
 流式回答请求：
 `{"clientRequestId":"UUID","modelId":"deepseek-v4-flash","answerFormat":"plain"}`。
-`answerFormat` 可选 `plain` 或 `card`，默认 `plain`。用户首次提问始终使用普通模式；
+`answerFormat` 可选 `plain` 或 `card`，默认 `plain`。普通提问使用普通模式；
 后端判定本条完成回答属于医疗内容时，前端在回答下显示“→ 是否生成一张病理科普卡片”。
 用户确认后再次请求 `answerFormat: "card"`，并通过 `sourceMessageId` 指向原助手回答。
 服务端会从原回答对应的用户问题生成固定分区卡片，而不是把助手回答当作新问题；原回答
@@ -37,6 +37,13 @@
 会话消息，最后一条必须是用户消息；响应类型为 `application/x-ndjson`，依次发送
 `start`、`delta`、`done` 或 `error` 事件。浏览器通过 AbortController 停止生成。
 若已经产生部分正文，服务端会尽量保存并标记为已停止。AI 回答最多 12000 字符。
+
+2026-10-01：支持明确自然语言指令，例如“帮我生成一张头痛科普卡片”，即使请求参数
+仍为默认 plain，服务端也会选择 card 并在 done 与历史消息中返回实际格式。
+“把刚才的回答整理成卡片”或“生成卡片”会选择当前会话最近一条助手回答，再复用原有
+来源资格与重复校验；没有来源时返回 PATHOLOGY_CARD_TOPIC_REQUIRED，要求说明健康主题。
+不越过最近一条无效回答猜测更早的主题。否定、能力询问及其他类型卡片不触发；无法识别的
+主题继续普通聊天。红旗预检优先，卡片仍经过本轮检索与引用核验。规则识别并非任意语义理解。
 助手消息保存 `provider`、`modelId`、`modelName`、`generationStatus`、`answerFormat`、
 `medicalContent` 和 `sourceMessageId`，因此同一会话可以逐条切换模型，刷新页面后仍能恢复
 原回答、追加卡片及两者关系。

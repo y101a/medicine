@@ -200,6 +200,21 @@ async def ai_history(db: AsyncSession, user_id: UUID, cid: UUID, limit: int = 30
     return history, triage, rows[0].id
 
 
+async def latest_card_source(db: AsyncSession, user_id: UUID, cid: UUID) -> UUID:
+    """Only the immediately preceding answer may be selected implicitly."""
+    await owned(db, user_id, cid)
+    source = await db.scalar(
+        select(Message)
+        .where(Message.consultation_id == cid, Message.role == "assistant")
+        .order_by(Message.sequence.desc())
+        .limit(1)
+    )
+    if source is None:
+        raise AppError(409, "PATHOLOGY_CARD_TOPIC_REQUIRED", "请说明要生成哪个健康主题的科普卡片")
+    # The existing source validator rejects non-medical, failed and card answers.
+    return source.id
+
+
 async def card_generation_history(
     db: AsyncSession,
     user_id: UUID,

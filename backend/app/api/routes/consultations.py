@@ -7,6 +7,7 @@ from fastapi.responses import StreamingResponse
 
 from app.ai import provider
 from app.ai.attachment_context import build_attachment_context
+from app.ai.card_intent import requests_pathology_card, requests_previous_card
 from app.ai.follow_up import (
     FOLLOW_UP_PREFIX,
     is_follow_up_prefix_fragment,
@@ -16,6 +17,7 @@ from app.ai.follow_up import (
 )
 from app.ai.generated_image_context import build_generated_image_context
 from app.ai.graph import render_rag_context, run_consultation_generation
+from app.ai.graph.retrieval_gate import evaluate_retrieval_gate
 from app.api.dependencies import CurrentUser, DbSession
 from app.core.config import get_settings
 from app.core.errors import AppError
@@ -85,6 +87,7 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
         )
     model = await get_model_for_user(db, user.id, payload.model_id)
     source_message_id = getattr(payload, "source_message_id", None)
+    answer_format = payload.answer_format
     user_message_id: UUID | None = None
     if source_message_id is not None:
         if payload.answer_format != "card":
@@ -106,6 +109,17 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
         # doubles valid; the real service supplies the selected user message ID.
         user_message_id = history_result[2] if len(history_result) > 2 else None
         user_text = history[-1]["content"]
+        if answer_format == "plain" and requests_pathology_card(user_text):
+            if evaluate_retrieval_gate(user_text).should_retrieve:
+                answer_format = "card"
+            elif requests_previous_card(user_text):
+                source_message_id = await service.latest_card_source(db, user.id, cid)
+                history, user_text = await service.card_generation_history(
+                    db, user.id, cid, source_message_id
+                )
+                answer_format = "card"
+                # Conversion is not a new personal health disclosure.
+                user_message_id = None
     graph_result = await run_consultation_generation(user_text, db)
     if graph_result["triage_route"] == "emergency":
         raise AppError(
@@ -231,7 +245,7 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
             async for chunk in provider.stream_chat(
                 history,
                 model,
-                payload.answer_format,
+                answer_format,
                 rag_context,
                 private_context,
             ):
@@ -293,7 +307,7 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
                 model.id,
                 model.name,
                 citations=verified_citations,
-                answer_format=payload.answer_format,
+                answer_format=answer_format,
                 medical_content=(graph_result["retrieval_gate_reason"] == "medical_content"),
                 source_message_id=source_message_id,
             )
@@ -317,7 +331,7 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
                         model.name,
                         generation_status="stopped",
                         citations=verified_citations,
-                        answer_format=payload.answer_format,
+                        answer_format=answer_format,
                         medical_content=(
                             graph_result["retrieval_gate_reason"] == "medical_content"
                         ),
@@ -344,7 +358,7 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
                         model.name,
                         generation_status="failed",
                         citations=verified_citations,
-                        answer_format=payload.answer_format,
+                        answer_format=answer_format,
                         medical_content=(
                             graph_result["retrieval_gate_reason"] == "medical_content"
                         ),
