@@ -184,7 +184,12 @@ def test_hybrid_fusion_uses_keywords_as_a_tiebreaker_without_overriding_strong_v
     assert exact_term_with_close_vector > close_vector_only
 
 
-async def test_pgvector_recall_returns_current_approved_citations():
+async def test_pgvector_recall_returns_current_approved_citations(monkeypatch):
+    from app.rag import retrieval
+
+    # This test verifies approved citations, not ranking against the mutable dev corpus.
+    settings = retrieval.get_settings().model_copy(update={"app_environment": "production"})
+    monkeypatch.setattr(retrieval, "get_settings", lambda: settings)
     source_id = await create_retrieval_fixture(f"retrieval_test_{uuid4().hex[:12]}")
     embedded_queries: list[str] = []
 

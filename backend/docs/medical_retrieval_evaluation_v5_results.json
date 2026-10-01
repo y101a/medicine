@@ -1,0 +1,1176 @@
+{
+  "ok": true,
+  "metric": "prototype_document_retrieval",
+  "case_count": 20,
+  "supported_case_count": 16,
+  "unsupported_case_count": 4,
+  "hit_count": 12,
+  "topic_hit_rate": 0.75,
+  "recall_at_1": 0.6875,
+  "recall_at_3": 0.75,
+  "mean_reciprocal_rank": 0.7188,
+  "unsupported_false_positive_count": 0,
+  "unsupported_false_positive_rate": 0,
+  "pass_rate": 0.8,
+  "mean_top_similarity": 0.286959,
+  "top_k": 3,
+  "cases": [
+    {
+      "case_id": "headache_term",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": false,
+      "passed": false,
+      "false_positive": false,
+      "matched_rank": null,
+      "top_similarity": null,
+      "returned_slugs": [],
+      "returned_titles": [],
+      "returned_trust_levels": [],
+      "expected_slugs": [
+        "headache-dizziness"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "headache-dizziness",
+          "title": "ͷʹ��ͷ�ο���ԭ��",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.166667,
+          "keyword_score": 0.166667,
+          "vector_similarity": null,
+          "rerank_score": 0.16666667,
+          "kept": false,
+          "reason": "keyword-only-below-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "urticaria-eczema",
+          "title": "ݡ������ʪ�����ԭ��",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.166667,
+          "keyword_score": 0.166667,
+          "vector_similarity": null,
+          "rerank_score": 0.16666667,
+          "kept": false,
+          "reason": "keyword-only-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "coronary-heart-disease",
+          "title": "���Ĳ�����ʹ��ҽԭ������",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.166667,
+          "keyword_score": 0.166667,
+          "vector_similarity": null,
+          "rerank_score": 0.16666667,
+          "kept": false,
+          "reason": "keyword-only-below-threshold"
+        }
+      ],
+      "filtered_count": 3,
+      "gate_profile": "candidate-threshold"
+    },
+    {
+      "case_id": "dizziness_term",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.25,
+      "returned_slugs": [
+        "headache-dizziness",
+        "headache-dizziness"
+      ],
+      "returned_titles": [
+        "ͷʹ��ͷ�ο���ԭ��",
+        "ͷʹ��ͷ�ο���ԭ��"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "headache-dizziness"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "headache-dizziness",
+          "title": "ͷʹ��ͷ�ο���ԭ��",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.25,
+          "keyword_score": 0.25,
+          "vector_similarity": null,
+          "rerank_score": 0.25,
+          "kept": true,
+          "reason": "keyword-only-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "headache-dizziness",
+          "title": "ͷʹ��ͷ�ο���ԭ��",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.222222,
+          "keyword_score": 0.222222,
+          "vector_similarity": null,
+          "rerank_score": 0.22222222,
+          "kept": true,
+          "reason": "keyword-only-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "headache-dizziness",
+          "title": "ͷʹ��ͷ�ο���ԭ��",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.111111,
+          "keyword_score": 0.111111,
+          "vector_similarity": null,
+          "rerank_score": 0.11111111,
+          "kept": false,
+          "reason": "keyword-only-below-threshold"
+        }
+      ],
+      "filtered_count": 1,
+      "gate_profile": "candidate-threshold"
+    },
+    {
+      "case_id": "dizziness_plain",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "urgent",
+      "split": "tune",
+      "hit": false,
+      "passed": false,
+      "false_positive": false,
+      "matched_rank": null,
+      "top_similarity": null,
+      "returned_slugs": [],
+      "returned_titles": [],
+      "returned_trust_levels": [],
+      "expected_slugs": [
+        "headache-dizziness"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "headache-dizziness",
+          "title": "ͷʹ��ͷ�ο���ԭ��",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.153846,
+          "keyword_score": 0.153846,
+          "vector_similarity": null,
+          "rerank_score": 0.15384616,
+          "kept": false,
+          "reason": "keyword-only-below-threshold"
+        }
+      ],
+      "filtered_count": 1,
+      "gate_profile": "candidate-threshold"
+    },
+    {
+      "case_id": "headache_danger",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "emergency",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.230769,
+      "returned_slugs": [
+        "headache-dizziness"
+      ],
+      "returned_titles": [
+        "ͷʹ��ͷ�ο���ԭ��"
+      ],
+      "returned_trust_levels": [
+        "prototype"
+      ],
+      "expected_slugs": [
+        "headache-dizziness",
+        "emergency-warning"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "headache-dizziness",
+          "title": "ͷʹ��ͷ�ο���ԭ��",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.230769,
+          "keyword_score": 0.230769,
+          "vector_similarity": null,
+          "rerank_score": 0.23076923,
+          "kept": true,
+          "reason": "keyword-only-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "emergency-warning",
+          "title": "����Σ�ձ���������ԭ������",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.153846,
+          "keyword_score": 0.153846,
+          "vector_similarity": null,
+          "rerank_score": 0.15384616,
+          "kept": false,
+          "reason": "keyword-only-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "urticaria-eczema",
+          "title": "ݡ������ʪ�����ԭ��",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.153846,
+          "keyword_score": 0.153846,
+          "vector_similarity": null,
+          "rerank_score": 0.15384616,
+          "kept": false,
+          "reason": "keyword-only-below-threshold"
+        }
+      ],
+      "filtered_count": 2,
+      "gate_profile": "candidate-threshold"
+    },
+    {
+      "case_id": "hematuria_term",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "urgent",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.222222,
+      "returned_slugs": [
+        "hematuria-urinary-tract-infection"
+      ],
+      "returned_titles": [
+        "Ѫ������·��Ⱦ����ԭ��"
+      ],
+      "returned_trust_levels": [
+        "prototype"
+      ],
+      "expected_slugs": [
+        "hematuria-urinary-tract-infection"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "hematuria-urinary-tract-infection",
+          "title": "Ѫ������·��Ⱦ����ԭ��",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.222222,
+          "keyword_score": 0.222222,
+          "vector_similarity": null,
+          "rerank_score": 0.22222222,
+          "kept": true,
+          "reason": "keyword-only-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "pediatric-fever",
+          "title": "��ͯ���ȿ���ԭ��",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.111111,
+          "keyword_score": 0.111111,
+          "vector_similarity": null,
+          "rerank_score": 0.11111111,
+          "kept": false,
+          "reason": "keyword-only-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "asthma",
+          "title": "������������ԭ������",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.111111,
+          "keyword_score": 0.111111,
+          "vector_similarity": null,
+          "rerank_score": 0.11111111,
+          "kept": false,
+          "reason": "keyword-only-below-threshold"
+        }
+      ],
+      "filtered_count": 2,
+      "gate_profile": "candidate-threshold"
+    },
+    {
+      "case_id": "uti_term",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.416667,
+      "returned_slugs": [
+        "hematuria-urinary-tract-infection",
+        "hematuria-urinary-tract-infection"
+      ],
+      "returned_titles": [
+        "Ѫ������·��Ⱦ����ԭ��",
+        "Ѫ������·��Ⱦ����ԭ��"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "hematuria-urinary-tract-infection"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "hematuria-urinary-tract-infection",
+          "title": "Ѫ������·��Ⱦ����ԭ��",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.416667,
+          "keyword_score": 0.416667,
+          "vector_similarity": null,
+          "rerank_score": 0.41666666,
+          "kept": true,
+          "reason": "keyword-only-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "hematuria-urinary-tract-infection",
+          "title": "Ѫ������·��Ⱦ����ԭ��",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.333333,
+          "keyword_score": 0.333333,
+          "vector_similarity": null,
+          "rerank_score": 0.33333334,
+          "kept": true,
+          "reason": "keyword-only-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "hematuria-urinary-tract-infection",
+          "title": "Ѫ������·��Ⱦ����ԭ��",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.166667,
+          "keyword_score": 0.166667,
+          "vector_similarity": null,
+          "rerank_score": 0.16666667,
+          "kept": false,
+          "reason": "keyword-only-below-threshold"
+        }
+      ],
+      "filtered_count": 1,
+      "gate_profile": "candidate-threshold"
+    },
+    {
+      "case_id": "uti_plain",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "urgent",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.384615,
+      "returned_slugs": [
+        "hematuria-urinary-tract-infection",
+        "1745207692481_31763.pdf"
+      ],
+      "returned_titles": [
+        "Ѫ������·��Ⱦ����ԭ��",
+        "�л����񹲺͹����������ͼƻ�����ίԱ�ṫ��"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "hematuria-urinary-tract-infection"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "hematuria-urinary-tract-infection",
+          "title": "Ѫ������·��Ⱦ����ԭ��",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.384615,
+          "keyword_score": 0.384615,
+          "vector_similarity": null,
+          "rerank_score": 0.38461539,
+          "kept": true,
+          "reason": "keyword-only-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "1745207692481_31763.pdf",
+          "title": "�л����񹲺͹����������ͼƻ�����ίԱ�ṫ��",
+          "source_key": "web_search_prototype",
+          "trust_level": "prototype",
+          "similarity": 0.2,
+          "keyword_score": 0.2,
+          "vector_similarity": null,
+          "rerank_score": 0.2,
+          "kept": true,
+          "reason": "keyword-only-at-or-above-threshold"
+        }
+      ],
+      "filtered_count": 0,
+      "gate_profile": "candidate-threshold"
+    },
+    {
+      "case_id": "uti_danger",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "urgent",
+      "split": "tune",
+      "hit": false,
+      "passed": false,
+      "false_positive": false,
+      "matched_rank": null,
+      "top_similarity": null,
+      "returned_slugs": [],
+      "returned_titles": [],
+      "returned_trust_levels": [],
+      "expected_slugs": [
+        "hematuria-urinary-tract-infection"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "hematuria-urinary-tract-infection",
+          "title": "Ѫ������·��Ⱦ����ԭ��",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.153846,
+          "keyword_score": 0.153846,
+          "vector_similarity": null,
+          "rerank_score": 0.15384616,
+          "kept": false,
+          "reason": "keyword-only-below-threshold"
+        }
+      ],
+      "filtered_count": 1,
+      "gate_profile": "candidate-threshold"
+    },
+    {
+      "case_id": "fever_term",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.307692,
+      "returned_slugs": [
+        "pediatric-fever",
+        "pediatric-fever",
+        "pediatric-fever"
+      ],
+      "returned_titles": [
+        "��ͯ���ȿ���ԭ��",
+        "��ͯ���ȿ���ԭ��",
+        "��ͯ���ȿ���ԭ��"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "pediatric-fever"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "pediatric-fever",
+          "title": "��ͯ���ȿ���ԭ��",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.307692,
+          "keyword_score": 0.307692,
+          "vector_similarity": null,
+          "rerank_score": 0.30769232,
+          "kept": true,
+          "reason": "keyword-only-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "pediatric-fever",
+          "title": "��ͯ���ȿ���ԭ��",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.307692,
+          "keyword_score": 0.307692,
+          "vector_similarity": null,
+          "rerank_score": 0.30769232,
+          "kept": true,
+          "reason": "keyword-only-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "pediatric-fever",
+          "title": "��ͯ���ȿ���ԭ��",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.307692,
+          "keyword_score": 0.307692,
+          "vector_similarity": null,
+          "rerank_score": 0.30769232,
+          "kept": true,
+          "reason": "keyword-only-at-or-above-threshold"
+        }
+      ],
+      "filtered_count": 0,
+      "gate_profile": "candidate-threshold"
+    },
+    {
+      "case_id": "fever_plain",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.25,
+      "returned_slugs": [
+        "pediatric-fever"
+      ],
+      "returned_titles": [
+        "��ͯ���ȿ���ԭ��"
+      ],
+      "returned_trust_levels": [
+        "prototype"
+      ],
+      "expected_slugs": [
+        "pediatric-fever"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "pediatric-fever",
+          "title": "��ͯ���ȿ���ԭ��",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.25,
+          "keyword_score": 0.25,
+          "vector_similarity": null,
+          "rerank_score": 0.25,
+          "kept": true,
+          "reason": "keyword-only-at-or-above-threshold"
+        }
+      ],
+      "filtered_count": 0,
+      "gate_profile": "candidate-threshold"
+    },
+    {
+      "case_id": "fever_infant",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "urgent",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 2,
+      "top_similarity": 0.2,
+      "returned_slugs": [
+        "headache-dizziness",
+        "pediatric-fever"
+      ],
+      "returned_titles": [
+        "ͷʹ��ͷ�ο���ԭ��",
+        "��ͯ���ȿ���ԭ��"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "pediatric-fever"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "headache-dizziness",
+          "title": "ͷʹ��ͷ�ο���ԭ��",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.2,
+          "keyword_score": 0.2,
+          "vector_similarity": null,
+          "rerank_score": 0.2,
+          "kept": true,
+          "reason": "keyword-only-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "pediatric-fever",
+          "title": "��ͯ���ȿ���ԭ��",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.2,
+          "keyword_score": 0.2,
+          "vector_similarity": null,
+          "rerank_score": 0.2,
+          "kept": true,
+          "reason": "keyword-only-at-or-above-threshold"
+        }
+      ],
+      "filtered_count": 0,
+      "gate_profile": "candidate-threshold"
+    },
+    {
+      "case_id": "fever_danger",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "emergency",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.3125,
+      "returned_slugs": [
+        "pediatric-fever",
+        "emergency-warning",
+        "hypertension"
+      ],
+      "returned_titles": [
+        "��ͯ���ȿ���ԭ��",
+        "����Σ�ձ���������ԭ������",
+        "��Ѫѹ��ʶ�����ԭ������"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "pediatric-fever",
+        "emergency-warning"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "pediatric-fever",
+          "title": "��ͯ���ȿ���ԭ��",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.3125,
+          "keyword_score": 0.3125,
+          "vector_similarity": null,
+          "rerank_score": 0.3125,
+          "kept": true,
+          "reason": "keyword-only-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "emergency-warning",
+          "title": "����Σ�ձ���������ԭ������",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.214286,
+          "keyword_score": 0.214286,
+          "vector_similarity": null,
+          "rerank_score": 0.21428572,
+          "kept": true,
+          "reason": "keyword-only-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "hypertension",
+          "title": "��Ѫѹ��ʶ�����ԭ������",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.214286,
+          "keyword_score": 0.214286,
+          "vector_similarity": null,
+          "rerank_score": 0.21428572,
+          "kept": true,
+          "reason": "keyword-only-at-or-above-threshold"
+        }
+      ],
+      "filtered_count": 0,
+      "gate_profile": "candidate-threshold"
+    },
+    {
+      "case_id": "hives_term",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.333333,
+      "returned_slugs": [
+        "urticaria-eczema",
+        "urticaria-eczema",
+        "urticaria-eczema"
+      ],
+      "returned_titles": [
+        "ݡ������ʪ�����ԭ��",
+        "ݡ������ʪ�����ԭ��",
+        "ݡ������ʪ�����ԭ��"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "urticaria-eczema"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "urticaria-eczema",
+          "title": "ݡ������ʪ�����ԭ��",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.333333,
+          "keyword_score": 0.333333,
+          "vector_similarity": null,
+          "rerank_score": 0.33333334,
+          "kept": true,
+          "reason": "keyword-only-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "urticaria-eczema",
+          "title": "ݡ������ʪ�����ԭ��",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.333333,
+          "keyword_score": 0.333333,
+          "vector_similarity": null,
+          "rerank_score": 0.33333334,
+          "kept": true,
+          "reason": "keyword-only-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "urticaria-eczema",
+          "title": "ݡ������ʪ�����ԭ��",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.333333,
+          "keyword_score": 0.333333,
+          "vector_similarity": null,
+          "rerank_score": 0.33333334,
+          "kept": true,
+          "reason": "keyword-only-at-or-above-threshold"
+        }
+      ],
+      "filtered_count": 0,
+      "gate_profile": "candidate-threshold"
+    },
+    {
+      "case_id": "eczema_term",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.285714,
+      "returned_slugs": [
+        "urticaria-eczema"
+      ],
+      "returned_titles": [
+        "ݡ������ʪ�����ԭ��"
+      ],
+      "returned_trust_levels": [
+        "prototype"
+      ],
+      "expected_slugs": [
+        "urticaria-eczema"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "urticaria-eczema",
+          "title": "ݡ������ʪ�����ԭ��",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.285714,
+          "keyword_score": 0.285714,
+          "vector_similarity": null,
+          "rerank_score": 0.2857143,
+          "kept": true,
+          "reason": "keyword-only-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "20200326151901299.html",
+          "title": "������ʶ��ױƷ������Ӧ",
+          "source_key": "web_search_prototype",
+          "trust_level": "prototype",
+          "similarity": 0.181818,
+          "keyword_score": 0.181818,
+          "vector_similarity": null,
+          "rerank_score": 0.18181819,
+          "kept": false,
+          "reason": "keyword-only-below-threshold"
+        }
+      ],
+      "filtered_count": 1,
+      "gate_profile": "candidate-threshold"
+    },
+    {
+      "case_id": "eczema_plain",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": false,
+      "passed": false,
+      "false_positive": false,
+      "matched_rank": null,
+      "top_similarity": null,
+      "returned_slugs": [],
+      "returned_titles": [],
+      "returned_trust_levels": [],
+      "expected_slugs": [
+        "urticaria-eczema"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "urticaria-eczema",
+          "title": "ݡ������ʪ�����ԭ��",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.142857,
+          "keyword_score": 0.142857,
+          "vector_similarity": null,
+          "rerank_score": 0.14285715,
+          "kept": false,
+          "reason": "keyword-only-below-threshold"
+        }
+      ],
+      "filtered_count": 1,
+      "gate_profile": "candidate-threshold"
+    },
+    {
+      "case_id": "hives_danger",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "emergency",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.25,
+      "returned_slugs": [
+        "emergency-warning"
+      ],
+      "returned_titles": [
+        "����Σ�ձ���������ԭ������"
+      ],
+      "returned_trust_levels": [
+        "prototype"
+      ],
+      "expected_slugs": [
+        "urticaria-eczema",
+        "emergency-warning"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "emergency-warning",
+          "title": "����Σ�ձ���������ԭ������",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.25,
+          "keyword_score": 0.25,
+          "vector_similarity": null,
+          "rerank_score": 0.25,
+          "kept": true,
+          "reason": "keyword-only-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "emergency-warning",
+          "title": "����Σ�ձ���������ԭ������",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.1875,
+          "keyword_score": 0.1875,
+          "vector_similarity": null,
+          "rerank_score": 0.1875,
+          "kept": false,
+          "reason": "keyword-only-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "hypertension",
+          "title": "��Ѫѹ��ʶ�����ԭ������",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.1875,
+          "keyword_score": 0.1875,
+          "vector_similarity": null,
+          "rerank_score": 0.1875,
+          "kept": false,
+          "reason": "keyword-only-below-threshold"
+        }
+      ],
+      "filtered_count": 2,
+      "gate_profile": "candidate-threshold"
+    },
+    {
+      "case_id": "unsupported_weather",
+      "case_type": "unsupported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": false,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": null,
+      "top_similarity": null,
+      "returned_slugs": [],
+      "returned_titles": [],
+      "returned_trust_levels": [],
+      "expected_slugs": [],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "coronary-heart-disease",
+          "title": "���Ĳ�����ʹ��ҽԭ������",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.125,
+          "keyword_score": 0.125,
+          "vector_similarity": null,
+          "rerank_score": 0.125,
+          "kept": false,
+          "reason": "keyword-only-below-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "diabetes",
+          "title": "���򲡳������������ԭ������",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.125,
+          "keyword_score": 0.125,
+          "vector_similarity": null,
+          "rerank_score": 0.125,
+          "kept": false,
+          "reason": "keyword-only-below-threshold"
+        }
+      ],
+      "filtered_count": 2,
+      "gate_profile": "candidate-threshold"
+    },
+    {
+      "case_id": "unsupported_login",
+      "case_type": "unsupported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": false,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": null,
+      "top_similarity": null,
+      "returned_slugs": [],
+      "returned_titles": [],
+      "returned_trust_levels": [],
+      "expected_slugs": [],
+      "candidates": [],
+      "filtered_count": 0,
+      "gate_profile": "candidate-threshold"
+    },
+    {
+      "case_id": "unsupported_wrist",
+      "case_type": "unsupported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": false,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": null,
+      "top_similarity": null,
+      "returned_slugs": [],
+      "returned_titles": [],
+      "returned_trust_levels": [],
+      "expected_slugs": [],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "chronic-health",
+          "title": "�������Խ�������ԭ������",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.111111,
+          "keyword_score": 0.111111,
+          "vector_similarity": null,
+          "rerank_score": 0.11111111,
+          "kept": false,
+          "reason": "keyword-only-below-threshold"
+        }
+      ],
+      "filtered_count": 1,
+      "gate_profile": "candidate-threshold"
+    },
+    {
+      "case_id": "unsupported_tooth",
+      "case_type": "unsupported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": false,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": null,
+      "top_similarity": null,
+      "returned_slugs": [],
+      "returned_titles": [],
+      "returned_trust_levels": [],
+      "expected_slugs": [],
+      "candidates": [],
+      "filtered_count": 0,
+      "gate_profile": "candidate-threshold"
+    }
+  ],
+  "by_body_system": {
+    "unspecified": {
+      "case_count": 20,
+      "supported_case_count": 16,
+      "unsupported_case_count": 4,
+      "pass_rate": 0.8,
+      "recall_at_1": 0.6875,
+      "recall_at_3": 0.75,
+      "mean_reciprocal_rank": 0.7188,
+      "unsupported_false_positive_rate": 0
+    }
+  },
+  "by_query_style": {
+    "unspecified": {
+      "case_count": 20,
+      "supported_case_count": 16,
+      "unsupported_case_count": 4,
+      "pass_rate": 0.8,
+      "recall_at_1": 0.6875,
+      "recall_at_3": 0.75,
+      "mean_reciprocal_rank": 0.7188,
+      "unsupported_false_positive_rate": 0
+    }
+  },
+  "by_safety_class": {
+    "education": {
+      "case_count": 12,
+      "supported_case_count": 8,
+      "unsupported_case_count": 4,
+      "pass_rate": 0.8333,
+      "recall_at_1": 0.75,
+      "recall_at_3": 0.75,
+      "mean_reciprocal_rank": 0.75,
+      "unsupported_false_positive_rate": 0
+    },
+    "emergency": {
+      "case_count": 3,
+      "supported_case_count": 3,
+      "unsupported_case_count": 0,
+      "pass_rate": 1,
+      "recall_at_1": 1,
+      "recall_at_3": 1,
+      "mean_reciprocal_rank": 1,
+      "unsupported_false_positive_rate": null
+    },
+    "urgent": {
+      "case_count": 5,
+      "supported_case_count": 5,
+      "unsupported_case_count": 0,
+      "pass_rate": 0.6,
+      "recall_at_1": 0.4,
+      "recall_at_3": 0.6,
+      "mean_reciprocal_rank": 0.5,
+      "unsupported_false_positive_rate": null
+    }
+  },
+  "by_split": {
+    "tune": {
+      "case_count": 20,
+      "supported_case_count": 16,
+      "unsupported_case_count": 4,
+      "pass_rate": 0.8,
+      "recall_at_1": 0.6875,
+      "recall_at_3": 0.75,
+      "mean_reciprocal_rank": 0.7188,
+      "unsupported_false_positive_rate": 0
+    }
+  },
+  "evaluation_split": "all",
+  "retry_count": 0,
+  "mode": "keyword",
+  "gate_profile": "candidate-threshold",
+  "gate_thresholds": {
+    "vector": 0.56,
+    "keyword": 0.2,
+    "keywordOnly": 0.2,
+    "webVector": 0.6
+  },
+  "filtered_count": 18,
+  "filter_reason_counts": {
+    "keyword-only-below-threshold": 18
+  }
+}

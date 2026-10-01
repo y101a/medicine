@@ -58,8 +58,8 @@ def citation(
     )
 
 
-def test_independent_dataset_covers_every_prototype_document():
-    """独立题集必须覆盖全部原型语料：新增语料却没补题时，这条会失败提醒。"""
+def test_combined_datasets_cover_every_prototype_document():
+    """Frozen historical questions plus new development regressions cover all documents."""
     backend_root = Path(__file__).resolve().parents[1]
     manifest = json.loads(
         (backend_root / "data" / "prototype_knowledge" / "manifest.json").read_text(
@@ -71,6 +71,10 @@ def test_independent_dataset_covers_every_prototype_document():
         backend_root / "docs" / "medical_retrieval_evaluation_independent.json"
     )
     covered = {slug for case in evaluation_set.cases for slug in case.expected_document_slugs}
+    expanded = load_evaluation_set(
+        backend_root / "docs" / "medical_retrieval_evaluation_v5.json"
+    )
+    covered.update(slug for case in expanded.cases for slug in case.expected_document_slugs)
 
     assert len(evaluation_set.cases) >= 15
     assert corpus_slugs <= covered, f"以下原型语料没有对应评测题：{sorted(corpus_slugs - covered)}"
@@ -129,7 +133,9 @@ def test_v2_dataset_has_frozen_tune_holdout_and_negative_cases():
         if case.case_type != "unsupported"
         for slug in case.expected_document_slugs
     }
-    assert corpus_slugs <= covered_slugs
+    # v2 is frozen against the original 13-document corpus; never relabel its holdout.
+    assert len(covered_slugs) == 13
+    assert covered_slugs <= corpus_slugs
 
 
 def test_case_type_and_expected_documents_must_agree():

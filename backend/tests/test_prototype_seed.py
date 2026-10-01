@@ -38,7 +38,7 @@ async def test_seed_prototype_corpus_is_labeled_and_idempotent(monkeypatch):
             async with sessions() as db:
                 first = await seed_prototype_knowledge(db)
                 await db.commit()
-            assert first.created_documents == 13
+            assert first.created_documents == 17
             assert first.duplicate_documents == 0
 
             async with sessions() as db:
@@ -55,10 +55,10 @@ async def test_seed_prototype_corpus_is_labeled_and_idempotent(monkeypatch):
                     )
                 )
             assert second.created_documents == 0
-            assert second.duplicate_documents == 13
+            assert second.duplicate_documents == 17
             assert source is not None and source.ingestion_status == "prototype"
             assert source.source_metadata["production_eligible"] is False
-            assert len(documents) == 13
+            assert len(documents) == 17
             assert all(document.review_status == "prototype" for document in documents)
             assert all(document.medical_reviewed_at is None for document in documents)
             assert all(document.document_metadata["prototype_only"] for document in documents)
@@ -77,10 +77,10 @@ def test_prototype_manifest_uses_only_local_markdown_files():
     directory = Path(__file__).resolve().parents[1] / "data" / "prototype_knowledge"
     manifest = load_manifest(directory)
 
-    assert len(manifest.documents) == 13
-    assert len({entry.slug for entry in manifest.documents}) == 13
+    assert len(manifest.documents) == 17
+    assert len({entry.slug for entry in manifest.documents}) == 17
     assert all((directory / entry.file).is_file() for entry in manifest.documents)
-    new_entries = manifest.documents[5:]
+    new_entries = manifest.documents[9:]
     assert {system: sum(system in entry.body_systems for entry in new_entries)
             for system in ("respiratory", "digestive", "cardiovascular", "endocrine")} == {
         "respiratory": 2, "digestive": 2, "cardiovascular": 2, "endocrine": 2,

@@ -1,6 +1,10 @@
 {
-  "version": "prototype-2026-09-30.1",
+  "version": "prototype-2026-10-01.1",
   "documents": [
+    {"slug":"headache-dizziness","title":"头痛与头晕科普原型","file":"headache-dizziness.md","topics":["头痛","头晕","眩晕"],"reference_urls":["https://medlineplus.gov/ency/article/003024.htm","https://medlineplus.gov/dizzinessandvertigo.html"]},
+    {"slug":"hematuria-urinary-tract-infection","title":"血尿与尿路感染科普原型","file":"hematuria-urinary-tract-infection.md","topics":["血尿","尿路感染","尿频","尿急","尿痛"],"reference_urls":["https://www.niddk.nih.gov/health-information/urologic-diseases/hematuria-blood-urine","https://www.niddk.nih.gov/health-information/urologic-diseases/bladder-infection-uti-in-adults/symptoms-causes"]},
+    {"slug":"pediatric-fever","title":"儿童发热科普原型","file":"pediatric-fever.md","topics":["儿童发热","孩子发烧","婴儿发热"],"reference_urls":["https://www.nhs.uk/symptoms/fever-in-children/"]},
+    {"slug":"urticaria-eczema","title":"荨麻疹与湿疹科普原型","file":"urticaria-eczema.md","topics":["荨麻疹","湿疹","风团","皮肤瘙痒"],"reference_urls":["https://www.nhs.uk/conditions/hives/","https://www.nhs.uk/conditions/atopic-eczema/"]},
     {
       "slug": "emergency-warning",
       "title": "紧急危险表现与求助原型资料",

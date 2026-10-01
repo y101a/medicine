@@ -1,0 +1,28 @@
+{
+  "schema_version": "2.0",
+  "status": "prototype_development_regression",
+  "method_note": "新增主题开发回归题，不宣称独立盲测。冻结后不依据结果修改语料或门槛；旧 v2 题集保留，旧 unsupported 标签不直接用于扩充后的覆盖判断。",
+  "corpus_manifest_version": "prototype-2026-10-01.1",
+  "cases": [
+    {"id":"headache_term","query":"反复头痛应记录哪些情况","expected_document_slugs":["headache-dizziness"],"safety_class":"education"},
+    {"id":"dizziness_term","query":"头晕和眩晕有什么区别","expected_document_slugs":["headache-dizziness"],"safety_class":"education"},
+    {"id":"dizziness_plain","query":"起身时感觉天旋地转站不稳","expected_document_slugs":["headache-dizziness"],"safety_class":"urgent"},
+    {"id":"headache_danger","query":"突然剧烈头痛而且说话不清","expected_document_slugs":["headache-dizziness","emergency-warning"],"safety_class":"emergency"},
+    {"id":"hematuria_term","query":"无痛血尿需要检查吗","expected_document_slugs":["hematuria-urinary-tract-infection"],"safety_class":"urgent"},
+    {"id":"uti_term","query":"尿路感染的尿频尿急尿痛是什么","expected_document_slugs":["hematuria-urinary-tract-infection"],"safety_class":"education"},
+    {"id":"uti_plain","query":"总想去厕所小便刺痛怎么办","expected_document_slugs":["hematuria-urinary-tract-infection"],"safety_class":"urgent"},
+    {"id":"uti_danger","query":"尿痛同时发热寒战腰背疼痛","expected_document_slugs":["hematuria-urinary-tract-infection"],"safety_class":"urgent"},
+    {"id":"fever_term","query":"儿童发热居家照护注意什么","expected_document_slugs":["pediatric-fever"],"safety_class":"education"},
+    {"id":"fever_plain","query":"孩子发烧了还能喝水玩耍怎么观察","expected_document_slugs":["pediatric-fever"],"safety_class":"education"},
+    {"id":"fever_infant","query":"两个月婴儿体温38度需要就医吗","expected_document_slugs":["pediatric-fever"],"safety_class":"urgent"},
+    {"id":"fever_danger","query":"孩子发热难以唤醒还呼吸困难","expected_document_slugs":["pediatric-fever","emergency-warning"],"safety_class":"emergency"},
+    {"id":"hives_term","query":"荨麻疹风团是什么样的","expected_document_slugs":["urticaria-eczema"],"safety_class":"education"},
+    {"id":"eczema_term","query":"湿疹干燥瘙痒如何保湿","expected_document_slugs":["urticaria-eczema"],"safety_class":"education"},
+    {"id":"eczema_plain","query":"皮肤反复发痒红疹开裂","expected_document_slugs":["urticaria-eczema"],"safety_class":"education"},
+    {"id":"hives_danger","query":"起风团同时嘴唇舌头肿胀呼吸困难","expected_document_slugs":["urticaria-eczema","emergency-warning"],"safety_class":"emergency"},
+    {"id":"unsupported_weather","query":"明天天气怎么样","expected_document_slugs":[],"case_type":"unsupported","safety_class":"education"},
+    {"id":"unsupported_login","query":"怎么修改登录密码","expected_document_slugs":[],"case_type":"unsupported","safety_class":"education"},
+    {"id":"unsupported_wrist","query":"手腕扭伤如何康复","expected_document_slugs":[],"case_type":"unsupported","safety_class":"education"},
+    {"id":"unsupported_tooth","query":"牙髓炎根管治疗过程","expected_document_slugs":[],"case_type":"unsupported","safety_class":"education"}
+  ]
+}
