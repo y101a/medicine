@@ -34,6 +34,7 @@ vi.mock('../api/privateKnowledge', () => ({
     getDocument: vi.fn(),
     retryDocument: vi.fn(),
     removeDocument: vi.fn(),
+    search: vi.fn(),
   },
 }))
 
@@ -64,6 +65,8 @@ function makeDocument(
     pageCount: 3,
     charCount: 12_000,
     chunkCount: 8,
+    parserVersion: 'parser-v1',
+    indexVersion: 'index-v1',
     status: 'ready',
     createdAt: '2026-10-01T00:00:00Z',
     updatedAt: '2026-10-01T00:00:00Z',
@@ -414,6 +417,133 @@ describe('我的知识库管理页', () => {
     await clickText('同意并上传')
     expect(document.body.textContent).toContain('这个文件类型暂不支持')
     expect(document.body.textContent).not.toContain('OCR worker crashed')
+    wrapper.unmount()
+  })
+
+  // ---- P2：知识库内搜索 ----
+
+  it('搜索只查勾选的库，命中按相关度展示（P2）', async () => {
+    vi.mocked(privateKnowledgeApi.search).mockResolvedValue([
+      {
+        referenceNumber: 1,
+        collectionId: 'col-1',
+        collectionName: '我的体检资料',
+        documentId: 'doc-1',
+        documentName: '体检报告.pdf',
+        locator: '第 1 页 第 2 段',
+        excerpt: '空腹血糖 6.1 mmol/L',
+        similarity: 0.83,
+      },
+    ])
+    const wrapper = await mountView()
+    const store = usePrivateKnowledgeStore()
+    // 默认范围就是当前库。
+    expect(store.searchCollectionIds).toEqual(['col-1'])
+
+    store.searchQuery = '血糖'
+    await flushPromises()
+    await wrapper.get('.run-search').trigger('click')
+    await flushPromises()
+
+    expect(privateKnowledgeApi.search).toHaveBeenCalledWith({
+      query: '血糖',
+      collectionIds: ['col-1'],
+      limit: 5,
+    })
+    expect(document.body.textContent).toContain('体检报告.pdf')
+    expect(document.body.textContent).toContain('空腹血糖 6.1 mmol/L')
+    expect(document.body.textContent).toContain('相关度 83%')
+    expect(document.body.textContent).toContain('第 1 页 第 2 段')
+    wrapper.unmount()
+  })
+
+  it('没勾选任何库时不能搜索，并说明原因', async () => {
+    const wrapper = await mountView()
+    const store = usePrivateKnowledgeStore()
+    store.setSearchCollections([])
+    store.searchQuery = '血糖'
+    await flushPromises()
+
+    expect(store.canSearch).toBe(false)
+    expect(document.body.textContent).toContain('请先勾选要检索的知识库')
+    await wrapper.get('.run-search').trigger('click')
+    expect(privateKnowledgeApi.search).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('最多只能勾选 3 个库，第 4 个复选框是禁用的', async () => {
+    vi.mocked(privateKnowledgeApi.collections).mockResolvedValue([
+      makeCollection(),
+      makeCollection({ id: 'col-2', name: '出院资料' }),
+      makeCollection({ id: 'col-3', name: '化验单' }),
+      makeCollection({ id: 'col-4', name: '影像说明' }),
+    ])
+    const wrapper = await mountView()
+    const store = usePrivateKnowledgeStore()
+    store.setSearchCollections(['col-1', 'col-2', 'col-3'])
+    await flushPromises()
+
+    const boxes = wrapper.findAll('.scope-option input[type="checkbox"]')
+    expect(boxes.length).toBe(4)
+    expect((boxes[3].element as HTMLInputElement).disabled).toBe(true)
+    expect(store.searchCollectionIds).toEqual(['col-1', 'col-2', 'col-3'])
+    wrapper.unmount()
+  })
+
+  it('命中为空时说明检索范围只覆盖勾选的库', async () => {
+    vi.mocked(privateKnowledgeApi.search).mockResolvedValue([])
+    const wrapper = await mountView()
+    const store = usePrivateKnowledgeStore()
+    store.searchQuery = '不存在的词'
+    await flushPromises()
+    await wrapper.get('.run-search').trigger('click')
+    await flushPromises()
+
+    expect(document.body.textContent).toContain('在你勾选的知识库里没有找到相关内容')
+    wrapper.unmount()
+  })
+
+  it('搜索失败只显示受控中文，不透传服务端原文', async () => {
+    vi.mocked(privateKnowledgeApi.search).mockRejectedValue(
+      new ApiError('qdrant timeout at shard 3', 'PRIVATE_KNOWLEDGE_SELECTION_INVALID', 422),
+    )
+    const wrapper = await mountView()
+    const store = usePrivateKnowledgeStore()
+    store.searchQuery = '血糖'
+    await flushPromises()
+    await wrapper.get('.run-search').trigger('click')
+    await flushPromises()
+
+    expect(document.body.textContent).toContain('选择的知识库无效，请重新选择')
+    expect(document.body.textContent).not.toContain('qdrant timeout')
+    wrapper.unmount()
+  })
+
+  it('切换检索范围会清掉上一轮命中，避免旧结果被当成新结果', async () => {
+    vi.mocked(privateKnowledgeApi.search).mockResolvedValue([
+      {
+        referenceNumber: 1,
+        collectionId: 'col-1',
+        collectionName: '我的体检资料',
+        documentId: 'doc-1',
+        documentName: '体检报告.pdf',
+        locator: '第 1 页',
+        excerpt: '空腹血糖 6.1 mmol/L',
+        similarity: 0.9,
+      },
+    ])
+    const wrapper = await mountView()
+    const store = usePrivateKnowledgeStore()
+    store.searchQuery = '血糖'
+    await flushPromises()
+    await wrapper.get('.run-search').trigger('click')
+    await flushPromises()
+    expect(store.searchResults.length).toBe(1)
+
+    store.setSearchCollections([])
+    await flushPromises()
+    expect(store.searchResults).toEqual([])
+    expect(store.searchPerformed).toBe(false)
     wrapper.unmount()
   })
 })

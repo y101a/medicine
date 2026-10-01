@@ -22,22 +22,26 @@ import {
   PRIVATE_KNOWLEDGE_NOTICE_SHORT,
   PRIVATE_KNOWLEDGE_NOTICE_VERSION,
   PRIVATE_KNOWLEDGE_SCOPE_HINT,
+  PRIVATE_KNOWLEDGE_SEARCH_EMPTY,
+  PRIVATE_KNOWLEDGE_SEARCH_HINT,
+  PRIVATE_KNOWLEDGE_SEARCH_LIMIT_HINT,
+  PRIVATE_KNOWLEDGE_SEARCH_MAX_COLLECTIONS,
+  PRIVATE_KNOWLEDGE_SEARCH_MAX_QUERY_LENGTH,
+  PRIVATE_KNOWLEDGE_SEARCH_SCOPE_REQUIRED,
   checkPrivateKnowledgeFile,
   privateKnowledgeErrorMessage,
   privateKnowledgeKindLabel,
+  privateKnowledgeSimilarityLabel,
 } from '../types/privateKnowledgeUi'
 
 /**
- * 「我的知识库」管理页（方案 §8.1、§9；P1）——DSH 版本。
+ * 「我的知识库」管理页（方案 §8.1、§9、§P2）。
  *
- * 2026-10-01 与 Codex 的版本在共享工作树里冲突：他随后把 `types`/`api`/`stores`/本文件都换成了
- * 他自己的实现。为了不继续互相覆盖、也不毁掉他的工作，本文件已从共享树撤出，这是仓库外备份
- * （`%TEMP%\dsh-private-kb-p1\`）。要重新启用必须先把 `privateKnowledgeUi.ts`、
- * `PrivateKnowledgeNoticeDialog.vue` 恢复进仓库，并把 `stores/privateKnowledge.ts` 换回合并版。
+ * P1：知识库列表与新建/改名/删除、上传（首次一次性说明）、文档状态与失败原因、重试与删除。
+ * P2：知识库内搜索（`POST /private-knowledge/search`）——只做检索，**不把命中送进对话**。
  *
- * 与 Codex 版本的差异（供选择）：本版对处理中文档**按单个文档轮询**（`GET /documents/{id}`）、
- * 有独立的首次说明弹窗（按说明版本记忆、取消不记）、上传区显示受控失败原因并可重试，
- * 并把「解析定位」（页数/字数/片段数）与文档数量摘要一起展示。
+ * 与 Codex 的 P3 咨询接线严格分开：本页不 import 他的选择器/引用组件，搜索范围用页面内的
+ * 普通复选框（最多 3 个）。数据层类型在 `types/privateKnowledge.ts`（他的文件，我只追加不改）。
  */
 const store = usePrivateKnowledgeStore()
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -53,12 +57,33 @@ onMounted(async () => {
   await store.load()
   // 库列表到位后再拉当前库的文档（store.loadDocuments 会在未选库时落到第一个可用库）。
   await store.loadDocuments()
+  // P2 搜索范围默认落在当前库；用户可在搜索区改成 1–3 个，换库不重置。
+  if (store.currentCollectionId) store.setSearchCollections([store.currentCollectionId])
 })
 // 离开页面就停掉轮询定时器（本功能不注册任何后台任务）。
 onBeforeUnmount(() => store.dispose())
 
 function reload() {
   void store.load().then(() => store.loadDocuments())
+}
+
+// ---- P2：知识库内搜索 ----
+// 范围用页面内的普通复选框（最多 3 个），不复用咨询页的选择器组件（那是 P3 的文件）。
+
+/** 勾选/取消一个知识库；已到 3 个上限时不再加。换范围会清掉上一轮结果（store 里做）。 */
+function toggleSearchScope(collectionId: string, checked: boolean) {
+  const current = store.searchCollectionIds
+  if (checked) {
+    if (current.includes(collectionId)
+      || current.length >= PRIVATE_KNOWLEDGE_SEARCH_MAX_COLLECTIONS) return
+    store.setSearchCollections([...current, collectionId])
+  } else {
+    store.setSearchCollections(current.filter(id => id !== collectionId))
+  }
+}
+
+function runSearch() {
+  void store.runSearch()
 }
 
 /** 上传入口：先选文件，再决定要不要弹首次说明。 */
@@ -390,6 +415,89 @@ function metaText(document: PrivateKnowledgeDocument) {
         </template>
         <p v-else class="documents-empty">先选择或新建一个知识库。</p>
       </section>
+
+      <!-- P2：只检索、不进对话；范围是用户显式勾选的 1–3 个库，结果只是他自己资料的命中。 -->
+      <section class="search" aria-label="在知识库中搜索">
+        <div class="section-head">
+          <h2>在知识库中搜索</h2>
+          <span class="search-limit">{{ PRIVATE_KNOWLEDGE_SEARCH_LIMIT_HINT }}</span>
+        </div>
+        <p class="search-hint">{{ PRIVATE_KNOWLEDGE_SEARCH_HINT }}</p>
+        <fieldset class="search-scope">
+          <legend>检索范围（最多 {{ PRIVATE_KNOWLEDGE_SEARCH_MAX_COLLECTIONS }} 个）</legend>
+          <label v-for="item in store.activeCollections" :key="item.id" class="scope-option">
+            <input
+              type="checkbox"
+              :checked="store.searchCollectionIds.includes(item.id)"
+              :disabled="!store.searchCollectionIds.includes(item.id)
+                && store.searchCollectionIds.length >= PRIVATE_KNOWLEDGE_SEARCH_MAX_COLLECTIONS"
+              @change="toggleSearchScope(item.id, ($event.target as HTMLInputElement).checked)"
+            />
+            <span>{{ item.name }}</span>
+          </label>
+          <p v-if="!store.activeCollections.length" class="scope-required">还没有可以检索的知识库。</p>
+          <p v-else-if="!store.searchCollectionIds.length" class="scope-required" role="note">
+            {{ PRIVATE_KNOWLEDGE_SEARCH_SCOPE_REQUIRED }}
+          </p>
+        </fieldset>
+        <div class="search-bar">
+          <el-input
+            v-model="store.searchQuery"
+            class="search-input"
+            :maxlength="PRIVATE_KNOWLEDGE_SEARCH_MAX_QUERY_LENGTH"
+            placeholder="例如：我的体检报告里血糖和糖化血红蛋白是多少"
+            aria-label="搜索内容"
+            @keyup.enter="runSearch"
+          />
+          <el-button
+            type="primary"
+            class="run-search"
+            :loading="store.searching"
+            :disabled="!store.canSearch"
+            @click="runSearch"
+          >
+            搜索
+          </el-button>
+          <el-button
+            v-if="store.searchQuery || store.searchPerformed"
+            text
+            class="clear-search"
+            @click="store.clearSearch()"
+          >
+            清空
+          </el-button>
+        </div>
+        <el-alert
+          v-if="store.searchError"
+          class="search-error"
+          :title="store.searchError"
+          type="error"
+          :closable="false"
+        />
+        <p v-if="store.searching" role="status">正在检索你勾选的知识库…</p>
+        <p
+          v-else-if="store.searchPerformed && !store.searchResults.length && !store.searchError"
+          class="search-empty"
+        >
+          {{ PRIVATE_KNOWLEDGE_SEARCH_EMPTY }}
+        </p>
+        <ol v-if="store.searchResults.length" class="search-results">
+          <li
+            v-for="hit in store.searchResults"
+            :key="`${hit.documentId}-${hit.referenceNumber}`"
+            class="search-hit"
+          >
+            <div class="hit-head">
+              <strong class="hit-document">{{ hit.documentName }}</strong>
+              <span class="hit-similarity">{{ privateKnowledgeSimilarityLabel(hit.similarity) }}</span>
+            </div>
+            <span class="hit-source">
+              {{ hit.collectionName }}<template v-if="hit.locator"> · {{ hit.locator }}</template>
+            </span>
+            <p class="hit-excerpt">{{ hit.excerpt }}</p>
+          </li>
+        </ol>
+      </section>
     </div>
 
     <PrivateKnowledgeNoticeDialog
@@ -447,6 +555,25 @@ h2 { font-size: 16px; font-weight: 600; color: #4b6277; margin: 0; }
 .document-meta { display: block; margin-top: 6px; color: #8a99a8; font-size: 12px; line-height: 1.8; }
 .document-failure { margin: 8px 0 0; color: #b3261e; font-size: 12px; line-height: 1.8; }
 .document-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+/* P2 搜索区：跨满两列，避免被挤进左侧窄栏。 */
+.search { grid-column: 1 / -1; margin-top: 8px; padding-top: 20px; border-top: 1px solid #e5edf4; }
+.search-limit { color: #8a99a8; font-size: 12px; }
+.search-hint { margin: 10px 0 14px; color: #4b6277; font-size: 12px; line-height: 1.8; }
+.search-scope { margin: 0 0 12px; padding: 10px 12px; border: 1px solid #e5edf4; border-radius: 12px; }
+.search-scope legend { padding: 0 6px; color: #8a99a8; font-size: 12px; }
+.scope-option { display: inline-flex; align-items: center; gap: 6px; margin: 0 14px 6px 0; color: #2f5876; font-size: 13px; }
+.scope-required { margin: 6px 0 0; color: #b26a00; font-size: 12px; }
+.search-bar { display: flex; align-items: center; gap: 8px; }
+.search-input { flex: 1; }
+.search-error { margin-top: 12px; }
+.search-empty { margin: 12px 0 0; color: #8a99a8; font-size: 13px; }
+.search-results { list-style: none; margin: 14px 0 0; padding: 0; }
+.search-hit { padding: 12px 0; border-bottom: 1px solid #e5edf4; }
+.hit-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.hit-document { color: #2f5876; font-size: 14px; word-break: break-all; }
+.hit-similarity { border-radius: 999px; padding: 1px 8px; background: #eef4fa; color: #4b6277; font-size: 12px; }
+.hit-source { display: block; margin-top: 4px; color: #8a99a8; font-size: 12px; }
+.hit-excerpt { margin: 8px 0 0; color: #4b6277; font-size: 13px; line-height: 1.8; }
 @media (max-width: 900px) {
   .knowledge-columns { grid-template-columns: 1fr; }
   .private-knowledge-page { padding: 24px 16px; }

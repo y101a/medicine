@@ -4,9 +4,12 @@ import { privateKnowledgeApi } from '../api/privateKnowledge'
 import type {
   PrivateKnowledgeCollection,
   PrivateKnowledgeDocument,
+  PrivateKnowledgeSearchResult,
 } from '../types/privateKnowledge'
 import {
   PRIVATE_KNOWLEDGE_MAX_COLLECTIONS,
+  PRIVATE_KNOWLEDGE_SEARCH_MAX_COLLECTIONS,
+  PRIVATE_KNOWLEDGE_SEARCH_MAX_LIMIT,
   isPrivateKnowledgeDocumentPending,
   privateKnowledgeErrorMessage,
 } from '../types/privateKnowledgeUi'
@@ -259,6 +262,59 @@ export const usePrivateKnowledgeStore = defineStore('privateKnowledge', () => {
     }
   }
 
+  // ↓↓↓ DSH 追加：P2 知识库内搜索（方案 §P2：只提供受控搜索接口，尚不自动送入模型） ↓↓↓
+  const searchQuery = ref('')
+  const searchCollectionIds = ref<string[]>([])
+  const searchResults = ref<PrivateKnowledgeSearchResult[]>([])
+  const searching = ref(false)
+  const searchError = ref('')
+  /** 是否已经搜过：用来区分「还没搜」和「搜了但没命中」两种空状态。 */
+  const searchPerformed = ref(false)
+
+  const canSearch = computed(
+    () => searchQuery.value.trim().length > 0
+      && searchCollectionIds.value.length > 0
+      && searchCollectionIds.value.length <= PRIVATE_KNOWLEDGE_SEARCH_MAX_COLLECTIONS
+      && !searching.value,
+  )
+
+  /** 设置检索范围（最多 3 个）。换范围就清掉上一轮结果，避免旧命中被当成新结果。 */
+  function setSearchCollections(ids: string[]) {
+    searchCollectionIds.value = ids.slice(0, PRIVATE_KNOWLEDGE_SEARCH_MAX_COLLECTIONS)
+    searchResults.value = []
+    searchError.value = ''
+    searchPerformed.value = false
+  }
+
+  async function runSearch() {
+    const query = searchQuery.value.trim()
+    if (!query || !searchCollectionIds.value.length) return
+    searching.value = true
+    searchError.value = ''
+    try {
+      searchResults.value = await privateKnowledgeApi.search({
+        query,
+        collectionIds: [...searchCollectionIds.value],
+        limit: PRIVATE_KNOWLEDGE_SEARCH_MAX_LIMIT,
+      })
+      searchPerformed.value = true
+    } catch (caught) {
+      // 搜索失败同样只显示受控中文，不透传服务端原文。
+      searchResults.value = []
+      searchPerformed.value = true
+      searchError.value = privateKnowledgeErrorMessage(caught)
+    } finally {
+      searching.value = false
+    }
+  }
+
+  function clearSearch() {
+    searchQuery.value = ''
+    searchResults.value = []
+    searchError.value = ''
+    searchPerformed.value = false
+  }
+
   /** 页面卸载时调用：停掉轮询定时器（不注册任何后台任务）。 */
   function dispose() {
     stopPolling()
@@ -292,6 +348,16 @@ export const usePrivateKnowledgeStore = defineStore('privateKnowledge', () => {
     retryDocument,
     removeDocument,
     refreshPendingDocuments,
+    searchQuery,
+    searchCollectionIds,
+    searchResults,
+    searching,
+    searchError,
+    searchPerformed,
+    canSearch,
+    setSearchCollections,
+    runSearch,
+    clearSearch,
     dispose,
   }
 })

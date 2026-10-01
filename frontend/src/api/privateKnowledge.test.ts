@@ -35,6 +35,8 @@ const document = {
   byteSize: 1024,
   charCount: 0,
   chunkCount: 0,
+  parserVersion: 'parser-v1',
+  indexVersion: 'index-v1',
   status: 'indexing' as const,
   createdAt: '2026-10-01T00:00:00Z',
   updatedAt: '2026-10-01T00:00:00Z',
@@ -105,7 +107,38 @@ describe('私人知识库接口层', () => {
     expect(Array.from(form.keys()).sort()).toEqual(['file', 'noticeAccepted', 'noticeVersion'])
   })
 
-  it('P2 的搜索接口本轮不实现，避免前端先于契约发出检索请求', () => {
-    expect(Object.keys(privateKnowledgeApi)).not.toContain('search')
+  it('搜索走 POST /search，请求体只有 query / collectionIds / limit，不含 userId（P2）', async () => {
+    const hit = {
+      referenceNumber: 1,
+      collectionId: 'col-1',
+      collectionName: '我的体检资料',
+      documentId: 'doc-1',
+      documentName: '体检报告.pdf',
+      locator: '第 1 页 第 2 段',
+      excerpt: '空腹血糖 6.1 mmol/L',
+      similarity: 0.83,
+    }
+    vi.mocked(http.post).mockResolvedValueOnce({ data: { items: [hit] } })
+
+    await expect(privateKnowledgeApi.search({
+      query: '血糖',
+      collectionIds: ['col-1', 'col-2'],
+      limit: 5,
+    })).resolves.toEqual([hit])
+
+    expect(http.post).toHaveBeenCalledWith('/private-knowledge/search', {
+      query: '血糖',
+      collectionIds: ['col-1', 'col-2'],
+      limit: 5,
+    })
+    // 契约首行同样适用于检索：身份只从认证上下文取。
+    const body = vi.mocked(http.post).mock.calls[0][1] as Record<string, unknown>
+    expect(Object.keys(body).sort()).toEqual(['collectionIds', 'limit', 'query'])
+  })
+
+  it('搜索接口返回的是展开后的 items，页面拿到的就是数组', async () => {
+    vi.mocked(http.post).mockResolvedValueOnce({ data: { items: [] } })
+    await expect(privateKnowledgeApi.search({ query: '血糖', collectionIds: ['col-1'] }))
+      .resolves.toEqual([])
   })
 })

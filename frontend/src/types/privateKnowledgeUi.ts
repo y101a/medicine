@@ -8,14 +8,16 @@ import type {
  * 「我的知识库」P1 管理页的界面常量、文案与本地预检。
  *
  * **为什么单独一个文件**：数据层的类型在 `./privateKnowledge.ts`（由 Codex 在实现 P3
- * 咨询接线时落地，2026-10-01）。为了不让双方在同一文件上互相覆盖，管理页专用的东西
- * 一律放这里，`privateKnowledge.ts` 我一行都不动。
+ * 咨询接线时落地，2026-10-01）。管理页专用的常量与文案一律放这里，减少双方在同一文件上
+ * 互相覆盖；只有「把 TS 类型对齐回后端 schema」（六状态、`parserVersion`/`indexVersion`、
+ * 搜索结果类型）时才追加到那个文件，且只增不改。
  *
- * 契约来源：`USER_PRIVATE_KNOWLEDGE_BASE_PLAN.md` §0（K1–K5）、§5、§7、§8.1、§9；并已按
- * Codex 的后端落地代码核对（`backend/app/api/routes/private_knowledge.py`、
- * `backend/app/schemas/private_knowledge.py`，2026-10-01 读，**当时未提交**）：
- * 说明版本字面值、`noticeAccepted`/`noticeVersion` 校验、受控错误码、30 MiB 体积与 100 页
- * 上限（`settings.attachment_max_bytes` / `attachment_max_pages`）都对得上。
+ * 契约来源：`USER_PRIVATE_KNOWLEDGE_BASE_PLAN.md` §0（K1–K5）、§5、§7、§8.1、§9、§P2；并已按
+ * 后端落地代码逐条核对（`backend/app/schemas/private_knowledge.py`、
+ * `backend/app/api/routes/private_knowledge.py`，2026-10-01 读，**当时未提交**）：
+ * 说明版本字面值、`noticeAccepted`/`noticeVersion` 校验、30 MiB / 100 页上限
+ * （`settings.attachment_max_bytes` / `attachment_max_pages`）、文档六状态、
+ * `chunkCount` 与 `parserVersion`/`indexVersion`、搜索请求的「1–3 个库 / 1–5 条」限制都对得上。
  *
  * 本页面的全部验证都走 `page.route` 桩，**不代表真实链路已通**。
  */
@@ -41,11 +43,14 @@ export const PRIVATE_KNOWLEDGE_MAX_BYTES = 30 * 1024 * 1024
 /** 与后端 `settings.attachment_max_pages` 一致（100 页）。 */
 export const PRIVATE_KNOWLEDGE_MAX_PAGES = 100
 
-/** 页面上显示的状态文案；后端当前只有这三个状态。 */
+/** 页面上显示的状态文案；六个状态与后端 `PrivateKnowledgeDocumentStatus` 一一对应。 */
 export const PRIVATE_KNOWLEDGE_DOCUMENT_STATUS_LABELS: Record<PrivateKnowledgeDocumentStatus, string> = {
+  queued: '排队中',
+  parsing: '解析中',
   indexing: '建立索引',
   ready: '可用',
   failed: '处理失败',
+  deleting: '正在删除',
 }
 
 /**
@@ -57,6 +62,10 @@ export const PRIVATE_KNOWLEDGE_DOCUMENT_STATUS_LABELS: Record<PrivateKnowledgeDo
  */
 export const PRIVATE_KNOWLEDGE_ERROR_MESSAGES: Record<string, string> = {
   PRIVATE_KNOWLEDGE_COLLECTION_NOT_FOUND: '这个知识库不存在或已被删除',
+  // 后端 409：同名建库 / 同内容文档；404：文档被删或不属于当前账号。
+  PRIVATE_KNOWLEDGE_COLLECTION_EXISTS: '已经有同名的知识库，请换个名字',
+  PRIVATE_KNOWLEDGE_DOCUMENT_EXISTS: '这个知识库里已经有内容相同的文档',
+  PRIVATE_KNOWLEDGE_DOCUMENT_NOT_FOUND: '这份文档不存在或已被删除',
   PRIVATE_KNOWLEDGE_NOTICE_REQUIRED: '上传前请先确认私人资料处理与模型使用说明',
   PRIVATE_KNOWLEDGE_DOCUMENT_UNSUPPORTED:
     '这个文件类型暂不支持：请上传 PDF、Word、PPT、TXT 或 Markdown',
@@ -101,9 +110,9 @@ export const PRIVATE_KNOWLEDGE_SCOPE_HINT =
 export const PRIVATE_KNOWLEDGE_BOUNDARY_HINT =
   '这里是你自己的资料，不会被当成经过医学审核的公共资料；它只帮你查找、整理和解释，不用于确诊、开药或调整用药。'
 
-/** 文档是否还在处理中（据此决定要不要继续轮询）。 */
+/** 文档是否还在处理中（据此决定要不要继续轮询）。`deleting` 由删除流程接管，不轮询。 */
 export function isPrivateKnowledgeDocumentPending(status: PrivateKnowledgeDocumentStatus): boolean {
-  return status === 'indexing'
+  return status === 'queued' || status === 'parsing' || status === 'indexing'
 }
 
 /** 文件类型标签；未知类型退回大写后缀，不猜具体格式。 */
@@ -143,4 +152,36 @@ export function checkPrivateKnowledgeFile(file: File): string {
   }
   if (file.size > PRIVATE_KNOWLEDGE_MAX_BYTES) return PRIVATE_KNOWLEDGE_LOCAL_ERRORS.tooLarge
   return ''
+}
+
+// ---------------------------------------------------------------------------
+// P2：知识库内搜索（`POST /private-knowledge/search`）
+//
+// 约束照抄后端 `PrivateKnowledgeSearchRequest`：`query` 1–2000（去首尾空白）、
+// `collectionIds` 1–3 且不可重复、`limit` 1–5（默认 5）。方案 §P2 明确「只提供受控搜索接口，
+// 尚不自动送入模型」，所以这一块只把命中显示给用户，不写进对话、不写进健康记录。
+// ---------------------------------------------------------------------------
+
+export const PRIVATE_KNOWLEDGE_SEARCH_MAX_COLLECTIONS = 3
+export const PRIVATE_KNOWLEDGE_SEARCH_MAX_LIMIT = 5
+export const PRIVATE_KNOWLEDGE_SEARCH_MAX_QUERY_LENGTH = 2000
+
+/** 搜索区的常驻说明：范围、性质、以及「这一步不会进对话」。 */
+export const PRIVATE_KNOWLEDGE_SEARCH_HINT =
+  '只在你勾选的知识库里查找；结果是你自己的未核验资料，不等同于公共医学来源。这一步只做检索，不会自动写进对话或健康记录。'
+
+/** 没勾选任何知识库时的说明。 */
+export const PRIVATE_KNOWLEDGE_SEARCH_SCOPE_REQUIRED = `请先勾选要检索的知识库（最多 ${PRIVATE_KNOWLEDGE_SEARCH_MAX_COLLECTIONS} 个）。`
+
+/** 没找到命中时的说明：讲清范围，避免用户以为「所有资料里都没有」。 */
+export const PRIVATE_KNOWLEDGE_SEARCH_EMPTY = '在你勾选的知识库里没有找到相关内容。'
+
+/** 命中数量上限说明（后端 limit 最大 5）。 */
+export const PRIVATE_KNOWLEDGE_SEARCH_LIMIT_HINT = `最多返回 ${PRIVATE_KNOWLEDGE_SEARCH_MAX_LIMIT} 条命中，按相关度排序。`
+
+/** 相关度只给区间值，不当成概率或医学结论。 */
+export function privateKnowledgeSimilarityLabel(similarity: number): string {
+  if (!Number.isFinite(similarity)) return '相关度未知'
+  const bounded = Math.max(0, Math.min(1, similarity))
+  return `相关度 ${Math.round(bounded * 100)}%`
 }

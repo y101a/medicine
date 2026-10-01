@@ -2,6 +2,7 @@ import http from './http'
 import type {
   PrivateKnowledgeCollection,
   PrivateKnowledgeDocument,
+  PrivateKnowledgeSearchResult,
 } from '../types/privateKnowledge'
 
 export const PRIVATE_KNOWLEDGE_NOTICE_VERSION = 'private-knowledge-upload-v1'
@@ -57,5 +58,22 @@ export const privateKnowledgeApi = {
   },
   async removeDocument(id: string) {
     await http.delete(`/private-knowledge/documents/${id}`)
+  },
+  /**
+   * 知识库内搜索（P2）。
+   *
+   * 请求体照后端 `PrivateKnowledgeSearchRequest`：`query`（1–2000）、`collectionIds`（1–3，不重复）、
+   * `limit`（1–5）；**不含 `userId`**（身份只从认证上下文取）。返回 `{items: [...]}` 展开成数组。
+   * 这一步只做检索，不把命中送进对话——方案 §P2「尚不自动送入模型」。
+   */
+  async search(payload: { query: string; collectionIds: string[]; limit?: number }) {
+    return (await http.post<{ items: PrivateKnowledgeSearchResult[] }>(
+      '/private-knowledge/search',
+      {
+        query: payload.query,
+        collectionIds: payload.collectionIds,
+        limit: payload.limit,
+      },
+    )).data.items
   },
 }

@@ -70,6 +70,8 @@ interface KnowledgeStubState {
   /** 上传请求的原始报文，用来核对 multipart 字段（不含 userId）。 */
   uploadBodies: string[]
   uploadContentTypes: string[]
+  /** 搜索请求的 JSON 报文（P2），用来核对只发 query / collectionIds / limit。 */
+  searchBodies: string[]
   /** 默认桩里没配置到的接口（与 `installApiStubs` 返回的是同一个数组）。 */
   unmatched: string[]
 }
@@ -80,6 +82,8 @@ interface StubOptions {
   /** 让上传返回受控错误码，验证前端映射。 */
   uploadErrorCode?: string
   uploadErrorStatus?: number
+  /** 让搜索返回受控错误码（P2），验证前端映射不透传原文。 */
+  searchErrorCode?: string
 }
 
 function json(route: Route, status: number, body: unknown) {
@@ -108,6 +112,7 @@ async function installKnowledgeStubs(page: Page, options: StubOptions = {}): Pro
     ]),
     uploadBodies: [],
     uploadContentTypes: [],
+    searchBodies: [],
     unmatched: [],
   }
 
@@ -148,6 +153,40 @@ async function installKnowledgeStubs(page: Page, options: StubOptions = {}): Pro
       state.collections = state.collections.filter(item => item.id !== id)
       state.documents.delete(id)
       return json(route, 200, {})
+    }
+    if (path === '/private-knowledge/search' && method === 'POST') {
+      const body = request.postDataJSON() as {
+        query: string
+        collectionIds: string[]
+        limit?: number
+      }
+      state.searchBodies.push(JSON.stringify(body))
+      if (options.searchErrorCode) {
+        return json(route, 422, {
+          code: options.searchErrorCode,
+          // 故意带一段「原始报文」：前端不得把它显示给用户。
+          message: 'selection rejected at gateway: shard 3 timeout',
+        })
+      }
+      // 命中只从勾选的那些库里出，且只取 `ready` 的文档，条数受 limit 限制。
+      const hits: Array<Record<string, unknown>> = []
+      for (const collectionId of body.collectionIds) {
+        const collectionName = state.collections.find(item => item.id === collectionId)?.name || ''
+        for (const item of state.documents.get(collectionId) || []) {
+          if (item.status !== 'ready') continue
+          hits.push({
+            referenceNumber: hits.length + 1,
+            collectionId,
+            collectionName,
+            documentId: item.id,
+            documentName: item.displayName,
+            locator: '第 1 页 第 2 段',
+            excerpt: `${body.query}：空腹血糖 6.1 mmol/L`,
+            similarity: 0.83,
+          })
+        }
+      }
+      return json(route, 200, { items: hits.slice(0, Math.min(body.limit ?? 5, 5)) })
     }
     if (documentsMatch && method === 'GET') {
       return json(route, 200, { items: state.documents.get(documentsMatch[1]) || [] })
@@ -425,4 +464,54 @@ test('1280px 无横向溢出；375px 按桌面优先约束给出窄屏提示', a
     element => Math.round(element.getBoundingClientRect().width),
   )
   expect(workspaceWidth, '工作区必须保持 1000px 桌面优先约束').toBe(1000)
+})
+
+test('知识库内搜索：命中展示文档名/定位/相关度，请求体只有 query+collectionIds+limit', async ({ page }) => {
+  const state = await installKnowledgeStubs(page)
+  await openPage(page)
+
+  // 搜索区常驻，且明说这一步不进对话（方案 §P2：尚不自动送入模型）。
+  await expect(page.locator('.search-scope')).toBeVisible()
+  await expect(page.locator('.search-hint')).toContainText('不会自动写进对话')
+
+  await page.locator('.search-input input').fill('血糖')
+  await page.locator('.run-search').click()
+
+  await expect(page.locator('.search-hit')).toHaveCount(1)
+  await expect(page.locator('.hit-document')).toContainText('体检报告.pdf')
+  await expect(page.locator('.hit-source')).toContainText('我的体检资料')
+  await expect(page.locator('.hit-similarity')).toContainText('相关度 83%')
+  await expect(page.locator('.hit-excerpt')).toContainText('空腹血糖 6.1 mmol/L')
+
+  expect(state.searchBodies.length).toBe(1)
+  const body = JSON.parse(state.searchBodies[0]) as Record<string, unknown>
+  expect(Object.keys(body).sort()).toEqual(['collectionIds', 'limit', 'query'])
+  expect(body.collectionIds).toEqual(['col-1'])
+})
+
+test('搜索范围可以加到第二个库，命中按所选范围返回', async ({ page }) => {
+  const state = await installKnowledgeStubs(page)
+  await openPage(page)
+
+  // 第二个库（用药记录）没有 ready 文档，所以命中仍是一条，但请求范围变成两个库。
+  await page.locator('.scope-option input').nth(1).check()
+  await page.locator('.search-input input').fill('血糖')
+  await page.locator('.run-search').click()
+  await expect(page.locator('.search-hit')).toHaveCount(1)
+
+  const body = JSON.parse(state.searchBodies[0]) as { collectionIds: string[] }
+  expect([...body.collectionIds].sort()).toEqual(['col-1', 'col-2'])
+})
+
+test('搜索被拒时只显示受控中文，不透传原始报文，也不留下旧命中', async ({ page }) => {
+  await installKnowledgeStubs(page, { searchErrorCode: 'PRIVATE_KNOWLEDGE_SELECTION_INVALID' })
+  await openPage(page)
+
+  await page.locator('.search-input input').fill('血糖')
+  await page.locator('.run-search').click()
+
+  await expect(page.locator('.search-error')).toContainText('选择的知识库无效，请重新选择')
+  await expect(page.locator('.search-error')).not.toContainText('selection rejected at gateway')
+  await expect(page.locator('.search-hit')).toHaveCount(0)
+  await expect(page.locator('.search-empty')).toHaveCount(0)
 })
