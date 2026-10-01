@@ -1,3 +1,5 @@
+import type { SpeechOutputIntent } from './speech'
+
 export interface Consultation {
   id: string
   title: string
@@ -34,6 +36,15 @@ export interface Message {
    * 缺格式时故意不命中——由普通聊天先问清格式，避免意外产生费用（方案 §3）。
    */
   documentGenerationIntent?: boolean
+  /**
+   * 服务端本地意图判定：用户消息里出现明确的**输出动作**（「用语音回答 / 朗读 / 读出来 / 播报」，
+   * 或直接说某个方言）才为 true；功能询问（「你支持语音吗」）、否定请求（「不要朗读」）、
+   * 引用示例与假设句都不触发（见 `backend/app/services/speech_intent.py`）。
+   *
+   * 命中时前端**照常**生成并保存文字回答，等这条回答完成后再请求语音自动朗读；
+   * 判定与错误码见 `VOICE_OUTPUT_PLAN.md` §4.3/§4.4。
+   */
+  speechOutputIntent?: SpeechOutputIntent | null
   followUp?: FollowUpCard | null
   triage?: TriageResult | null
   citations?: MessageCitation[]

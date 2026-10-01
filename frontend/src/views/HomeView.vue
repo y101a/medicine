@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { readSelectedModelId, rememberSelectedModelId } from '../utils/modelPreference'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -42,6 +43,12 @@ import GeneratedDocumentCard from '../components/GeneratedDocumentCard.vue'
 import { useDocumentGeneration } from '../composables/useDocumentGeneration'
 import { DOCUMENT_GENERATION_NOTICE_VERSION } from '../api/documentGenerations'
 import { voiceApi } from '../api/voice'
+import MessageSpeechControl from '../components/MessageSpeechControl.vue'
+import { useSpeechOutput } from '../composables/useSpeechOutput'
+import {
+  clearPendingSpeech, pendingSpeech, rememberPendingSpeech, takePendingSpeech,
+} from '../composables/pendingSpeech'
+import { SPEECH_RATE_OPTIONS } from '../types/speech'
 
 const route = useRoute()
 const router = useRouter()
@@ -62,9 +69,20 @@ const title = ref('')
 const models = ref<AiModel[]>([])
 const modelsLoading = ref(true)
 const modelsError = ref('')
-const selectedModelId = ref('')
+const selectedModelId = ref(readSelectedModelId(auth.user?.id))
+
+function rememberCurrentUserSelectedModelId(modelId: string): void {
+  rememberSelectedModelId(auth.user?.id, modelId)
+}
 const cardGeneratingSourceId = ref('')
 let cid = typeof route.params.id === 'string' ? route.params.id : ''
+/**
+ * 本实例**挂载时**对应的会话 id。工作区是 `<router-view :key="route.fullPath">`，
+ * 所以新会话发出第一条消息后 `router.replace` 会把本组件整个换掉：`cid` 会被改写成本次
+ * 新建的会话，但它已经不等于挂载时的路由参数了。自动朗读必须认得这个差别，
+ * 否则会在一个马上要被卸载的实例上开始播放（见 `autoSpeakAnswer`）。
+ */
+const mountedCid = cid
 const createRequestId = crypto.randomUUID()
 let pending: { content: string; id: string } | null = null
 let generationController: AbortController | undefined
@@ -113,8 +131,108 @@ const {
   remove: removeDocument,
 } = useDocumentGeneration(generationCid)
 
+// ── 语音输出（TTS，方案 `VOICE_OUTPUT_PLAN.md` §6）───────────────────────────────
+/**
+ * 整页**只有这一个播放器**：同一时间只播一段，第二条消息开始播时旧的会被抢占。
+ * 音频只在内存（Blob + Object URL），停止/切会话/卸载都会释放；前端只传产品枚举
+ * `speechPreset` 与语速，朗读文本由服务端按 `messageId` 重新取。
+ */
+const {
+  presets: speechPresets,
+  presetsNotice: speechPresetsNotice,
+  preset: speechPreset,
+  rate: speechRate,
+  presetLabel: speechPresetLabel,
+  loadPresets: loadSpeechPresets,
+  play: playSpeech,
+  pause: pauseSpeech,
+  stop: stopSpeech,
+  stateFor: speechStateFor,
+  errorFor: speechErrorFor,
+} = useSpeechOutput()
+/**
+ * 语音对话模式：用户主动开启后，每条新回答完成即自动朗读（契约 §2.3）。
+ * **只在当前页面内存里**，不写 localStorage——刷新即回到关闭，避免公共电脑突然出声（§6.3）。
+ */
+const speechMode = ref(false)
+
+/** 只有「已完成且确实有正文」的助手回答才有朗读入口：用户消息、未完成、已停止的都没有。 */
+function canSpeakMessage(message: Message): boolean {
+  return message.role === 'assistant'
+    && !message.id.startsWith('stream-')
+    && message.generationStatus === 'completed'
+    && Boolean(message.content.trim())
+}
+
+/** 手动朗读：点击本身就是用户手势，浏览器不会拦自动播放。 */
+function onSpeechPlay(message: Message) {
+  if (!cid) return
+  void playSpeech({ consultationId: cid, messageId: message.id, text: message.content })
+}
+
+/**
+ * 接手排队的自动朗读。挂载时取一次（队列已就绪的常见情况），
+ * 再用 watch 兜住「组件先挂载、请求后到」的竞态。
+ */
+function consumePendingSpeech() {
+  // 接手方必须是「挂载时的会话就是当前会话」的实例：新会话首条消息发出后，旧实例的 `cid`
+  // 已被改写成本次新建的会话，但它马上会被 `router.replace` 换掉，不能让它接手。
+  if (mountedCid !== cid) return
+  const queued = pendingSpeech.value
+  if (!queued || queued.consultationId !== cid) return
+  const taken = takePendingSpeech(cid)
+  if (taken) void playSpeech(taken)
+}
+
+watch(pendingSpeech, consumePendingSpeech)
+
+function toggleSpeechMode() {
+  speechMode.value = !speechMode.value
+  if (!speechMode.value) stopSpeech()
+}
+
+/**
+ * 回答完成后按需自动朗读（契约 §2.1）：用户明确要求（服务端 `speechOutputIntent`）或模式开着。
+ *
+ * 只在文字回答**已经显示完成**、并且人还在同一会话时才出声；用户明确说出的方言只覆盖本轮，
+ * 不改本机默认偏好（契约 §6.3）。
+ */
+function autoSpeakAnswer(
+  userMessage: Message,
+  answer: Message,
+  expectedCid: string,
+  userId?: string,
+) {
+  const intent = userMessage.speechOutputIntent
+  if (intent?.requested !== true && !speechMode.value) return
+  if (!answer.content.trim()) return
+  if (cid !== expectedCid) return
+  if (userId && auth.user?.id !== userId) return
+  const request = {
+    consultationId: expectedCid,
+    messageId: answer.id,
+    text: answer.content,
+    presetOverride: intent?.speechPreset || undefined,
+  }
+  clearPendingSpeech()
+  // 本实例即将被 `router.replace` 换掉时（新会话首条消息）**不能**在这里播：
+  // 播放刚开始就会被卸载流程取消，用户开了语音模式却听不到第一条回答。
+  // 判据是「挂载时的会话 id 与本次回答的会话是否一致」，不能看 `route.params.id`——
+  // 那段 replace 已经执行过了，此刻两者必然相等。
+  if (mountedCid !== expectedCid) {
+    rememberPendingSpeech(request)
+    return
+  }
+  void playSpeech(request)
+}
+
 const documentDialogVisible = ref(false)
 const documentDialogError = ref('')
+/**
+ * 这个浏览器是否已经确认过说明版本（用户 2026-09-28 决定：每次生成都弹确认弹窗，
+ * 已确认过时只显示短提示、不再要求勾选，这样 PPT 模板入口随时可达）。
+ */
+const documentNoticeAlreadyAccepted = ref(false)
 /** 取消首次说明后的短提示：说明没有建任务、不会扣费，以及怎么再来一次。 */
 const documentCancelNotice = ref('')
 /** 待提交的来源：命中文档意图的用户消息（只留 id，主题原文不落前端状态）。 */
@@ -169,6 +287,8 @@ watch(displayedVoiceNotice, (message) => {
 }, { immediate: true })
 
 async function startRecording() {
+  // 语音对话模式下扬声器可能正在朗读：先停播，避免自己的声音被麦克风重新录进去（契约 §2.3④）。
+  stopSpeech()
   voiceNotice.value = ''
   if (!voiceConsentSeen.value) {
     try {
@@ -436,6 +556,7 @@ async function loadModels() {
     const preferred = models.value.find(model => model.isDefault) || models.value[0]
     if (!models.value.some(model => model.id === selectedModelId.value)) {
       selectedModelId.value = preferred?.id || ''
+      rememberCurrentUserSelectedModelId(selectedModelId.value)
     }
     if (!models.value.length) modelsError.value = '暂无可用模型；紧急症状预检仍可使用，普通问题将先保存但不能生成回答'
   } catch (e) {
@@ -480,6 +601,10 @@ async function load(older = false) {
 }
 onMounted(() => {
   void loadModels()
+  // 音色/方言白名单只在服务端维护，拉不到时前端退回「只普通话」的最小兜底（契约 §3.1）。
+  void loadSpeechPresets()
+  // 接手上一实例排队的自动朗读：新会话首条消息的 `router.replace` 会重新挂载本组件。
+  consumePendingSpeech()
   if (cid) void load()
   else if (draft.value) nextTick(() => input.value?.focus())
   if (!voiceTipSeen.value) {
@@ -491,6 +616,9 @@ onBeforeUnmount(() => {
   if (voiceNoticeTimer !== undefined) clearTimeout(voiceNoticeTimer)
   // 本地缩略图是内存里的 Object URL，卸载时必须释放。
   releaseAttachmentPreviews()
+  // 语音输出同理：切会话/退出登录都会重新挂载本组件，音频与请求必须在这里收干净
+  // （组合式自己也注册了一次卸载释放，这里是显式收口）。
+  stopSpeech()
 })
 const retryableModelErrors = new Set([
   'AI_PROVIDER_TIMEOUT',
@@ -510,6 +638,7 @@ async function generateAnswer(
   answerFormat: AnswerFormat,
   attempted = new Set<string>(),
 ) {
+  const requestUserId = auth.user?.id
   retrievalNotice.value = ''
   rememberRetrievalNotice(auth.user?.id, cid, '')
   attempted.add(modelId)
@@ -559,6 +688,9 @@ async function generateAnswer(
     } else {
       scrollBottom()
     }
+    // 语音输出（方案 §2.1）：文字回答**先保存并显示完成**，再按需请求这条回答的语音；
+    // 语音请求失败只影响语音本身，文字、引用与其它功能都不受影响。
+    autoSpeakAnswer(userMessage, completed, cid, requestUserId)
   } catch (caught) {
     if (caught instanceof DOMException && caught.name === 'AbortError') {
       if (placeholder.content && !placeholder.content.includes('（回答已停止生成）')) {
@@ -693,6 +825,8 @@ async function submitFollowUp(message: Message, answers: FollowUpAnswers) {
   await sendContent(formatFollowUpAnswers(message.followUp, answers))
 }
 function stopGeneration() {
+  // 停止生成时同时停止朗读并释放音频（契约 §2.3⑤）。
+  stopSpeech()
   generationController?.abort()
 }
 
@@ -776,10 +910,10 @@ function startDocumentGeneration(source: Message) {
   documentSource.value = { id: source.id }
   documentDialogError.value = ''
   documentCancelNotice.value = ''
-  if (readDocumentGenerationNoticeVersion() === DOCUMENT_GENERATION_NOTICE_VERSION) {
-    void runDocumentGeneration()
-    return
-  }
+  // 每次都先弹确认弹窗（用户 2026-09-28 决定）。已确认过说明时只是短版、不再要求勾选；
+  // 这一步同时是 PPT 模板的入口——原来「记住版本就直接生成」会让老用户没有地方选模板。
+  documentNoticeAlreadyAccepted.value =
+    readDocumentGenerationNoticeVersion() === DOCUMENT_GENERATION_NOTICE_VERSION
   documentDialogVisible.value = true
 }
 
@@ -787,10 +921,11 @@ function startDocumentGeneration(source: Message) {
  * 真正提交。失败只显示受控原因，**不回退聊天模型**。
  * 幂等键由组合式按 `sourceMessageId` 复用，前端重复点击不会重复计费。
  */
-async function runDocumentGeneration() {
+async function runDocumentGeneration(payload?: { templateFile: File | null }) {
   const pending = documentSource.value
   if (!pending) return
-  const result = await submitDocument(pending.id)
+  // 模板只在用户于确认弹窗里主动选过 `.pptx` 时才有值；没选就仍走原来的 JSON 创建接口（契约 §3.3）。
+  const result = await submitDocument(pending.id, payload?.templateFile ?? null)
   if (result.ok) {
     rememberDocumentGenerationNoticeVersion(DOCUMENT_GENERATION_NOTICE_VERSION)
     documentDialogError.value = ''
@@ -1000,6 +1135,18 @@ onBeforeRouteUpdate(canLeave)
                 v-if="!message.followUp && message.citations?.length"
                 :citations="message.citations"
               />
+              <!-- 语音输出（契约 §6.2）：只在已完成且有正文的助手回答上出现，用户消息没有入口。
+                   播放器是整页单例，所以「继续」走同一条播放调用——同一条消息已有音频时不会重新合成。 -->
+              <MessageSpeechControl
+                v-if="canSpeakMessage(message)"
+                :state="speechStateFor(message.id)"
+                :error="speechErrorFor(message.id)"
+                :preset-label="speechPresetLabel"
+                @play="onSpeechPlay(message)"
+                @pause="pauseSpeech"
+                @resume="onSpeechPlay(message)"
+                @stop="stopSpeech"
+              />
               <PathologyCardOffer
                 v-if="canOfferPathologyCard(message)"
                 :loading="cardGeneratingSourceId === message.id"
@@ -1067,11 +1214,35 @@ onBeforeRouteUpdate(canLeave)
         <label class="sr-only" for="symptom-input">症状或健康问题</label>
         <textarea id="symptom-input" ref="input" v-model="draft" :maxlength="DRAFT_LIMIT" rows="3" :disabled="saving || generating || !ready"
           :placeholder="composerPlaceholder" @keydown="keydown"></textarea>
+        <!-- 语音输出偏好（契约 §6.3）：模式必须由用户主动点击开启；方言与语速只发产品枚举，
+             前端不认识供应商 voice/instruction，也不允许用户自定义。 -->
+        <div class="speech-prefs">
+          <button
+            class="speech-mode-button"
+            :class="{ active: speechMode }"
+            type="button"
+            :aria-pressed="speechMode"
+            :title="speechMode
+              ? '关闭语音对话模式'
+              : '开启语音对话模式：每条科普回答完成后自动朗读（仍是按键录音，不是持续监听）'"
+            @click="toggleSpeechMode"
+          >{{ speechMode ? '语音对话模式：已开启' : '语音对话模式' }}</button>
+          <!-- 用原生 select：音色/语速是低频偏好，不值得为它引入组件库控件，
+               也避免抢走「输入区第一个 ElSelect」这类既有定位（那条断言指向模型选择器）。 -->
+          <select v-model="speechPreset" class="speech-preset-select" aria-label="选择朗读音色">
+            <option v-for="item in speechPresets" :key="item.id" :value="item.id">{{ item.label }}</option>
+          </select>
+          <select v-model="speechRate" class="speech-rate-select" aria-label="选择朗读语速">
+            <option v-for="item in SPEECH_RATE_OPTIONS" :key="item.value" :value="item.value">{{ item.label }}</option>
+          </select>
+          <span v-if="speechPresetsNotice" class="speech-presets-notice">{{ speechPresetsNotice }}</span>
+        </div>
         <div class="composer-bottom">
           <HospitalNavigator />
           <div class="send-area">
             <el-select
               v-model="selectedModelId"
+              @change="rememberCurrentUserSelectedModelId"
               class="model-select"
               aria-label="选择回答模型"
               :disabled="modelsLoading || saving || generating"
@@ -1116,7 +1287,7 @@ onBeforeRouteUpdate(canLeave)
           </div>
         </div>
       </form>
-      <div class="composer-meta"><span>仅提供健康科普与就医分流，不作确诊，不替代医生；上传的文档不会被用来下诊断。</span><span>可用输入法语音输入（如豆包输入法） · 也可点麦克风录音 · 回形针直接打开文件选择器，文档与图片按类型自动分流 · Enter 发送 · Shift + Enter 换行</span></div>
+      <div class="composer-meta"><span>仅提供健康科普与就医分流，不作确诊，不替代医生；上传的文档不会被用来下诊断。</span><span>可用输入法语音输入（如豆包输入法） · 也可点麦克风录音 · 回形针直接打开文件选择器，文档与图片按类型自动分流 · 每条回答可点「朗读」，也可直接说「请用语音回答」 · Enter 发送 · Shift + Enter 换行</span></div>
     </div>
     <ImageUploadDialog
       v-model="imageDialogVisible"
@@ -1134,6 +1305,7 @@ onBeforeRouteUpdate(canLeave)
       v-model="documentDialogVisible"
       :submitting="documentSubmitting"
       :error="documentDialogError"
+      :already-accepted="documentNoticeAlreadyAccepted"
       @confirm="runDocumentGeneration"
     />
   </main>
@@ -1162,6 +1334,16 @@ textarea::placeholder { color: #99a5b0; }
 .composer-bottom { justify-content: space-between; }
 .send-area { justify-content: flex-end; }
 .model-select { width: 190px; }
+.speech-prefs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.speech-mode-button { padding: 5px 10px; border: 1px solid #d7e3ee; border-radius: 9px; background: #fff;
+  color: #4b7ea6; font-size: 12px; cursor: pointer; }
+.speech-mode-button:hover { border-color: #9cc3e0; background: #f4faff; }
+.speech-mode-button.active { border-color: #9cc3e0; background: #eef6fe; color: #22628f; }
+.speech-preset-select, .speech-rate-select { padding: 5px 8px; border: 1px solid #d7e3ee; border-radius: 9px;
+  background: #fff; color: #4b7ea6; font-size: 12px; cursor: pointer; }
+.speech-preset-select { width: 148px; }
+.speech-rate-select { width: 110px; }
+.speech-presets-notice { color: #bf7a15; font-size: 11px; }
 .model-option { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .model-option small { color: #93a1ae; }
 .model-error, .voice-tip, .voice-notice { margin-bottom: 12px; }

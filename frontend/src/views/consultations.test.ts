@@ -259,6 +259,8 @@ describe('真实咨询界面', () => {
     const { wrapper } = await setup()
     const select = wrapper.findComponent({ name: 'ElSelect' })
     select.vm.$emit('update:modelValue', 'deepseek-v4-flash')
+    select.vm.$emit('change', 'deepseek-v4-flash')
+    expect(window.localStorage.getItem('medical-assistant:selected-model:u1')).toBe('deepseek-v4-flash')
     await wrapper.get('textarea').setValue('请解释最近的头痛')
     await wrapper.get('form').trigger('submit')
     await flushPromises()
