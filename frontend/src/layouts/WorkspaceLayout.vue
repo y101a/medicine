@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { computed, ref, watch, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { House, ChatDotRound, Clock, Setting, Plus, Fold, Expand, ArrowDown } from '@element-plus/icons-vue'
+import { House, ChatDotRound, Clock, Collection, Setting, Plus, Fold, Expand, ArrowDown } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../stores/auth'
 import { getApiErrorMessage } from '../api/http'
 import { useConsultationsStore } from '../stores/consultations'
 import { useHealthRecordsStore } from '../stores/healthRecords'
+import { usePrivateKnowledgeStore } from '../stores/privateKnowledge'
 import HealthRecordNoticeDialog from '../components/HealthRecordNoticeDialog.vue'
 
 const store = useAuthStore()
 const consultations = useConsultationsStore()
 const healthRecords = useHealthRecordsStore()
+const privateKnowledge = usePrivateKnowledgeStore()
 watch(() => store.user?.id, (id) => {
   if (id) {
     void consultations.load()
@@ -20,7 +22,10 @@ watch(() => store.user?.id, (id) => {
   }
 }, { immediate: true })
 // 离开工作区（退出登录或登录态失效）时清空，避免下一个账号看到上一个用户的记录。
-onUnmounted(() => healthRecords.reset())
+onUnmounted(() => {
+  healthRecords.reset()
+  privateKnowledge.reset()
+})
 const route = useRoute()
 const router = useRouter()
 const collapsed = ref(false)
@@ -32,12 +37,15 @@ const title = computed(() => ({
   chat: '智能咨询',
   consultation: '智能咨询',
   history: '咨询历史',
+  'private-knowledge': '我的知识库',
   settings: '设置',
 }[String(route.name)] || '病理诊断科普助手'))
 const links = [
   { path: '/app', label: '首页', icon: House, names: ['home'] },
   { path: '/app/chat', label: '智能咨询', icon: ChatDotRound, names: ['chat', 'consultation'] },
   { path: '/app/history', label: '咨询历史', icon: Clock, names: ['history'] },
+  // 方案 §8.1：私人资料要有独立入口，不放进公共医学知识搜索页，也不塞进附件弹窗。
+  { path: '/app/private-knowledge', label: '我的知识库', icon: Collection, names: ['private-knowledge'] },
 ]
 async function newChat() {
   await router.push({ path: '/app/chat', query: { new: String(Date.now()) } })

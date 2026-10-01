@@ -101,3 +101,29 @@ export function rememberDocumentGenerationNoticeVersion(version: string): void {
     // 同上：写不进去也不影响本次会话内已经确认的效果。
   }
 }
+
+/**
+ * 「我的知识库」上传说明版本。与配图/文档生成同理记「已确认的说明版本」而不是 true：
+ * 说明升版要重新确认一次。**用户取消上传时不写这个键**（与方案 §8.2「取消不记版本」同一原则）。
+ *
+ * 只新增键与两个读写函数，没有改动上面任何既有键或语义。
+ */
+export const PRIVATE_KNOWLEDGE_NOTICE_STORAGE_KEY = 'medical-assistant:private-knowledge-notice-version'
+
+/** 已确认过的私人知识库上传说明版本；与当前版本不一致时需要重新确认一次。 */
+export function readPrivateKnowledgeNoticeVersion(): string {
+  try {
+    return window.localStorage.getItem(PRIVATE_KNOWLEDGE_NOTICE_STORAGE_KEY) || ''
+  } catch {
+    // 隐私模式等场景：当作「没确认过」，只是多弹一次说明，不影响使用。
+    return ''
+  }
+}
+
+export function rememberPrivateKnowledgeNoticeVersion(version: string): void {
+  try {
+    window.localStorage.setItem(PRIVATE_KNOWLEDGE_NOTICE_STORAGE_KEY, version)
+  } catch {
+    // 同上：写不进去也不影响本次会话内已经确认的效果。
+  }
+}
