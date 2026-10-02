@@ -109,7 +109,7 @@ test('智能咨询隐藏页面级滚动条，只保留消息区域滚动条', as
     return { htmlScrollbarWidth: html.scrollbarWidth, bodyScrollbarWidth: body.scrollbarWidth }
   })
 
-  expect(outerScrollStyle.overflowY, '工作区内容仍应可通过滚轮滚动').toBe('auto')
+  expect(outerScrollStyle.overflowY, '历史对话外层不应响应滚轮滚动').toBe('hidden')
   expect(outerScrollStyle.scrollbarWidth, '最右侧页面级滚动条应隐藏').toBe('none')
   expect(recentScrollStyle.overflowY, '最近咨询列表仍应可滚动').toBe('auto')
   expect(recentScrollStyle.scrollbarWidth, '最近咨询列表不应再显示第二个滚动条').toBe('none')

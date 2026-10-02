@@ -117,7 +117,10 @@ async function menu(command: string) {
           </el-dropdown-menu></template>
         </el-dropdown>
       </header>
-      <div class="workspace-content"><router-view :key="route.fullPath" /></div>
+      <div
+        class="workspace-content"
+        :class="{ 'workspace-content--chat': route.name === 'chat' || route.name === 'consultation' }"
+      ><router-view :key="route.fullPath" /></div>
     </div>
     <HealthRecordNoticeDialog />
     <p class="viewport-hint" role="status">
@@ -201,6 +204,7 @@ nav a.selected { background: #e7f0fa; color: #196db2; font-weight: 600; }
   scrollbar-width: none;
 }
 .workspace-content::-webkit-scrollbar { display: none; }
+.workspace-content--chat { overflow: hidden; }
 /* 正式入口已移入账号菜单。旧组件暂留在 DSH 在途的输入框结构中，避免并行改同一文件；在工作区内不显示。 */
 .workspace-content :deep(.composer-bottom .hospital-navigator--button) { display: none; }
 button:focus-visible, a:focus-visible { outline: 2px solid #398ad0; outline-offset: 3px; }

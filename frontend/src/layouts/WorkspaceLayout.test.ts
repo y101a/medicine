@@ -136,14 +136,14 @@ describe('工作区布局与健康记录接入', () => {
     wrapper.unmount()
   })
 
-  it('工作区内容可继续滚动，但不显示页面级滚动条', async () => {
+  it('智能咨询固定工作区外层，只保留消息区域滚动', async () => {
     const { wrapper, router } = await setup()
 
     await router.push('/app/chat')
     await flushPromises()
 
     const content = wrapper.get('.workspace-content')
-    expect(content.classes()).not.toContain('workspace-content--chat')
+    expect(content.classes()).toContain('workspace-content--chat')
     wrapper.unmount()
   })
 
