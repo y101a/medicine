@@ -88,6 +88,23 @@ test('右上角账号菜单提供附近医院导航，并保留定位说明', as
   await expect(page.locator('.composer-bottom .navigator-trigger')).toBeHidden()
 })
 
+test('智能咨询隐藏页面级滚动条，只保留消息区域滚动条', async ({ page }) => {
+  await installApiStubs(page)
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.goto('/app/chat')
+  await waitForRendered(page)
+
+  const outerScrollStyle = await page.locator('.workspace-content').evaluate(element => {
+    const style = getComputedStyle(element)
+    return { overflowY: style.overflowY, scrollbarWidth: style.scrollbarWidth }
+  })
+  const conversationOverflow = await page.locator('.conversation').evaluate(element => getComputedStyle(element).overflowY)
+
+  expect(outerScrollStyle.overflowY, '工作区内容仍应可通过滚轮滚动').toBe('auto')
+  expect(outerScrollStyle.scrollbarWidth, '最右侧页面级滚动条应隐藏').toBe('none')
+  expect(conversationOverflow, '对话消息区域应保留独立滚动').toBe('auto')
+})
+
 test('移动端：记录工作区 1000px 桌面优先约束（已知范围问题，非缺陷）', async ({ page }) => {
   await installApiStubs(page)
   await page.setViewportSize({ width: 375, height: 720 })

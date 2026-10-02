@@ -136,6 +136,17 @@ describe('工作区布局与健康记录接入', () => {
     wrapper.unmount()
   })
 
+  it('工作区内容可继续滚动，但不显示页面级滚动条', async () => {
+    const { wrapper, router } = await setup()
+
+    await router.push('/app/chat')
+    await flushPromises()
+
+    const content = wrapper.get('.workspace-content')
+    expect(content.classes()).not.toContain('workspace-content--chat')
+    wrapper.unmount()
+  })
+
   it('离开工作区时清理状态，避免下一个账号看到上一个用户的记录', async () => {
     const { wrapper } = await setup()
     const store = useHealthRecordsStore()

@@ -183,7 +183,15 @@ nav a.selected { background: #e7f0fa; color: #196db2; font-weight: 600; }
 .user-avatar { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #edf3fa; color: #3777ad; }
 .user-avatar { overflow: hidden; }
 .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.workspace-content { flex: 1; min-height: 0; overflow: auto; }
+.workspace-content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  /* 首页、设置等内容可继续鼠标滚动，但不显示最右侧整页滚动条。 */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.workspace-content::-webkit-scrollbar { display: none; }
 /* 正式入口已移入账号菜单。旧组件暂留在 DSH 在途的输入框结构中，避免并行改同一文件；在工作区内不显示。 */
 .workspace-content :deep(.composer-bottom .hospital-navigator--button) { display: none; }
 button:focus-visible, a:focus-visible { outline: 2px solid #398ad0; outline-offset: 3px; }
