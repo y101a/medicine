@@ -26,6 +26,18 @@ body,
   margin: 0;
 }
 
+/* 页面根节点仍可响应滚轮，但不显示浏览器最外层滚动条；具体内容区自行管理滚动。 */
+html,
+body {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;
+}
+
 body {
   min-height: 100vh;
 }

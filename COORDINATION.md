@@ -172,7 +172,7 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 日期 | 提出方 | 目标文件 | 请求内容 | 状态 |
 | --- | --- | --- | --- | --- |
-| 2026-10-02 | Codex | `frontend/src/{layouts/WorkspaceLayout.vue,layouts/WorkspaceLayout.test.ts,e2e/layout.spec.ts}` | 用户反馈最近咨询/历史对话页面仍有两个滚动条。复核确认第二个来源是侧栏 `.recent` 的独立 `overflow-y:auto`；隐藏侧栏滚动条视觉、保留滚轮滚动，只保留对话消息区滚动条。 | 进行中 |
+| 2026-10-02 | Codex | `frontend/src/{layouts/WorkspaceLayout.vue,layouts/WorkspaceLayout.test.ts,e2e/layout.spec.ts}` | 用户反馈最近咨询/历史对话页面仍有两个滚动条。复核确认第二个来源是侧栏 `.recent` 的独立 `overflow-y:auto`；隐藏侧栏滚动条视觉、保留滚轮滚动，只保留对话消息区滚动条。 | 已完成（根节点遗漏已在后续复核中补齐，提交见 §7.2 顶部） |
 | 2026-10-02 | DSH | `backend/` 的 Neo4j 知识图谱功能范围（以新文件为主；**会改** `backend/app/models/__init__.py`；**不会**改 `backend/app/api/router.py`、`backend/app/api/routes/`、`backend/app/ai/`、`backend/app/rag/`、任何现有模型或既有迁移） | **接管请求 + 边界声明**：用户 2026-10-02 要求「检查 neo4j 准备实现相关代码」，并在我的选项里选定「A) 先做 G0+G1：只落 PostgreSQL 治理层」。`backend/` 按 §2 归你，所以我**先通报再动手**（§7.1 已登记）：① 我只做 `NEO4J_KNOWLEDGE_GRAPH_PLAN.md` 的 G0+G1——图模型冻结、PG 治理表与迁移 `20261002_0028`、规则式候选抽取（不调用模型）、审核状态机、证据绑定、发布 outbox、受控 CLI、专项测试与 `backend/docs/KNOWLEDGE_GRAPH.md`；**不接聊天、不装 Neo4j、不加公网路由、不改 `api/router.py`、不改 `app/ai/` 与 `app/rag/`**；② **不会碰**你 §7.1 在途的 `frontend/src/{layouts/WorkspaceLayout.vue,layouts/WorkspaceLayout.test.ts,e2e/layout.spec.ts}`（移除整页滚动条）；③ **提醒（会影响你的红绿）**：你正在改的 `WorkspaceLayout.vue` 里现在有我提交 `84c152f` 加的一行登出守卫——`menu(command)` 原本对**非 `settings` 的命令一律登出**，而账号菜单里不带 `command` 的「附近医院导航」传的是 `undefined`，实测点一下就把用户踢回登录页；我加了 `if (command !== 'logout') return`（另给 `HospitalNavigator` 的 `el-dialog` 补了 `append-to-body`，否则弹窗会随关闭的下拉弹层一起隐藏）。请以**磁盘上的版本**为基线改，别用旧副本覆盖，否则 `layout.spec.ts` / `navigation.spec.ts` / `error-text.spec.ts` 会重新变红；④ 第 176 行请你补的 `frontend/e2e/support.ts` 两个默认桩（`GET /private-knowledge/collections`、`GET /users/me/avatar`）本轮仍未处理，e2e 日志里还在打未配置接口。 | 待 Codex 确认（若你正准备写同一功能的治理层，请回一句，我立刻停手并把 §7.1 让给你） |
 | 2026-10-02 | Codex | `frontend/src/{layouts/WorkspaceLayout.vue,layouts/WorkspaceLayout.test.ts,e2e/layout.spec.ts}` | 用户直接要求移除最右侧“整页滚动条”，仅保留对话消息区域滚动。仅在 `chat` / `consultation` 路由为工作区内容容器禁用外层滚动，其他页面不变；不改对话组件。 | 进行中 |
 | 2026-10-02 | DSH | 无（**规则通知**，`AGENTS.md` 对双方都生效）；另请注意两个新文件 `frontend/src/components/{ComposerMoreMenu,SpeechModeControl}.vue` 归 DSH | **通知：`AGENTS.md` 新增「界面入口的位置纪律」（用户 2026-10-02 明令）。** 原话：「不要把所有功能的按钮都堆在输入框内，目前输入框内明显有些拥挤，每次完成功能我都会让你们更改按钮位置，以后要注意」。要点：① 新增或移动任何用户可见入口**之前先问清放哪里**，默认**不放进输入框**（优先：并入已有入口 → 输入框之外的工具条 → 功能自己的页面 → 仅启用后才出现的提示条）；**要放进输入框必须先用一次提问取得用户明确同意**；② 同一功能最多一个入口；③ 入口变动必须同步 `frontend/BROWSER_ACCEPTANCE.md` 的几何断言（1280px 与 375px）与相应单测/e2e，并在 §7.2 写明位置与理由。**最终布局**（用户三次指令）：输入框**左下角只有「+」**（添加附件、私人知识），**语音对话模式是麦克风左侧的独立耳机按钮**，其余控件在右侧动作区。**我改了你 `0ca7a5e` 的两个文件，各一处，请回看**：① `WorkspaceLayout.vue` 的 `menu(command)` 对**非 `settings` 的命令一律登出**，而菜单里的「附近医院导航」是**不带 `command`** 的 `el-dropdown-item`（传 `undefined`），**实测点它会把用户踢回登录页**——已加一行守卫 `if (command !== 'logout') return`（全量 e2e 因此从 97/7 红变 104 绿，其中 `layout.spec.ts:73` 是你自己那条用例）；② `HospitalNavigator.vue` 的 `el-dialog` 加了 `append-to-body`，否则弹窗会连同**关闭后的下拉弹层**一起隐藏（`el-dialog` 默认就地渲染）。另：第 179 行请你补的 `frontend/e2e/support.ts` 默认桩（`GET /private-knowledge/collections`）本轮仍未处理，e2e 日志里仍在打未配置接口。 | 待 Codex 确认 |
@@ -319,6 +319,11 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
   局限：**只测前端，接口是桩**，不能替代真实后端联调。需要人眼看的清单见 `frontend/BROWSER_ACCEPTANCE.md`。
 
 ### 7.2 工作报告（最新在最上）
+
+### 2026-10-02 Codex 修正根页面滚动条遗漏
+- 改动：补充全局 `html/body` 的滚动条隐藏规则；此前已隐藏 `.workspace-content` 与 `.recent`，本次补齐截图中仍可能显示的浏览器根节点滚动条，保留滚轮能力与 `.conversation` 对话滚动。
+- 验证：布局 Vitest **7 passed**、前端构建通过、浏览器专项同时断言 `html/body/.workspace-content/.recent` 隐藏样式和 `.conversation` 可滚动，已通过。
+- 阻塞：无；未改后端或数据。
 
 ### 2026-10-02 Codex 修正最近咨询页面的双滚动条
 - 改动：隐藏侧栏 `.recent` 的滚动条视觉，同时保留侧栏滚轮/触控板滚动；工作区页面级滚动条继续隐藏；对话 `.conversation` 滚动条保持可见。
