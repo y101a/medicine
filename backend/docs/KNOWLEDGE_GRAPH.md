@@ -134,8 +134,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_knowledge_graph_smoke.ps1
 
 冒烟脚本在**一次性数据库 `kg_cli_smoke`** 里跑完整链路（建库 → 迁移 → 造一篇已审核文档 →
 登记概念 → 抽候选 → 审核 → 发布 → 取任务 → 回写成功 → verify → 制造正文漂移 → verify 退出码 1
-→ retire-stale → verify 恢复干净），结束后删库并打印 dev 库的 `graph_*` 表数量（应为 0，
-证明 dev 库没有被写入）。当前结果：**21 步全通过**。
+→ retire-stale → verify 恢复干净），结束后删库，**再连回真实开发库**逐张打印五个 `graph_*` 表的
+行数（应为 0，证明整轮没有写进 dev 库）。当前结果：**21 步全通过**；dev 库 `medical_assistant`
+停在迁移 `20261002_0028`，`graph_concepts` / `graph_concept_aliases` / `graph_claims` /
+`graph_claim_evidence` / `graph_publication_jobs` 均为 **0 行**。
 
 已知的既有问题（**不是**本轮引入）：`alembic check` 在仓库范围内并不干净——它报告
 `generated_documents`/`message_private_knowledge_citations` 的 CHECK 约束命名漂移，以及

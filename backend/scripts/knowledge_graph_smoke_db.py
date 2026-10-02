@@ -15,6 +15,13 @@ from app.db.session import SessionLocal
 from app.models.knowledge import KnowledgeChunk, KnowledgeDocument, KnowledgeSource
 
 SMOKE_DB = "kg_cli_smoke"
+GRAPH_TABLES = [
+    "graph_concepts",
+    "graph_concept_aliases",
+    "graph_claims",
+    "graph_claim_evidence",
+    "graph_publication_jobs",
+]
 CHUNKS = [
     "肺癌的常见表现包括咳嗽、咯血和胸痛。出现咯血应尽快到胸外科就诊。戒烟是最重要的自我照护措施。",
     "本页内容正在整理中。",
@@ -120,18 +127,23 @@ async def drift() -> None:
 
 
 async def drop() -> None:
-    """删临时库，并确认 dev 库里没有多出 graph_* 表。"""
+    """删临时库，并确认**真实开发库**里的图谱表没有被写入。"""
 
     connection = await _admin_connection()
     try:
         await connection.execute(f"DROP DATABASE IF EXISTS {SMOKE_DB} WITH (FORCE)")
-        count = await connection.fetchval(
-            "select count(*) from information_schema.tables "
-            "where table_schema = 'public' and table_name like 'graph_%'"
-        )
-        print(f"dev db graph tables: {count}")
     finally:
         await connection.close()
+    settings = get_settings()
+    dev = await _admin_connection(settings.postgres_db)
+    try:
+        head = await dev.fetchval("select version_num from alembic_version")
+        print(f"dev db {settings.postgres_db} alembic head: {head}")
+        for table in GRAPH_TABLES:
+            count = await dev.fetchval("select count(*) from " + table)
+            print(f"  {table}: {count} rows")
+    finally:
+        await dev.close()
 
 
 if __name__ == "__main__":
