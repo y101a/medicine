@@ -21,7 +21,7 @@
 | --- | --- |
 | G0 模型冻结 + 小型金标准 | 已落地（见第 3 节与 `tests/test_knowledge_graph_candidates.py` 的 `GOLD_*`） |
 | G1 PostgreSQL 治理层 | 已落地：5 张表、迁移 `20261002_0028`、规则式候选抽取、审核状态机、发布 outbox、受控 CLI、测试、冒烟脚本 |
-| G2 Neo4j 投影 | **未做**：本机没有 Neo4j 服务，`pyproject.toml` 里没有 driver，没有 worker |
+| G2 Neo4j 投影 | **未做**：本机没有 Neo4j 服务，`pyproject.toml` 里没有 driver，没有 worker。**用户 2026-10-02 决定：暂不安装/下载 Neo4j**，等进入 G2 时再拉 `neo4j:5-community` 镜像并加默认关闭的 compose profile（见 `PROJECT_PROGRESS.md` ADR-012） |
 | G3 运行时接线 / G4 上下文注入 / G5 前端探索器 | **未做** |
 
 因此现在**没有任何用户可见行为依赖图谱**：它不影响问答，也不影响检索。回答仍走原有
