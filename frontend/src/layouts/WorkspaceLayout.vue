@@ -29,6 +29,15 @@ onUnmounted(() => {
 })
 const route = useRoute()
 const router = useRouter()
+watch(() => route.name, (name) => {
+  const locked = name === 'chat' || name === 'consultation'
+  document.documentElement.classList.toggle('chat-viewport-locked', locked)
+  document.body.classList.toggle('chat-viewport-locked', locked)
+}, { immediate: true })
+onUnmounted(() => {
+  document.documentElement.classList.remove('chat-viewport-locked')
+  document.body.classList.remove('chat-viewport-locked')
+})
 const collapsed = ref(false)
 const avatarFailed = ref(false)
 watch(() => store.avatarUrl, () => { avatarFailed.value = false })
@@ -205,6 +214,8 @@ nav a.selected { background: #e7f0fa; color: #196db2; font-weight: 600; }
 }
 .workspace-content::-webkit-scrollbar { display: none; }
 .workspace-content--chat { overflow: hidden; }
+:global(html.chat-viewport-locked),
+:global(body.chat-viewport-locked) { overflow-y: hidden; overscroll-behavior-y: none; }
 /* 正式入口已移入账号菜单。旧组件暂留在 DSH 在途的输入框结构中，避免并行改同一文件；在工作区内不显示。 */
 .workspace-content :deep(.composer-bottom .hospital-navigator--button) { display: none; }
 button:focus-visible, a:focus-visible { outline: 2px solid #398ad0; outline-offset: 3px; }

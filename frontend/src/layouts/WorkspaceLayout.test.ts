@@ -65,6 +65,7 @@ async function setup() {
     routes: [
       { path: '/app', name: 'home', component: { template: '<p>home</p>' } },
       { path: '/app/chat', name: 'chat', component: { template: '<p>chat</p>' } },
+      { path: '/app/consultations/:id', name: 'consultation', component: { template: '<p>consultation</p>' } },
       { path: '/app/history', name: 'history', component: { template: '<p>history</p>' } },
       { path: '/app/settings', name: 'settings', component: { template: '<p>settings</p>' } },
     ],
@@ -136,7 +137,7 @@ describe('工作区布局与健康记录接入', () => {
     wrapper.unmount()
   })
 
-  it('智能咨询固定工作区外层，只保留消息区域滚动', async () => {
+  it('智能咨询与历史会话锁定文档滚动，离开后恢复', async () => {
     const { wrapper, router } = await setup()
 
     await router.push('/app/chat')
@@ -144,6 +145,18 @@ describe('工作区布局与健康记录接入', () => {
 
     const content = wrapper.get('.workspace-content')
     expect(content.classes()).toContain('workspace-content--chat')
+    expect(document.documentElement.classList.contains('chat-viewport-locked')).toBe(true)
+    expect(document.body.classList.contains('chat-viewport-locked')).toBe(true)
+
+    await router.push('/app/consultations/c1')
+    await flushPromises()
+    expect(wrapper.get('.workspace-content').classes()).toContain('workspace-content--chat')
+    expect(document.documentElement.classList.contains('chat-viewport-locked')).toBe(true)
+
+    await router.push('/app')
+    await flushPromises()
+    expect(document.documentElement.classList.contains('chat-viewport-locked')).toBe(false)
+    expect(document.body.classList.contains('chat-viewport-locked')).toBe(false)
     wrapper.unmount()
   })
 

@@ -88,10 +88,23 @@ test('右上角账号菜单提供附近医院导航，并保留定位说明', as
   await expect(page.locator('.composer-bottom .navigator-trigger')).toBeHidden()
 })
 
-test('智能咨询隐藏页面级滚动条，只保留消息区域滚动条', async ({ page }) => {
-  await installApiStubs(page)
+test('历史聊天固定视口页面，只允许消息区滚动', async ({ page }) => {
+  await installApiStubs(page, {
+    extra: {
+      'GET /consultations/c-e2e': {
+        body: {
+          id: 'c-e2e',
+          title: '历史聊天滚动验证',
+          messageCount: 0,
+          createdAt: '2026-10-02T00:00:00Z',
+          updatedAt: '2026-10-02T00:00:00Z',
+        },
+      },
+      'GET /consultations/c-e2e/messages': { body: { items: [], hasMore: false } },
+    },
+  })
   await page.setViewportSize({ width: 1280, height: 800 })
-  await page.goto('/app/chat')
+  await page.goto('/app/consultations/c-e2e')
   await waitForRendered(page)
 
   const outerScrollStyle = await page.locator('.workspace-content').evaluate(element => {
@@ -106,7 +119,12 @@ test('智能咨询隐藏页面级滚动条，只保留消息区域滚动条', as
   const rootScrollStyle = await page.evaluate(() => {
     const html = getComputedStyle(document.documentElement)
     const body = getComputedStyle(document.body)
-    return { htmlScrollbarWidth: html.scrollbarWidth, bodyScrollbarWidth: body.scrollbarWidth }
+    return {
+      htmlScrollbarWidth: html.scrollbarWidth,
+      bodyScrollbarWidth: body.scrollbarWidth,
+      htmlOverflowY: html.overflowY,
+      bodyOverflowY: body.overflowY,
+    }
   })
 
   expect(outerScrollStyle.overflowY, '历史对话外层不应响应滚轮滚动').toBe('hidden')
@@ -115,7 +133,55 @@ test('智能咨询隐藏页面级滚动条，只保留消息区域滚动条', as
   expect(recentScrollStyle.scrollbarWidth, '最近咨询列表不应再显示第二个滚动条').toBe('none')
   expect(rootScrollStyle.htmlScrollbarWidth, 'html 根节点不应显示第三个滚动条').toBe('none')
   expect(rootScrollStyle.bodyScrollbarWidth, 'body 根节点不应显示第三个滚动条').toBe('none')
+  expect(rootScrollStyle.htmlOverflowY, '历史聊天期间文档根节点必须锁定纵向滚动').toBe('hidden')
+  expect(rootScrollStyle.bodyOverflowY, '历史聊天期间 body 必须锁定纵向滚动').toBe('hidden')
   expect(conversationOverflow, '对话消息区域应保留独立滚动').toBe('auto')
+
+  const conversation = page.locator('.conversation')
+  await conversation.evaluate((element) => {
+    const filler = document.createElement('div')
+    filler.dataset.scrollTestFiller = 'true'
+    filler.style.height = '2000px'
+    element.append(filler)
+    element.scrollTop = 0
+  })
+  const messageArea = await conversation.boundingBox()
+  expect(messageArea).not.toBeNull()
+  await page.mouse.move(messageArea!.x + messageArea!.width / 2, messageArea!.y + messageArea!.height / 2)
+  await page.mouse.wheel(0, 500)
+  await expect.poll(() => conversation.evaluate(element => element.scrollTop)).toBeGreaterThan(0)
+
+  const scrollStateAfterMessageWheel = await page.evaluate(() => ({
+    window: window.scrollY,
+    document: document.documentElement.scrollTop,
+    body: document.body.scrollTop,
+    workspace: document.querySelector('.workspace')?.scrollTop,
+    content: document.querySelector('.workspace-content')?.scrollTop,
+  }))
+  expect(scrollStateAfterMessageWheel, '滚动消息不能带动历史聊天整页').toEqual({
+    window: 0,
+    document: 0,
+    body: 0,
+    workspace: 0,
+    content: 0,
+  })
+
+  const topbar = await page.locator('.topbar').boundingBox()
+  expect(topbar).not.toBeNull()
+  const probeHeight = await page.evaluate(() => {
+    const probe = document.createElement('div')
+    probe.dataset.pageScrollProbe = 'true'
+    probe.style.cssText = 'position:absolute;top:1400px;left:0;width:1px;height:200px;pointer-events:none'
+    document.body.append(probe)
+    return document.documentElement.scrollHeight
+  })
+  expect(probeHeight, '滚轮验证前必须确保页面本身有可滚动溢出').toBeGreaterThan(800)
+  const messageScrollTop = await conversation.evaluate(element => element.scrollTop)
+  await page.mouse.move(topbar!.x + topbar!.width / 2, topbar!.y + topbar!.height / 2)
+  await page.mouse.wheel(0, 500)
+  await page.waitForTimeout(100)
+  expect(await conversation.evaluate(element => element.scrollTop), '滚动页面空白区不应移动消息列表').toBe(messageScrollTop)
+  expect(await page.evaluate(() => window.scrollY), '历史聊天视口不得随滚轮移动').toBe(0)
 })
 
 test('移动端：记录工作区 1000px 桌面优先约束（已知范围问题，非缺陷）', async ({ page }) => {

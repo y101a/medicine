@@ -246,6 +246,7 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 执行者 | 任务 | 正在改的文件 | 迁移编号 | 占用数据库 | 开始时间 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
+| Codex | **修复历史聊天滚轮仍移动整页**（2026-10-03 复核上次未生效）：聊天/历史详情路由给 `html/body` 加纵向滚动锁；保持工作区 1000px 窄屏约束和 `.conversation` 独立滚动；补真实历史路由的滚轮验证。 | `frontend/src/layouts/WorkspaceLayout.vue`、`frontend/src/layouts/WorkspaceLayout.test.ts`、`frontend/e2e/layout.spec.ts`、`COORDINATION.md` | 无 | 否 | 2026-10-03 | 已释放（报告见 §7.2 顶部） |
 | Codex | **锁定历史对话页外层滚动**（用户 2026-10-02 反馈鼠标滚轮仍能滚动页面）：只对 `chat/consultation` 禁用 `.workspace-content` 外层滚动，保留 HomeView `.conversation` 消息滚动；补单测与浏览器断言。 | `frontend/src/{layouts/WorkspaceLayout.vue,layouts/WorkspaceLayout.test.ts,e2e/layout.spec.ts}`、`COORDINATION.md` | 无 | 否 | 2026-10-02 | 已释放（提交与验证见 §7.2 顶部） |
 | Codex | **隐藏最近咨询侧栏滚动条**（用户 2026-10-02 反馈仍有两个滑动框）：保留侧栏列表滚轮能力，隐藏 `.recent` 的滚动条视觉；对话 `.conversation` 滚动条保持不变。 | `frontend/src/{layouts/WorkspaceLayout.vue,layouts/WorkspaceLayout.test.ts,e2e/layout.spec.ts}`、`COORDINATION.md` | 无 | 否 | 2026-10-02 | 已释放（提交与验证见 §7.2 顶部） |
 | DSH | **Neo4j 知识图谱 G0+G1：冻结图模型 + PostgreSQL 治理层**（用户 2026-10-02 要求「检查 neo4j 准备实现相关代码」，并在我的选项里选定「A) 先做 G0+G1：只落 PostgreSQL 治理层（推荐）」）：按 `NEO4J_KNOWLEDGE_GRAPH_PLAN.md` 做 ① G0 冻结 `conceptType` 五类、五个 predicate 白名单和「每条线上事实至少一条有效证据」规则，落成代码常量 + 文档 + 小型人工金标准；② G1 新增 `graph_concepts` / `graph_concept_aliases` / `graph_claims` / `graph_claim_evidence` / `graph_publication_jobs` 五个治理表与迁移 `20261002_0028`、规则式候选抽取（**不调用任何模型**）、审核状态机（发布/拒绝/退回/撤回）、证据绑定、文档 superseded/expired 的撤回校验、发布 outbox（**只入队，不含 Neo4j 写入**）；③ 受控 CLI（`app/knowledge_graph_cli.py`，仿 `app/rag/cli.py` 的 argparse + JSON 输出与退出码）：**不新增任何公网路由、不改 `backend/app/api/router.py`、不接聊天、不装 Neo4j、不调用付费接口**；④ 专项测试与 `backend/docs/KNOWLEDGE_GRAPH.md`。**`backend/` 按 §2 归 Codex，本次按用户指令接管该功能范围内的文件，已先在第 6 节通报。** | `backend/app/models/knowledge_graph.py`（新）、`backend/app/models/__init__.py`、`backend/migrations/versions/20261002_0028_knowledge_graph_governance.py`（新）、`backend/app/services/knowledge_graph_{vocabulary,registry,candidates,review,publication}.py`（新）、`backend/scripts/{run_knowledge_graph_smoke.ps1,knowledge_graph_smoke_db.py,knowledge_graph_smoke_concepts.json}`（新）、`backend/app/schemas/knowledge_graph.py`（新）、`backend/app/knowledge_graph_cli.py`（新）、`backend/tests/test_knowledge_graph_*.py`（新）、`backend/docs/KNOWLEDGE_GRAPH.md`（新）、`COORDINATION.md` | `20261002_0028` | 是（真实开发库：迁移 up/down 往返 + 完整 pytest；只写自编测试语料，不写真实用户资料、不调用付费模型/embedding） | 2026-10-02 | 已释放（提交 `2505640`；报告见 §7.2 顶部） |
@@ -320,6 +321,12 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
   局限：**只测前端，接口是桩**，不能替代真实后端联调。需要人眼看的清单见 `frontend/BROWSER_ACCEPTANCE.md`。
 
 ### 7.2 工作报告（最新在最上）
+
+### 2026-10-03 Codex 修复历史聊天滚轮仍移动整页
+- 改动：上次只锁 `.workspace-content`，没有锁文档根滚动；现进入 `chat/consultation` 时给 `html/body` 加 `chat-viewport-locked`，纵向溢出不再响应滚轮；路由离开或布局卸载时清理。聊天消息 `.conversation` 继续独立滚动。
+- 验证：历史会话路由浏览器用例人为制造整页溢出，确认滚轮不会移动页面、消息区仍可滚动；布局 Playwright **15 passed**、布局 Vitest **7 passed**、`npm run build` 通过。窄屏 1000px 工作区约束也通过。
+- 更正：首次尝试把整个工作区设为 `position:fixed`，被窄屏回归用例发现会取消页面横向溢出；该做法已撤销，最终修复保留既有窄屏布局行为。
+- 阻塞：无；未改后端或数据库。
 
 ### 2026-10-02 Codex 锁定历史对话页外层滚动
 - 改动：`chat/consultation` 路由的 `.workspace-content` 改为 `overflow:hidden`，仅 `.conversation` 接收滚轮；首页/设置等页面继续保留内容滚动。
