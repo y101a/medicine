@@ -54,20 +54,24 @@ function pickFile(page: Page) {
 }
 
 test.describe('病历文档附件', () => {
-  test('回形针按钮位于麦克风左侧', async ({ page }) => {
+  test('「+」独占输入框左下角，麦克风在右侧动作区，附件已收进菜单', async ({ page }) => {
     await installApiStubs(page, { extra: STUBS })
     await openComposer(page)
 
-    const attach = page.locator('button[aria-label="添加附件"]')
+    const more = page.locator('.composer-more-button')
     const mic = page.locator('button[aria-label="语音输入"]')
-    await expect(attach).toBeVisible()
-    const attachBox = await attach.boundingBox()
+    await expect(more).toBeVisible()
+    await expect(page.locator('button[aria-label="添加附件"]'), '附件已收进「+」菜单').toHaveCount(0)
+    const composerBox = await page.locator('.composer').boundingBox()
+    const moreBox = await more.boundingBox()
     const micBox = await mic.boundingBox()
-    expect(attachBox, '回形针应可测量').not.toBeNull()
+    expect(composerBox, '输入框应可测量').not.toBeNull()
+    expect(moreBox, '「+」入口应可测量').not.toBeNull()
     expect(micBox, '麦克风应可测量').not.toBeNull()
+    expect(moreBox!.x - composerBox!.x, '「+」应贴输入框左侧').toBeLessThan(composerBox!.width / 2)
     expect(
-      attachBox!.x + attachBox!.width,
-      `回形针右边界 ${Math.round(attachBox!.x + attachBox!.width)}px 应不晚于麦克风左边界 ${Math.round(micBox!.x)}px`,
+      moreBox!.x + moreBox!.width,
+      `「+」右边界 ${Math.round(moreBox!.x + moreBox!.width)}px 应不晚于麦克风左边界 ${Math.round(micBox!.x)}px`,
     ).toBeLessThanOrEqual(micBox!.x)
   })
 

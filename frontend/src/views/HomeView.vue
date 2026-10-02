@@ -12,14 +12,15 @@ import { usePrivateKnowledgeStore } from '../stores/privateKnowledge'
 import { privateKnowledgeErrorMessage } from '../types/privateKnowledgeUi'
 import { ApiError, getApiErrorMessage } from '../api/http'
 import type { AiModel, AnswerFormat, FollowUpAnswers, FollowUpCard, Message } from '../types/consultations'
-import { Top, ChatDotRound, Compass, Document, CloseBold, Microphone, Paperclip, Headset } from '@element-plus/icons-vue'
+import { Top, ChatDotRound, Compass, Document, CloseBold, Microphone } from '@element-plus/icons-vue'
 import medicalAiAvatar from '../assets/medical-ai-avatar.png'
 import AssistantAnswerCard from '../components/AssistantAnswerCard.vue'
 import StructuredFollowUpCard from '../components/StructuredFollowUpCard.vue'
 import EmergencyTriageCard from '../components/EmergencyTriageCard.vue'
 import ReferenceSources from '../components/ReferenceSources.vue'
 import PrivateKnowledgeReferences from '../components/PrivateKnowledgeReferences.vue'
-import PrivateKnowledgeSelector from '../components/PrivateKnowledgeSelector.vue'
+import ComposerMoreMenu from '../components/ComposerMoreMenu.vue'
+import SpeechModeControl from '../components/SpeechModeControl.vue'
 import MessageAttachments from '../components/MessageAttachments.vue'
 import HospitalNavigator from '../components/HospitalNavigator.vue'
 import PathologyCardOffer from '../components/PathologyCardOffer.vue'
@@ -52,7 +53,7 @@ import { useSpeechOutput } from '../composables/useSpeechOutput'
 import {
   clearPendingSpeech, pendingSpeech, rememberPendingSpeech, takePendingSpeech,
 } from '../composables/pendingSpeech'
-import { SPEECH_RATE_OPTIONS } from '../types/speech'
+import type { SpeechRate } from '../types/speech'
 
 const route = useRoute()
 const router = useRouter()
@@ -162,8 +163,6 @@ const {
  * **只在当前页面内存里**，不写 localStorage——刷新即回到关闭，避免公共电脑突然出声（§6.3）。
  */
 const speechMode = ref(false)
-/** 音色与语速属于语音对话模式的低频设置，只在耳机按钮上方的面板中按需显示。 */
-const speechSettingsVisible = ref(false)
 
 /** 只有「已完成且确实有正文」的助手回答才有朗读入口：用户消息、未完成、已停止的都没有。 */
 function canSpeakMessage(message: Message): boolean {
@@ -195,19 +194,30 @@ function consumePendingSpeech() {
 
 watch(pendingSpeech, consumePendingSpeech)
 
-function toggleSpeechSettings() {
-  if (!speechMode.value) {
-    speechMode.value = true
-    speechSettingsVisible.value = true
-    return
-  }
-  speechSettingsVisible.value = !speechSettingsVisible.value
+/**
+ * 「+」菜单里语音对话模式是一个明确的开关；音色与语速就在同一个面板里，
+ * 不再需要「先点开设置、再点一次收起」的两段式交互。
+ */
+function enableSpeechMode() {
+  speechMode.value = true
 }
 
 function disableSpeechMode() {
   speechMode.value = false
-  speechSettingsVisible.value = false
   stopSpeech()
+}
+
+// 菜单组件只上抛事件，真正的写入仍在本页，保持单一数据源。
+function updateSpeechPreset(value: string) {
+  speechPreset.value = value
+}
+
+function updateSpeechRate(value: SpeechRate) {
+  speechRate.value = value
+}
+
+function updateSelectedCollections(value: string[]) {
+  selectedPrivateKnowledgeIds.value = value
 }
 
 /**
@@ -422,9 +432,19 @@ async function loadDraftAttachments(id: string) {
   forgetSentAttachments(new Set(sentIds))
 }
 
-const attachTitle = computed(() => attachments.value.length >= ATTACHMENT_LIMIT
-  ? `一次最多带上 ${ATTACHMENT_LIMIT} 份附件`
-  : '添加附件：可选病历文档（PDF / Word / PPT / txt / md）或图片（报告、片子、患处照片）')
+/**
+ * 「+」菜单里「选择文档或图片」不可用时的**原因**（空字符串表示可用）。
+ * 以前这个按钮只是变灰，用户点下去没有任何反馈；现在原因直接写在菜单面板里，
+ * 这是用户反馈「点击没反应」的第二处根因。
+ */
+const attachmentsDisabledReason = computed(() => {
+  if (attachmentUploading.value) return '正在解析上一个附件，稍后再添加'
+  if (attachments.value.length >= ATTACHMENT_LIMIT) return `一次最多带上 ${ATTACHMENT_LIMIT} 份附件`
+  if (saving.value) return '正在发送，稍后再添加'
+  if (generating.value) return '正在生成回答，稍后再添加'
+  if (!ready.value) return '会话还在加载，稍后再添加'
+  return ''
+})
 /**
  * 已上传图片的类别与能力边界。类别来自服务端自动分类的响应，前端只如实展示；
  * 被判为「无关 / 看不清」的图片根本不会进这个列表（契约第 10.2 节）。
@@ -1256,8 +1276,23 @@ onBeforeRouteUpdate(canLeave)
         <textarea id="symptom-input" ref="input" v-model="draft" :maxlength="DRAFT_LIMIT" rows="3" :disabled="saving || generating || !ready"
           :placeholder="composerPlaceholder" @keydown="keydown"></textarea>
         <div class="composer-bottom">
-          <HospitalNavigator />
+          <!-- 左下角只留一个「+」（附件与私人知识），其余控件全部靠右（用户 2026-10-02 指令）。 -->
+          <div class="composer-tools">
+            <ComposerMoreMenu
+              :attachments-disabled-reason="attachmentsDisabledReason"
+              :attachment-count="attachments.length"
+              :attachment-limit="ATTACHMENT_LIMIT"
+              :collections="privateKnowledge.collections"
+              :collections-loading="privateKnowledge.loading"
+              :collections-error="privateKnowledge.error"
+              :selected-collection-ids="selectedPrivateKnowledgeIds"
+              @add-attachment="chooseAttachments"
+              @update:selected-collection-ids="updateSelectedCollections"
+              @retry-collections="privateKnowledge.load"
+            />
+          </div>
           <div class="send-area">
+            <HospitalNavigator />
             <el-select
               v-model="selectedModelId"
               @change="rememberCurrentUserSelectedModelId"
@@ -1284,66 +1319,18 @@ onBeforeRouteUpdate(canLeave)
             <button v-if="voiceState === 'recording'" class="voice-cancel" type="button" @click="cancelRecording">取消</button>
             <!-- 动作按钮整组不拆行：窗口很窄时让「设置」与「动作」分成两行，而不是把发送键单独挤到下一行。 -->
             <div class="send-actions">
-            <PrivateKnowledgeSelector
-              v-model="selectedPrivateKnowledgeIds"
-              :collections="privateKnowledge.collections"
-              :loading="privateKnowledge.loading"
-              :disabled="saving || generating || !ready"
+            <!-- 语音对话模式已从「+」里分离出来：独立入口，放在麦克风左侧。 -->
+            <SpeechModeControl
+              :speech-mode="speechMode"
+              :presets="speechPresets"
+              :preset="speechPreset"
+              :rate="speechRate"
+              :presets-notice="speechPresetsNotice"
+              @enable="enableSpeechMode"
+              @disable="disableSpeechMode"
+              @update:preset="updateSpeechPreset"
+              @update:rate="updateSpeechRate"
             />
-            <!-- 语音模式首次点击即开启并向上展开设置；开启后耳机只负责展开/收起，避免用户
-                 为了改音色误把模式关掉。真正的关闭动作放在面板内并明确标注。 -->
-            <div class="speech-mode-menu">
-              <button
-                class="speech-mode-button"
-                :class="{ active: speechMode }"
-                type="button"
-                :aria-pressed="speechMode"
-                :aria-expanded="speechSettingsVisible"
-                aria-controls="speech-settings-panel"
-                :aria-label="speechMode
-                  ? (speechSettingsVisible ? '收起语音设置' : '打开语音设置')
-                  : '开启语音对话模式并设置音色与语速'"
-                :title="speechMode
-                  ? (speechSettingsVisible ? '收起语音设置（模式保持开启）' : '语音对话模式已开启，点此设置音色与语速')
-                  : '开启语音对话模式：回答完成后自动朗读'"
-                @click="toggleSpeechSettings"
-              ><el-icon :size="18"><Headset /></el-icon></button>
-              <div
-                v-if="speechMode && speechSettingsVisible"
-                id="speech-settings-panel"
-                class="speech-settings-panel"
-                role="dialog"
-                aria-label="语音对话设置"
-                @keydown.esc="speechSettingsVisible = false"
-              >
-                <div class="speech-settings-header">
-                  <div><strong>语音对话模式</strong><small>回答完成后自动朗读</small></div>
-                  <button type="button" class="speech-mode-disable" @click="disableSpeechMode">关闭模式</button>
-                </div>
-                <label class="speech-setting-field">
-                  <span>音色</span>
-                  <select v-model="speechPreset" class="speech-preset-select" aria-label="选择朗读音色">
-                    <option v-for="item in speechPresets" :key="item.id" :value="item.id">{{ item.label }}</option>
-                  </select>
-                </label>
-                <label class="speech-setting-field">
-                  <span>语速</span>
-                  <select v-model="speechRate" class="speech-rate-select" aria-label="选择朗读语速">
-                    <option v-for="item in SPEECH_RATE_OPTIONS" :key="item.value" :value="item.value">{{ item.label }}</option>
-                  </select>
-                </label>
-                <span v-if="speechPresetsNotice" class="speech-presets-notice" role="status">{{ speechPresetsNotice }}</span>
-                <small class="speech-settings-note">仍需按麦克风说话，不会持续监听。</small>
-              </div>
-            </div>
-            <button
-              class="attach-button"
-              type="button"
-              :disabled="attachmentUploading || saving || generating || !ready || attachments.length >= ATTACHMENT_LIMIT"
-              aria-label="添加附件"
-              :title="attachTitle"
-              @click="chooseAttachments"
-            ><el-icon :size="18"><Paperclip /></el-icon></button>
             <button
               class="voice-button"
               :class="{ recording: voiceState === 'recording' }"
@@ -1360,7 +1347,7 @@ onBeforeRouteUpdate(canLeave)
           </div>
         </div>
       </form>
-      <div class="composer-meta"><span>仅提供健康科普与就医分流，不作确诊，不替代医生；上传的文档不会被用来下诊断。</span><span>可用输入法语音输入（如豆包输入法） · 也可点麦克风录音 · 回形针直接打开文件选择器，文档与图片按类型自动分流 · 默认只对你说「请用语音回答」的回答朗读，也可点每条回答下的「朗读」<template v-if="speechMode"> · <strong class="speech-mode-hint">语音对话模式已开启：回答完成后会自动朗读</strong></template> · Enter 发送 · Shift + Enter 换行</span></div>
+      <div class="composer-meta"><span>仅提供健康科普与就医分流，不作确诊，不替代医生；上传的文档不会被用来下诊断。</span><span>可用输入法语音输入（如豆包输入法） · 也可点麦克风录音 · 点输入框左下角的「+」添加附件（文档与图片按类型自动分流）、选私人知识 · 麦克风左侧的耳机键开关语音对话模式 · 默认只对你说「请用语音回答」的回答朗读，也可点每条回答下的「朗读」<template v-if="speechMode"> · <strong class="speech-mode-hint">语音对话模式已开启：回答完成后会自动朗读</strong></template> · Enter 发送 · Shift + Enter 换行</span></div>
     </div>
     <ImageUploadDialog
       v-model="imageDialogVisible"
@@ -1403,7 +1390,10 @@ h1 { font-size: 34px; font-weight: 600; letter-spacing: 1px; color: #253c52; mar
 .composer:focus-within { border-color: #8cb9de; box-shadow: 0 0 0 3px #f1f7fc; }
 textarea { display: block; width: 100%; min-height: 70px; max-height: 200px; resize: vertical; border: none; outline: none; font: inherit; font-size: 14px; line-height: 1.8; color: #324e67; background: transparent; }
 textarea::placeholder { color: #99a5b0; }
-.composer-bottom, .send-area { display: flex; align-items: center; gap: 12px; }
+.composer-bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+/* 左下角工具区只放「+」；右侧动作区靠右对齐（用户 2026-10-02：加号在左下角、其余在右边）。 */
+.composer-tools { display: flex; align-items: center; gap: 10px; }
+.send-area { display: flex; align-items: center; gap: 12px; margin-left: auto; }
 .composer-bottom { justify-content: space-between; }
 /* 动作用一行放不下时（窗口较窄）在动作区内部换行，不把底栏整体拆成两段。 */
 .send-area { justify-content: flex-end; flex-wrap: wrap; }
@@ -1412,30 +1402,7 @@ textarea::placeholder { color: #99a5b0; }
 .model-select { width: 190px; }
 .speech-mode-hint { color: #1f6396; font-weight: 600; }
 /* 音色和语速收进耳机按钮的上拉设置，不再常驻占用输入框底栏。 */
-.speech-mode-menu { display: inline-flex; }
-.speech-mode-button { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid #d7e3ee;
-  border-radius: 10px; background: #fff; color: #4b7ea6; cursor: pointer; }
-.speech-mode-button:hover { border-color: #9cc3e0; background: #f4faff; }
-.speech-mode-button:focus-visible, .speech-mode-disable:focus-visible,
-.speech-preset-select:focus-visible, .speech-rate-select:focus-visible { outline: 2px solid #4b91c4; outline-offset: 2px; }
-.speech-mode-button.active { border-color: #7fb3d8; background: #e8f3fd; color: #1f6396; }
-.speech-settings-panel { position: absolute; z-index: 30; right: 20px; bottom: 60px; width: min(280px, calc(100% - 40px));
-  box-sizing: border-box; padding: 14px; border: 1px solid #cfe0ee; border-radius: 13px; background: #fff;
-  box-shadow: 0 12px 32px rgb(38 74 104 / 16%); color: #405c73; }
-.speech-settings-panel::after { position: absolute; right: 126px; bottom: -6px; width: 10px; height: 10px;
-  border-right: 1px solid #cfe0ee; border-bottom: 1px solid #cfe0ee; background: #fff; content: ''; transform: rotate(45deg); }
-.speech-settings-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-.speech-settings-header div { display: grid; gap: 3px; }
-.speech-settings-header strong { color: #315a79; font-size: 13px; }
-.speech-settings-header small, .speech-settings-note { color: #8a9aaa; font-size: 11px; line-height: 1.5; }
-.speech-mode-disable { border: none; padding: 2px 0; background: transparent; color: #6c879c; font-size: 11px; cursor: pointer; }
-.speech-mode-disable:hover { color: #286b9d; }
-.speech-setting-field { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: center; gap: 8px; margin-top: 8px;
-  color: #70879a; font-size: 12px; }
-.speech-preset-select, .speech-rate-select { width: 100%; min-width: 0; padding: 7px 9px; border: 1px solid #d7e3ee;
-  border-radius: 9px; background: #fff; color: #416681; font-size: 12px; cursor: pointer; }
-.speech-presets-notice { display: block; margin-top: 8px; color: #bf7a15; font-size: 11px; line-height: 1.5; }
-.speech-settings-note { display: block; margin-top: 10px; }
+/* 语音设置面板与附件入口已移入 `components/ComposerMoreMenu.vue`（输入框减负，用户 2026-10-02 明令）。 */
 .model-option { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .model-option small { color: #93a1ae; }
 .model-error, .voice-tip, .voice-notice { margin-bottom: 12px; }
@@ -1447,9 +1414,6 @@ textarea::placeholder { color: #99a5b0; }
 .voice-button.recording { border-color: #e2b1ab; background: #fdf1f0; color: #c0492f; }
 .voice-cancel { border: none; padding: 0; background: transparent; color: #8798a8; font-size: 11px; cursor: pointer; }
 .voice-cancel:hover { color: #52697d; }
-.attach-button { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid #d7e3ee; border-radius: 10px; background: #fff; color: #4b7ea6; cursor: pointer; }
-.attach-button:hover:not(:disabled) { border-color: #9cc3e0; background: #f4faff; }
-.attach-button:disabled { border-color: #e6ecf2; background: #f3f6f9; color: #b3c1cd; cursor: default; }
 .attachment-notice { margin-bottom: 12px; }
 .attachment-tray { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
 .attachment-item { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid #dbe7f1; border-radius: 10px; background: #f7fbff; color: #4b6480; font-size: 11px; }

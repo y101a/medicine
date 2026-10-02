@@ -53,6 +53,10 @@ async function newChat() {
 }
 async function menu(command: string) {
   if (command === 'settings') return router.push('/app/settings')
+  // 账号菜单里除了「设置 / 退出登录」，还可能有不带 `command` 的条目（2026-10-02 加入的
+  // 「附近医院导航」就是这样）：只有明确的 `logout` 才允许登出。此前这里落到默认分支，
+  // 点一下导航入口就会把用户踢回登录页（e2e 7 项红的根因，已实测复现）。
+  if (command !== 'logout') return
   if (store.pendingAction === 'logout') return
   try {
     await store.logout()

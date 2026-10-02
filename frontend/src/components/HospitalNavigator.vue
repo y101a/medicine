@@ -126,7 +126,10 @@ function formatDuration(seconds?: number | null) {
       <span><strong>附近医院导航</strong><small>定位仅用于本次查询，不保存</small></span>
     </button>
 
-    <el-dialog v-model="visible" title="附近医院导航" width="min(680px, 92vw)" destroy-on-close>
+    <!-- `append-to-body` 是必需的：入口 2026-10-02 移进账号下拉菜单后，弹窗若仍就地渲染，
+         会连同**关闭后的下拉弹层**一起被隐藏（Element Plus 的 el-dialog 默认不传送，
+         而 getByRole 默认忽略不可见元素，表现为「点了没反应」）。 -->
+    <el-dialog v-model="visible" title="附近医院导航" width="min(680px, 92vw)" destroy-on-close append-to-body>
       <el-alert
         title="如有胸痛、严重呼吸困难、疑似卒中等危急表现，请立即拨打 120，不要自行驾车。"
         type="error"

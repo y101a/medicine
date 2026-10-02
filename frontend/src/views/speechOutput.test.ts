@@ -466,37 +466,34 @@ describe('对话页接线（HomeView）', () => {
     expect(consultationsApi.stream).toHaveBeenCalledTimes(1)
   })
 
-  it('语音对话模式：默认隐藏设置，开启后上拉，可收起或在面板内关闭', async () => {
+  it('语音对话模式：默认关闭；点耳机面板里的「开启」后可选音色与语速，关闭后不再自动朗读', async () => {
     await setup('/app/chat')
     await sendMessage(wrapper as VueWrapper, '头痛怎么办')
     expect(speechApi.synthesize).not.toHaveBeenCalled()
 
-    const modeButton = Array.from(document.querySelectorAll<HTMLButtonElement>('.speech-mode-button'))[0]
-    expect(modeButton.getAttribute('aria-pressed')).toBe('false')
-    expect(document.querySelector('.speech-settings-panel')).toBeNull()
-    expect(document.querySelector('.speech-preset-select')).toBeNull()
-    modeButton.click()
+    // 默认关闭：耳机上 aria-pressed=false，面板里没有音色/语速。
+    const mode = document.querySelector<HTMLButtonElement>('.speech-mode-button')
+    expect(mode, '输入区应有语音对话模式入口').toBeTruthy()
+    expect(mode?.getAttribute('aria-pressed')).toBe('false')
+    mode?.click()
     await nextTick()
-    expect(modeButton.getAttribute('aria-pressed')).toBe('true')
-    expect(modeButton.getAttribute('aria-expanded')).toBe('true')
     expect(document.querySelector('.speech-settings-panel')).toBeTruthy()
+    expect(document.querySelector('.speech-preset-select')).toBeNull()
+    expect(document.querySelector('.speech-rate-select')).toBeNull()
+
+    // 开启后音色与语速就在同一个面板里。
+    document.querySelector<HTMLButtonElement>('.speech-mode-enable')?.click()
+    await nextTick()
     expect(document.querySelector('.speech-preset-select')).toBeTruthy()
     expect(document.querySelector('.speech-rate-select')).toBeTruthy()
 
-    // 开启后耳机只控制设置面板，不会因为收起面板而误关自动朗读。
-    modeButton.click()
-    await nextTick()
-    expect(modeButton.getAttribute('aria-pressed')).toBe('true')
-    expect(document.querySelector('.speech-settings-panel')).toBeNull()
-    modeButton.click()
-    await nextTick()
+    // 面板内关闭模式：设置随之收起。
     document.querySelector<HTMLButtonElement>('.speech-mode-disable')?.click()
     await nextTick()
-    expect(modeButton.getAttribute('aria-pressed')).toBe('false')
-    expect(document.querySelector('.speech-settings-panel')).toBeNull()
+    expect(document.querySelector('.speech-preset-select')).toBeNull()
 
     // 再开启，证明关闭后仍可恢复，并沿用原来的自动朗读链路。
-    modeButton.click()
+    document.querySelector<HTMLButtonElement>('.speech-mode-enable')?.click()
     await nextTick()
 
     await sendMessage(wrapper as VueWrapper, '再讲讲注意事项')
@@ -510,8 +507,10 @@ describe('对话页接线（HomeView）', () => {
       value: vi.fn().mockRejectedValue(blocked), configurable: true,
     })
     await setup('/app/chat', [userMessage, completedAnswer])
-    // 模式开关必须由用户点击（契约 §6.3：默认关闭）。
-    Array.from(document.querySelectorAll<HTMLButtonElement>('.speech-mode-button'))[0].click()
+    // 模式开关必须由用户点击（契约 §6.3：默认关闭），入口是发送键左侧的耳机按钮。
+    document.querySelector<HTMLButtonElement>('.speech-mode-button')?.click()
+    await nextTick()
+    document.querySelector<HTMLButtonElement>('.speech-mode-enable')?.click()
     await nextTick()
 
     await sendMessage(wrapper as VueWrapper, '头痛怎么办')

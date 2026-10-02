@@ -99,7 +99,9 @@ test('导航接口返回结构化报文时，错误提示不出现原始 JSON', 
 
   await page.goto('/app/chat')
   await settle(page)
-  await page.locator('.navigator-trigger').click()
+  // 导航入口 2026-10-02 起在右上角账号菜单里（`0ca7a5e`），输入框里的触发器已隐藏。
+  await page.locator('.user-menu').click()
+  await page.locator('.navigator-menu-item').click()
   await page.getByRole('button', { name: '不使用定位' }).click()
   await page.getByLabel('城市或行政区编码').fill('北京')
   await page.getByRole('button', { name: '查询医院' }).click()

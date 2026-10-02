@@ -26,18 +26,29 @@ const DIALOG = '附近医院导航'
 async function openNavigator(page: import('@playwright/test').Page) {
   await page.goto('/app/chat')
   await settle(page)
-  await page.locator('.navigator-trigger').click()
+  // 入口 2026-10-02 已按用户要求从输入框移到右上角账号菜单（Codex 提交 `0ca7a5e`）。
+  await page.locator('.user-menu').click()
+  await page.locator('.navigator-menu-item').click()
   await expect(page.locator('.el-dialog', { hasText: DIALOG })).toBeVisible()
 }
 
-test('导航入口显示本次定位不保存的隐私提示', async ({ page }) => {
+test('账号菜单里的导航入口在申请定位前先说明用途', async ({ page }) => {
   await installApiStubs(page)
   await page.goto('/app/chat')
   await settle(page)
 
-  const privacyHint = page.locator('.navigator-trigger small')
-  await expect(privacyHint).toBeVisible()
-  await expect(privacyHint).toHaveText('定位仅用于本次查询，不保存')
+  // 输入框里的旧触发器已隐藏：全页只剩账号菜单这一个入口。
+  await expect(page.locator('.composer-bottom .navigator-trigger'), '输入框里不该再出现导航入口').toBeHidden()
+  await page.locator('.user-menu').click()
+  const item = page.locator('.navigator-menu-item')
+  await expect(item, '账号菜单里应有「附近医院导航」').toBeVisible()
+  await expect(item).toContainText('附近医院导航')
+  await item.click()
+
+  // 隐私说明必须在**申请定位之前**就出现，而不是等用户点了定位才补上。
+  const consent = page.locator('.location-consent p')
+  await expect(consent, '申请定位前必须先说明用途').toContainText('坐标仅在本次请求内存中使用')
+  await expect(consent, '必须说明不落库不写日志').toContainText('不会保存')
 })
 
 async function failGeolocation(

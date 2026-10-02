@@ -75,14 +75,18 @@ async function openComposer(page: Page) {
   if (await tip.isVisible()) await tip.locator('.el-alert__close-btn').click()
 }
 
-function attachButton(page: Page) {
-  return page.locator('button[aria-label="添加附件"]')
+function moreMenuButton(page: Page) {
+  return page.locator('.composer-more-button')
 }
 
-/** 单击附件按钮就直接弹系统文件选择器——不再有「上传文档 / 上传图片」菜单。 */
+/**
+ * 附件入口收在输入框唯一的「+」菜单里（用户 2026-10-02 明令减负）：
+ * 开菜单 → 点「选择文档或图片」→ 直接弹系统文件选择器，中间没有「上传文档 / 上传图片」二选一。
+ */
 async function pickFiles(page: Page, files: { name: string; mimeType: string; buffer: Buffer }[]) {
   const chooser = page.waitForEvent('filechooser')
-  await attachButton(page).click()
+  await moreMenuButton(page).click()
+  await page.locator('.composer-more-menu .add-attachment').click()
   await (await chooser).setFiles(files)
 }
 
@@ -110,29 +114,37 @@ async function confirmDialog(page: Page, agree = true) {
 }
 
 test.describe('图片上传与识别', () => {
-  test('附件按钮在麦克风左侧，单击直接打开本机文件选择器（没有菜单）', async ({ page }) => {
+  test('「+」独占输入框左下角，点「选择文档或图片」直接打开本机文件选择器', async ({ page }) => {
     await installApiStubs(page, { extra: STUBS })
     await openComposer(page)
 
-    const attach = attachButton(page)
+    const more = moreMenuButton(page)
     const mic = page.locator('button[aria-label="语音输入"]')
-    await expect(attach).toBeVisible()
+    await expect(more).toBeVisible()
+    await expect(page.locator('button[aria-label="添加附件"]'), '附件已收进「+」菜单').toHaveCount(0)
     await expect(page.locator('button[aria-label="添加图片"]'), '不应再有独立图片按钮').toHaveCount(0)
 
-    const attachBox = await attach.boundingBox()
+    const composerBox = await page.locator('.composer').boundingBox()
+    const moreBox = await more.boundingBox()
     const micBox = await mic.boundingBox()
-    expect(attachBox, '附件按钮应可测量').not.toBeNull()
+    expect(composerBox, '输入框应可测量').not.toBeNull()
+    expect(moreBox, '「+」入口应可测量').not.toBeNull()
     expect(micBox, '麦克风应可测量').not.toBeNull()
+    expect(moreBox!.x - composerBox!.x, '「+」应贴输入框左侧').toBeLessThan(composerBox!.width / 2)
     expect(
-      attachBox!.x + attachBox!.width,
-      `附件按钮右边界 ${Math.round(attachBox!.x + attachBox!.width)}px 应不晚于麦克风左边界 ${Math.round(micBox!.x)}px`,
+      moreBox!.x + moreBox!.width,
+      `「+」右边界 ${Math.round(moreBox!.x + moreBox!.width)}px 应不晚于麦克风左边界 ${Math.round(micBox!.x)}px`,
     ).toBeLessThanOrEqual(micBox!.x)
 
-    // 单击即进系统文件选择器；中途不该冒出「上传文档 / 上传图片」菜单
+    // 菜单项单击即进系统文件选择器；菜单里不该再冒出「上传文档 / 上传图片」二选一
     const chooser = page.waitForEvent('filechooser')
-    await attach.click()
+    await more.click()
+    const item = page.locator('.composer-more-menu .add-attachment')
+    await expect(item, '「+」菜单里应有添加附件项').toBeVisible()
+    await expect(item).toContainText('选择文档或图片')
     await expect(page.getByText('上传文档', { exact: true }), '不该再有上传菜单').toHaveCount(0)
     await expect(page.getByText('上传图片', { exact: true }), '不该再有上传菜单').toHaveCount(0)
+    await item.click()
     await (await chooser).setFiles([])
   })
 

@@ -725,13 +725,17 @@ describe('病历文档附件', () => {
     )
   }
 
-  it('附件按钮位于麦克风左侧，并带无障碍标签', async () => {
+  it('「+」独占输入框左下角；语音对话模式在麦克风左侧，附件不再单独占按钮', async () => {
     const { wrapper } = await setup()
-    // 附件按钮就在输入区里，与麦克风同为 .send-area 下的按钮。
+    // 左下角工具区只放一个「+」（附件与私人知识收在它的面板里）。
+    const tools = wrapper.findAll('.composer-tools button').map(button => button.attributes('aria-label'))
+    expect(tools).toHaveLength(1)
+    expect(tools[0]).toContain('更多功能')
+    // 右侧动作区紧挨麦克风左侧的是语音对话模式入口（用户 2026-10-02 要求它独立出来）。
     const labels = wrapper.findAll('.send-area button')
       .map(button => button.attributes('aria-label'))
-    expect(labels).toContain('添加附件')
-    expect(labels[labels.indexOf('语音输入') - 1]).toBe('添加附件')
+    expect(labels).not.toContain('添加附件')
+    expect(labels[labels.indexOf('语音输入') - 1]).toBe('开启语音对话模式并设置音色与语速')
     wrapper.unmount()
   })
 

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { nextTick } from 'vue'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
@@ -167,28 +168,37 @@ async function uploadImageDirect(wrapper: VueWrapper, files: File[] = [imageFile
 }
 
 describe('图片上传与识别（前端）', () => {
-  it('只有一个附件按钮，位于麦克风左侧，并带无障碍标签', async () => {
+  it('「+」独占输入框左下角，语音对话模式在麦克风左侧，附件不再单独占按钮', async () => {
     const { wrapper } = await setup()
+    // 左下角工具区只放一个「+」（附件与私人知识收在它的面板里）。
+    const tools = wrapper.findAll('.composer-tools button').map(button => button.attributes('aria-label'))
+    expect(tools).toHaveLength(1)
+    expect(tools[0]).toContain('更多功能')
     const labels = wrapper.findAll('.send-area button').map(button => button.attributes('aria-label'))
-    expect(labels.filter(label => label === '添加附件')).toHaveLength(1)
+    expect(labels).not.toContain('添加附件')
     expect(labels).not.toContain('添加图片')
-    expect(labels[labels.indexOf('语音输入') - 1]).toBe('添加附件')
+    expect(labels[labels.indexOf('语音输入') - 1]).toBe('开启语音对话模式并设置音色与语速')
     wrapper.unmount()
   })
 
-  it('点附件按钮直接打开本机文件选择器，一个选择器同时收文档与图片', async () => {
+  it('「+」菜单里的「选择文档或图片」直接打开本机文件选择器，一个选择器同时收文档与图片', async () => {
     const { wrapper } = await setup()
     const clickSpy = vi.spyOn(HTMLInputElement.prototype, 'click')
-    await wrapper.get('button[aria-label="添加附件"]').trigger('click')
+    await wrapper.get('.composer-more-button').trigger('click')
+    await nextTick()
+    const item = document.querySelector<HTMLButtonElement>('.composer-more-menu .add-attachment')
+    expect(item, '「+」菜单里应有添加附件项').toBeTruthy()
+    item?.click()
+    await nextTick()
 
     const clickedInput = clickSpy.mock.instances[0] as HTMLInputElement | undefined
-    expect(clickedInput, '按钮应直接触发本机文件选择器').toBeDefined()
+    expect(clickedInput, '菜单项应直接触发本机文件选择器').toBeDefined()
     const accept = clickedInput?.getAttribute('accept') || ''
     expect(accept).toContain('.pdf')
     expect(accept).toContain('.docx')
     expect(accept).toContain('image/jpeg')
     expect(accept).toContain('image/png')
-    // 只剩一个文件入口，因此也不该再有菜单
+    // 全页仍只有这一个文件入口，且不经过 el-upload/dropdown 之类的中间件。
     expect(wrapper.findAll('input[type="file"]')).toHaveLength(1)
     expect(document.querySelector('.el-dropdown-menu')).toBeNull()
     wrapper.unmount()
