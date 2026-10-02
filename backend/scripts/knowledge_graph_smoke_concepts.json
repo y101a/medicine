@@ -1,0 +1,10 @@
+{
+  "concepts": [
+    {"conceptType": "topic", "canonicalName": "肺癌", "aliases": ["支气管肺癌", "肺癌"]},
+    {"conceptType": "symptom", "canonicalName": "咳嗽", "aliases": []},
+    {"conceptType": "symptom", "canonicalName": "胸痛", "aliases": []},
+    {"conceptType": "red_flag", "canonicalName": "咯血", "aliases": []},
+    {"conceptType": "department", "canonicalName": "胸外科", "aliases": []},
+    {"conceptType": "self_care", "canonicalName": "戒烟", "aliases": []}
+  ]
+}
