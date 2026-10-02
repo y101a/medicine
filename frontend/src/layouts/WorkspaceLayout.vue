@@ -156,7 +156,16 @@ async function menu(command: string) {
 .workspace.collapsed { grid-template-columns: 76px minmax(0, 1fr); }
 .sidebar { display: flex; flex-direction: column; padding: 28px 16px 14px; background: #f6f8fb; border-right: 1px solid #e8edf3; }
 .sidebar { min-height: 0; }
-.recent { overflow-y: auto; margin: 22px 0; font-size: 12px; color: #8a99a8; }
+.recent {
+  overflow-y: auto;
+  margin: 22px 0;
+  font-size: 12px;
+  color: #8a99a8;
+  /* 最近咨询仍可滚轮查看，但不再与消息区同时显示第二个滚动条。 */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.recent::-webkit-scrollbar { display: none; }
 .recent p { padding: 0 12px; }
 .recent > span { display: block; padding: 8px 12px; line-height: 1.8; }
 .recent a { display: block; padding: 10px 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; border-radius: 8px; color: #647588; }

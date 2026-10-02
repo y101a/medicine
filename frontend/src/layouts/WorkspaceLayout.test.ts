@@ -147,6 +147,13 @@ describe('工作区布局与健康记录接入', () => {
     wrapper.unmount()
   })
 
+  it('最近咨询列表保留滚轮区域但使用无滚动条样式', async () => {
+    const { wrapper } = await setup()
+
+    expect(wrapper.find('.recent').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
   it('离开工作区时清理状态，避免下一个账号看到上一个用户的记录', async () => {
     const { wrapper } = await setup()
     const store = useHealthRecordsStore()

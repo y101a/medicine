@@ -98,10 +98,16 @@ test('智能咨询隐藏页面级滚动条，只保留消息区域滚动条', as
     const style = getComputedStyle(element)
     return { overflowY: style.overflowY, scrollbarWidth: style.scrollbarWidth }
   })
+  const recentScrollStyle = await page.locator('.recent').evaluate(element => {
+    const style = getComputedStyle(element)
+    return { overflowY: style.overflowY, scrollbarWidth: style.scrollbarWidth }
+  })
   const conversationOverflow = await page.locator('.conversation').evaluate(element => getComputedStyle(element).overflowY)
 
   expect(outerScrollStyle.overflowY, '工作区内容仍应可通过滚轮滚动').toBe('auto')
   expect(outerScrollStyle.scrollbarWidth, '最右侧页面级滚动条应隐藏').toBe('none')
+  expect(recentScrollStyle.overflowY, '最近咨询列表仍应可滚动').toBe('auto')
+  expect(recentScrollStyle.scrollbarWidth, '最近咨询列表不应再显示第二个滚动条').toBe('none')
   expect(conversationOverflow, '对话消息区域应保留独立滚动').toBe('auto')
 })
 
