@@ -14,6 +14,12 @@ const city = ref('')
 const items = ref<HospitalNavigationItem[]>([])
 const notice = ref('')
 const error = ref('')
+const props = withDefaults(defineProps<{
+  /** 账号菜单内使用精简菜单项；默认保留独立按钮，兼容既有挂载点。 */
+  trigger?: 'button' | 'menu'
+}>(), {
+  trigger: 'button',
+})
 
 const hasResults = computed(() => items.value.length > 0)
 
@@ -110,8 +116,12 @@ function formatDuration(seconds?: number | null) {
 </script>
 
 <template>
-  <div class="hospital-navigator">
-    <button class="navigator-trigger" type="button" @click="open">
+  <div class="hospital-navigator" :class="`hospital-navigator--${props.trigger}`">
+    <el-dropdown-item v-if="props.trigger === 'menu'" class="navigator-menu-item" @click="open">
+      <el-icon><LocationFilled /></el-icon>
+      <span>附近医院导航</span>
+    </el-dropdown-item>
+    <button v-else class="navigator-trigger" type="button" @click="open">
       <el-icon><LocationFilled /></el-icon>
       <span><strong>附近医院导航</strong><small>定位仅用于本次查询，不保存</small></span>
     </button>
@@ -192,6 +202,7 @@ function formatDuration(seconds?: number | null) {
 .navigator-trigger > span { display: flex; flex-direction: column; gap: 2px; }
 .navigator-trigger strong { font-size: 13px; font-weight: 600; }
 .navigator-trigger small { display: block; color: #7e94a7; font-size: 10px; }
+.navigator-menu-item { display: flex; align-items: center; gap: 8px; }
 .location-consent { padding: 28px 12px 12px; text-align: center; color: #4e677d; }
 .location-consent > .el-icon { color: #377fb7; }
 .location-consent h3 { margin: 12px 0 8px; color: #314e67; }

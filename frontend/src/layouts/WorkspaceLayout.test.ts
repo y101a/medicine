@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import ElementPlus from 'element-plus'
 import WorkspaceLayout from './WorkspaceLayout.vue'
+import HospitalNavigator from '../components/HospitalNavigator.vue'
 import { useAuthStore } from '../stores/auth'
 import { useHealthRecordsStore } from '../stores/healthRecords'
 import { healthRecordsApi } from '../api/healthRecords'
@@ -117,6 +118,21 @@ describe('工作区布局与健康记录接入', () => {
     // 这两项已并入设置页分栏；断言它们确实从导航里消失，避免以为入口还留着。
     expect(wrapper.find('a[href="/app/health-records"]').exists()).toBe(false)
     expect(wrapper.find('a[href="/app/profile"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('账号下拉菜单提供附近医院导航入口', async () => {
+    const { wrapper } = await setup()
+
+    expect(wrapper.findComponent(HospitalNavigator).props('trigger')).toBe('menu')
+    await wrapper.get('.user-menu').trigger('click')
+    await flushPromises()
+    expect(document.body.textContent).toContain('附近医院导航')
+    const item = document.body.querySelector('.navigator-menu-item') as HTMLElement
+    expect(item).not.toBeNull()
+    await item.click()
+    await flushPromises()
+    expect(document.body.textContent).toContain('查找路线时间更短的附近医院')
     wrapper.unmount()
   })
 

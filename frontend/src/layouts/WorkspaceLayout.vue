@@ -9,6 +9,7 @@ import { useConsultationsStore } from '../stores/consultations'
 import { useHealthRecordsStore } from '../stores/healthRecords'
 import { usePrivateKnowledgeStore } from '../stores/privateKnowledge'
 import HealthRecordNoticeDialog from '../components/HealthRecordNoticeDialog.vue'
+import HospitalNavigator from '../components/HospitalNavigator.vue'
 
 const store = useAuthStore()
 const consultations = useConsultationsStore()
@@ -106,6 +107,7 @@ async function menu(command: string) {
             <span>{{ displayName }}</span><el-icon><ArrowDown /></el-icon>
           </button>
           <template #dropdown><el-dropdown-menu>
+            <HospitalNavigator trigger="menu" />
             <el-dropdown-item command="settings">设置</el-dropdown-item>
             <el-dropdown-item command="logout" divided :disabled="store.pendingAction === 'logout'">退出登录</el-dropdown-item>
           </el-dropdown-menu></template>
@@ -178,5 +180,7 @@ nav a.selected { background: #e7f0fa; color: #196db2; font-weight: 600; }
 .user-avatar { overflow: hidden; }
 .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .workspace-content { flex: 1; min-height: 0; overflow: auto; }
+/* 正式入口已移入账号菜单。旧组件暂留在 DSH 在途的输入框结构中，避免并行改同一文件；在工作区内不显示。 */
+.workspace-content :deep(.composer-bottom .hospital-navigator--button) { display: none; }
 button:focus-visible, a:focus-visible { outline: 2px solid #398ad0; outline-offset: 3px; }
 </style>

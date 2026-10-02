@@ -70,6 +70,24 @@ test('旧路径重定向到设置页的对应分栏', async ({ page }) => {
   await expect(page.locator('#profile-title')).toBeVisible()
 })
 
+test('右上角账号菜单提供附近医院导航，并保留定位说明', async ({ page }) => {
+  await installApiStubs(page)
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.goto('/app/chat')
+  await waitForRendered(page)
+
+  await page.locator('.user-menu').click()
+  const menuItem = page.locator('.navigator-menu-item')
+  await expect(menuItem).toBeVisible()
+  await expect(menuItem).toContainText('附近医院导航')
+  await menuItem.click()
+
+  const dialog = page.getByRole('dialog', { name: '附近医院导航' })
+  await expect(dialog).toBeVisible()
+  await expect(dialog).toContainText('坐标仅在本次请求内存中使用')
+  await expect(page.locator('.composer-bottom .navigator-trigger')).toBeHidden()
+})
+
 test('移动端：记录工作区 1000px 桌面优先约束（已知范围问题，非缺陷）', async ({ page }) => {
   await installApiStubs(page)
   await page.setViewportSize({ width: 375, height: 720 })
