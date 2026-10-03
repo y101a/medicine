@@ -124,6 +124,78 @@
       "expected_document_slugs": ["thyroid-conditions"],
       "candidate_source_keys": ["developer_prototype_knowledge"],
       "safety_class": "education"
+    },
+    {
+      "id": "wellness_how_much_activity",
+      "query": "平时基本不动，想把身体练起来，一周动多久才算够",
+      "expected_topics": ["身体活动", "运动量"],
+      "expected_document_slugs": ["wellness-physical-activity"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "wellness_sitting_all_day",
+      "query": "一天到晚坐着上班，久坐对身体到底有什么不好",
+      "expected_topics": ["久坐", "久坐危害"],
+      "expected_document_slugs": ["wellness-sedentary-behaviour"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "wellness_daily_diet_principles",
+      "query": "想把每天吃的调整得合理一些，主要按什么原则来",
+      "expected_topics": ["平衡膳食", "膳食指南"],
+      "expected_document_slugs": ["wellness-balanced-diet-principles"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "wellness_eat_move_balance",
+      "query": "吃的和动的怎么搭配才不容易长胖，一周要练几次",
+      "expected_topics": ["吃动平衡", "健康体重"],
+      "expected_document_slugs": ["wellness-diet-and-activity-balance"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "wellness_salt_oil_alcohol",
+      "query": "一天吃多少盐和油算合适，酒能不能喝一点",
+      "expected_topics": ["少盐", "控糖限酒"],
+      "expected_document_slugs": ["wellness-salt-oil-sugar-alcohol"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "wellness_start_training_safely",
+      "query": "想开始健身，听说要先评估再安排，这是为什么",
+      "expected_topics": ["科学健身", "运动处方"],
+      "expected_document_slugs": ["wellness-fitness-guide-framework"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "wellness_warmup_in_cold",
+      "query": "天冷出去跑步之前要不要先热身，衣服怎么穿合适",
+      "expected_topics": ["热身", "运动防护"],
+      "expected_document_slugs": ["wellness-warmup-and-protection"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "wellness_tcm_wellness_basics",
+      "query": "中医说的养生主要讲哪几个方面，哪些说法别当成能治病",
+      "expected_topics": ["中医养生", "治未病"],
+      "expected_document_slugs": ["wellness-tcm-health-literacy"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "wellness_three_reductions",
+      "query": "经常听到三减三健，具体指什么，是谁提出来的",
+      "expected_topics": ["三减三健", "全民健康生活方式行动"],
+      "expected_document_slugs": ["wellness-healthy-lifestyle-action"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
     }
   ]
 }

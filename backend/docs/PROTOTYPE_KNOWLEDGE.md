@@ -48,6 +48,49 @@
 （DSH 沙箱下不放宽权限时会出现 8 项 `PermissionError` 的 setup 错误，属环境问题，
 见 `COORDINATION.md` 第 4 节环境备注。）
 
+## 2026-10-03 wellness 批次（已导入，**未向量化**）
+
+用户要求把养生健身知识真正写进库里，本批次按上面的原型通道落地（不涉及正式审核，因为通道本身
+即声明未审核）。清单版本 `prototype-2026-10-03.1`，新增 9 篇：
+
+| slug | 主题 |
+| --- | --- |
+| `wellness-physical-activity` | 身体活动的益处与建议活动量 |
+| `wellness-sedentary-behaviour` | 久坐行为与相关风险 |
+| `wellness-balanced-diet-principles` | 平衡膳食八条准则 |
+| `wellness-diet-and-activity-balance` | 吃动平衡与每周运动量 |
+| `wellness-salt-oil-sugar-alcohol` | 少盐少油、控糖限酒的量值 |
+| `wellness-fitness-guide-framework` | 《全民健身指南》「先评估再安排」框架 |
+| `wellness-warmup-and-protection` | 热身与运动保暖 |
+| `wellness-tcm-health-literacy` | 中医养生一般理念（功效表述已改为理论表述） |
+| `wellness-healthy-lifestyle-action` | 全民健康生活方式行动与三减三健 |
+
+**库内状态（实测快照）**：生效 9 篇 / 38 个文本块，全部 `review_status=prototype`、
+`medical_reviewed=false`、`production_eligible=false`、`body_systems=[]`（该字段只允许 4 种人体系统，
+养生健身不归类）；另有 **14 条历史版本被标 `superseded`**——两轮正文修订（统一免责措辞、补常见口语说法）
+按「同来源同 URL 新版本」机制留下的快照，检索只取 `prototype` 那 9 篇。官方入口记在各篇 `reference_urls`。
+
+**没有做的**：未跑 `embed-prototype`（**不调用收费向量服务、不把正文送出本机**），因此这 9 篇**没有向量**；
+未加入 `approved_for_ingestion`；未生成任何 `approved` 文档。全库现有 48 篇 / 168 块 / 72 块带向量，
+新增的 38 块不在其中。
+
+**未采用的一条**：《中国公民中医养生保健素养》第三十三至四十二条（叩齿、咽津、摩腹、足心按摩等）**没有导入**——
+原文自带保健功效说法（清肝明目、强腰固肾），且涉及自行操作，仅以「不建议照做」的形式入库只会给检索带来噪声。
+相关候选留在 `docs/wellness_candidates.json`，需要时再单独决定。
+
+**召回实测（`mode=keyword`，零云端调用）**：
+
+- 仓库自带题集 `docs/medical_retrieval_evaluation_independent.json`（本轮补了 9 道 wellness 题，共 24 题）：
+  新增 9 题 **9/9 命中且都排第 1**；但**这 9 道的措辞与语料里补的口语说法接近，属于同一轮设计，不能当作独立证据**。
+- 同题集整体 keyword 模式 12/24；其中**旧语料只有 3/15**——说明纯关键词模式对换词提问本来就弱，
+  线上默认走 hybrid（向量占 85%）。
+- 另做一组**未写进语料**的自由口语问法（如「体检说血脂高，油要少吃吗」「想给爸妈安排锻炼，先查什么」）：
+  keyword 模式下 **3/9** 能召回 wellness 文档。
+
+**结论**：内容已可被检索到（关键措辞与较接近的问法能命中，且未带向量的块在 hybrid 中保留原始关键词得分、
+不按 15% 折算，见 `app/rag/retrieval.py` 注释），但要在真实自由提问下达到旧语料的召回水平，
+需要走 `embed-prototype` 生成向量——那一步会把正文送到阿里云并向用户计费，**须单独确认后再做**。
+
 ## 可复现命令
 
 在 `backend` 目录执行：

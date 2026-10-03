@@ -31,6 +31,10 @@ async def test_seed_prototype_corpus_is_labeled_and_idempotent(monkeypatch):
         "app.rag.prototype_seed.PROTOTYPE_SOURCE_URL",
         f"https://prototype.invalid/test/{source_key}",
     )
+    # 数量以清单为准，避免每次扩充语料都要改这里。
+    expected_documents = len(
+        load_manifest(Path(__file__).resolve().parents[1] / "data" / "prototype_knowledge").documents
+    )
     async with engine.connect() as connection:
         transaction = await connection.begin()
         sessions = async_sessionmaker(connection, expire_on_commit=False)
@@ -38,7 +42,7 @@ async def test_seed_prototype_corpus_is_labeled_and_idempotent(monkeypatch):
             async with sessions() as db:
                 first = await seed_prototype_knowledge(db)
                 await db.commit()
-            assert first.created_documents == 17
+            assert first.created_documents == expected_documents
             assert first.duplicate_documents == 0
 
             async with sessions() as db:
@@ -55,10 +59,10 @@ async def test_seed_prototype_corpus_is_labeled_and_idempotent(monkeypatch):
                     )
                 )
             assert second.created_documents == 0
-            assert second.duplicate_documents == 17
+            assert second.duplicate_documents == expected_documents
             assert source is not None and source.ingestion_status == "prototype"
             assert source.source_metadata["production_eligible"] is False
-            assert len(documents) == 17
+            assert len(documents) == expected_documents
             assert all(document.review_status == "prototype" for document in documents)
             assert all(document.medical_reviewed_at is None for document in documents)
             assert all(document.document_metadata["prototype_only"] for document in documents)
@@ -77,10 +81,11 @@ def test_prototype_manifest_uses_only_local_markdown_files():
     directory = Path(__file__).resolve().parents[1] / "data" / "prototype_knowledge"
     manifest = load_manifest(directory)
 
-    assert len(manifest.documents) == 17
-    assert len({entry.slug for entry in manifest.documents}) == 17
+    assert len(manifest.documents) == 26
+    assert len({entry.slug for entry in manifest.documents}) == 26
     assert all((directory / entry.file).is_file() for entry in manifest.documents)
-    new_entries = manifest.documents[9:]
+    # 2026-10-03 追加了 wellness 批次（9 篇），排序在末尾，故第二批次显式取 [9:17]。
+    new_entries = manifest.documents[9:17]
     assert {system: sum(system in entry.body_systems for entry in new_entries)
             for system in ("respiratory", "digestive", "cardiovascular", "endocrine")} == {
         "respiratory": 2, "digestive": 2, "cardiovascular": 2, "endocrine": 2,
@@ -90,6 +95,25 @@ def test_prototype_manifest_uses_only_local_markdown_files():
         assert all(urlsplit(url).scheme == "https" for url in entry.reference_urls)
         content = load_markdown(directory / entry.file)
         assert "未经医学专业审核" in content
+        assert len(chunk_markdown(content)) >= 2
+
+
+def test_wellness_batch_is_prototype_only_and_marks_unreviewed():
+    """2026-10-03 追加的养生健身批次：自编原型语料，正文自带「未经医学专业审核」声明。"""
+    directory = Path(__file__).resolve().parents[1] / "data" / "prototype_knowledge"
+    manifest = load_manifest(directory)
+    wellness = [entry for entry in manifest.documents if entry.slug.startswith("wellness-")]
+
+    assert len(wellness) == 9
+    for entry in wellness:
+        assert entry.topics
+        assert entry.reference_urls, entry.slug
+        # 官方入口允许 http（膳食指南与中医药局站点当前为 http），只要求是绝对 URL。
+        assert all(urlsplit(url).scheme in {"http", "https"} for url in entry.reference_urls)
+        assert entry.body_systems == []
+        content = load_markdown(directory / entry.file)
+        assert "未经医学专业审核" in content
+        assert "不用于诊断或治疗" in content
         assert len(chunk_markdown(content)) >= 2
 
 

@@ -1,5 +1,5 @@
 {
-  "version": "prototype-2026-10-01.1",
+  "version": "prototype-2026-10-03.1",
   "documents": [
     {"slug":"headache-dizziness","title":"头痛与头晕科普原型","file":"headache-dizziness.md","topics":["头痛","头晕","眩晕"],"reference_urls":["https://medlineplus.gov/ency/article/003024.htm","https://medlineplus.gov/dizzinessandvertigo.html"]},
     {"slug":"hematuria-urinary-tract-infection","title":"血尿与尿路感染科普原型","file":"hematuria-urinary-tract-infection.md","topics":["血尿","尿路感染","尿频","尿急","尿痛"],"reference_urls":["https://www.niddk.nih.gov/health-information/urologic-diseases/hematuria-blood-urine","https://www.niddk.nih.gov/health-information/urologic-diseases/bladder-infection-uti-in-adults/symptoms-causes"]},
@@ -116,6 +116,69 @@
         "https://literature.chinacdc.cn/xuekefuwu/gonggongweishengxueshuredianzhuiz/202208/t20220822_260896.html",
         "https://www.nhc.gov.cn/cms-search/downFiles/95b301aab5de437192f9fbda9baf522e.pdf"
       ]
+    },
+    {
+      "slug": "wellness-physical-activity",
+      "title": "身体活动：为什么要动、动多少算够",
+      "file": "wellness-physical-activity.md",
+      "topics": ["身体活动", "运动", "活动量", "150分钟", "运动不足"],
+      "reference_urls": ["https://www.who.int/news-room/fact-sheets/detail/physical-activity"]
+    },
+    {
+      "slug": "wellness-sedentary-behaviour",
+      "title": "久坐行为与不活动的健康风险",
+      "file": "wellness-sedentary-behaviour.md",
+      "topics": ["久坐", "久坐危害", "不活动", "每小时起来动一动"],
+      "reference_urls": ["https://www.who.int/news-room/fact-sheets/detail/physical-activity"]
+    },
+    {
+      "slug": "wellness-balanced-diet-principles",
+      "title": "平衡膳食的八条准则",
+      "file": "wellness-balanced-diet-principles.md",
+      "topics": ["平衡膳食", "膳食指南", "八准则", "食物多样", "合理搭配"],
+      "reference_urls": ["http://dg.cnsoc.org/article/04/J4-AsD_DR3OLQMnHG0-jZA.html"]
+    },
+    {
+      "slug": "wellness-diet-and-activity-balance",
+      "title": "吃动平衡与每周运动量",
+      "file": "wellness-diet-and-activity-balance.md",
+      "topics": ["吃动平衡", "健康体重", "每周150分钟", "6000步", "抗阻运动"],
+      "reference_urls": ["http://dg.cnsoc.org/article/04/J4-AsD_DR3OLQMnHG0-jZA.html"]
+    },
+    {
+      "slug": "wellness-salt-oil-sugar-alcohol",
+      "title": "少盐少油、控糖限酒的具体量",
+      "file": "wellness-salt-oil-sugar-alcohol.md",
+      "topics": ["少盐", "少油", "控糖", "限酒", "食盐5克", "添加糖", "含糖饮料"],
+      "reference_urls": ["http://dg.cnsoc.org/article/04/J4-AsD_DR3OLQMnHG0-jZA.html"]
+    },
+    {
+      "slug": "wellness-fitness-guide-framework",
+      "title": "科学健身先评估再安排",
+      "file": "wellness-fitness-guide-framework.md",
+      "topics": ["全民健身指南", "科学健身", "运动处方", "运动能力评估"],
+      "reference_urls": ["https://www.sport.gov.cn/whzx/n5588/c900457/content.html"]
+    },
+    {
+      "slug": "wellness-warmup-and-protection",
+      "title": "热身与运动时的保暖",
+      "file": "wellness-warmup-and-protection.md",
+      "topics": ["热身", "运动防护", "洋葱式穿衣法", "运动损伤预防", "拉伸"],
+      "reference_urls": ["https://www.sport.gov.cn/n20001280/n20001265/n20066978/c28503043/content.html"]
+    },
+    {
+      "slug": "wellness-tcm-health-literacy",
+      "title": "中医养生的一般理念",
+      "file": "wellness-tcm-health-literacy.md",
+      "topics": ["中医养生", "治未病", "养生四大基石", "起居有常", "情志"],
+      "reference_urls": ["http://www.natcm.gov.cn/bangongshi/gongzuodongtai/2018-03-25/5248.html"]
+    },
+    {
+      "slug": "wellness-healthy-lifestyle-action",
+      "title": "全民健康生活方式行动与「三减三健」",
+      "file": "wellness-healthy-lifestyle-action.md",
+      "topics": ["三减三健", "全民健康生活方式行动", "减盐减油减糖", "健康体重", "健康骨骼", "健康口腔"],
+      "reference_urls": ["https://www.chinacdc.cn/jiankang121/mryw/"]
     }
   ]
 }

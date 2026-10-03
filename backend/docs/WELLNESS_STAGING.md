@@ -1,17 +1,23 @@
-# 养生健身知识储备（暂存区，**尚未入库**）
+# 养生健身知识储备（9 篇已按开发原型通道写入；**未进入正式知识库**）
 
 > 用户 2026-10-03 要求：「帮我搜索储备一些关于养生健身相关的知识暂时放入文件中，等我确定后再写入给 AI」。
 > 本文件是**给你看的复核清单**，配套机器可读的候选草稿在同目录 `wellness_candidates.json`。
 
 ## 0. 当前状态（先说清楚没做什么）
 
-- **没有**加入 `approved_for_ingestion` 白名单。**2026-10-03 更新**：经用户同意，已在 `medical_source_registry.json`
-  **登记**中国营养学会 / 国家体育总局 / 国家中医药管理局 3 条来源（状态均为「仅登记、未批准」）；福建卫健委
-  转载稿按用户决定**暂缓**，未登记。
-- **没有**导入知识库、**没有**生成向量、**没有**写数据库、**没有**接进问答或知识图谱。
-- 内容全部是**我自己的概括**（`content_mode: original_summary`），逐字引用为空数组；除福建那条已按用户决定改为
-  `deferred_source_not_registered` 外，其余 10 条状态都是 `pending_qualified_medical_review`——**没有真实医学审核签名，因此按 `CONTROLLED_INGESTION.md` 现在一条都不能导入**。
-- 这份储备**不会**自动生效：你不确认，它就只是两个文件。
+- **已写入 dev 数据库**：经用户要求，9 篇按**开发原型通道**导入（`review_status=prototype`、
+  `medical_reviewed=false`、`production_eligible=false`，仅 `APP_ENVIRONMENT=development` 时参与检索）；
+  库内快照与召回实测见 `backend/docs/PROTOTYPE_KNOWLEDGE.md` 的「2026-10-03 wellness 批次」。**未向量化**
+  （不调用收费向量服务、不把正文送出本机），**未进入正式知识库**。
+- **没有**加入 `approved_for_ingestion` 白名单：已在 `medical_source_registry.json` **登记**中国营养学会 /
+  国家体育总局 / 国家中医药管理局 3 条来源（状态均为「仅登记、未批准」）；福建卫健委转载稿按用户决定
+  **暂缓**，未登记。
+- **没有**任何一条以正式（`approved`）文档入库：没有真实医学审核签名，按 `CONTROLLED_INGESTION.md`
+  一条都不能按正式文档导入——**我不会代签**。
+- 候选里 10 条仍是 `pending_qualified_medical_review`（福建那条为 `deferred_source_not_registered`）。
+  实际入库 9 篇：① 《中国公民中医养生保健素养》第三十三至四十二条「常用养生保健简易方法」**未导入**
+  （原文自带保健功效说法且涉及自行操作，理由见 `PROTOTYPE_KNOWLEDGE.md` 同节）；② 八段锦/功法安全那条
+  因来源暂缓未导入。
 
 ## 1. 来源清单（都是我实际抓取到的页面）
 
