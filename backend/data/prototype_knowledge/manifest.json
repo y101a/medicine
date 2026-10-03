@@ -1,5 +1,5 @@
 {
-  "version": "prototype-2026-10-03.1",
+  "version": "prototype-2026-10-03.2",
   "documents": [
     {"slug":"headache-dizziness","title":"头痛与头晕科普原型","file":"headache-dizziness.md","topics":["头痛","头晕","眩晕"],"reference_urls":["https://medlineplus.gov/ency/article/003024.htm","https://medlineplus.gov/dizzinessandvertigo.html"]},
     {"slug":"hematuria-urinary-tract-infection","title":"血尿与尿路感染科普原型","file":"hematuria-urinary-tract-infection.md","topics":["血尿","尿路感染","尿频","尿急","尿痛"],"reference_urls":["https://www.niddk.nih.gov/health-information/urologic-diseases/hematuria-blood-urine","https://www.niddk.nih.gov/health-information/urologic-diseases/bladder-infection-uti-in-adults/symptoms-causes"]},
@@ -179,6 +179,274 @@
       "file": "wellness-healthy-lifestyle-action.md",
       "topics": ["三减三健", "全民健康生活方式行动", "减盐减油减糖", "健康体重", "健康骨骼", "健康口腔"],
       "reference_urls": ["https://www.chinacdc.cn/jiankang121/mryw/"]
+    },
+    {
+      "slug": "fitness-aerobic-intensity",
+      "title": "有氧运动强度怎么判断",
+      "file": "fitness-aerobic-intensity.md",
+      "topics": ["运动强度", "心率", "最大心率", "说话法"],
+      "reference_urls": [
+        "https://tyj.wuhan.gov.cn/ggfwsx_14800/tyjs/202309/t20230922_2269353.html",
+        "https://www.ncwchnhc.org.cn/content/content.html?id=7312653347058618368"
+      ]
+    },
+    {
+      "slug": "fitness-resistance-training",
+      "title": "力量（抗阻）训练的原则与安全",
+      "file": "fitness-resistance-training.md",
+      "topics": ["力量训练", "抗阻训练", "肌肉强化", "每周2到3次"],
+      "reference_urls": [
+        "https://www.sport.gov.cn/n20001280/n20001265/n20066978/c29520818/content.html",
+        "http://dg.cnsoc.org/article/04/k9W2iu8FT6K5oWaQKArU9g.html"
+      ]
+    },
+    {
+      "slug": "fitness-stretching",
+      "title": "柔韧性与拉伸：什么时候拉、怎么拉",
+      "file": "fitness-stretching.md",
+      "topics": ["拉伸", "柔韧性", "动态牵伸", "静态牵伸"],
+      "reference_urls": [
+        "https://tyj.wuhan.gov.cn/ggfwsx_14800/tyjs/202601/t20260110_2709444.html",
+        "https://www.sport.gov.cn/n20001280/n20067626/n20067766/c28355702/content.html"
+      ]
+    },
+    {
+      "slug": "fitness-progression",
+      "title": "运动量为什么要循序渐进",
+      "file": "fitness-progression.md",
+      "topics": ["运动量", "循序渐进", "运动负荷", "训练过度"],
+      "reference_urls": [
+        "https://tyj.wuhan.gov.cn/ggfwsx_14800/tyjs/202309/t20230922_2269353.html",
+        "https://www.sport.gov.cn/n20001280/n20001265/n20066978/c20282409/content.html"
+      ]
+    },
+    {
+      "slug": "fitness-children-adolescents",
+      "title": "儿童青少年身体活动建议",
+      "file": "fitness-children-adolescents.md",
+      "topics": ["儿童青少年", "每天60分钟", "屏幕时间", "户外活动", "近视防控"],
+      "reference_urls": [
+        "https://www.sport.gov.cn/n20001280/n20067626/n20067766/c28355702/content.html",
+        "https://www.sport.gov.cn/n20001280/n20001265/n20066978/c28815756/content.html"
+      ]
+    },
+    {
+      "slug": "fitness-older-adults-falls",
+      "title": "老年人身体活动与防跌倒",
+      "file": "fitness-older-adults-falls.md",
+      "topics": ["老年人", "防跌倒", "平衡能力", "抗阻训练"],
+      "reference_urls": [
+        "https://www.sport.gov.cn/n20001280/n20001265/n20066978/c29697721/content.html",
+        "https://www.who.int/news-room/fact-sheets/detail/physical-activity"
+      ]
+    },
+    {
+      "slug": "fitness-pregnancy",
+      "title": "孕期身体活动的一般建议",
+      "file": "fitness-pregnancy.md",
+      "topics": ["孕期运动", "产后恢复", "医生评估", "运动禁忌证"],
+      "reference_urls": [
+        "https://www.ncwchnhc.org.cn/content/content.html?id=7312653347058618368",
+        "https://www.who.int/news-room/fact-sheets/detail/physical-activity"
+      ]
+    },
+    {
+      "slug": "fitness-chronic-conditions",
+      "title": "高血压、糖尿病等慢病人群运动的通用注意",
+      "file": "fitness-chronic-conditions.md",
+      "topics": ["慢病运动", "高血压", "糖尿病", "医生评估", "低血糖"],
+      "reference_urls": [
+        "https://www.gscdc.cn/html/book/mxfcrxjbysh/mxfcrxjbysh-show-224.html",
+        "https://www.gov.cn/zhengce/202407/content_6960478.htm"
+      ]
+    },
+    {
+      "slug": "fitness-hydration-heat",
+      "title": "运动补水与高温天气运动",
+      "file": "fitness-hydration-heat.md",
+      "topics": ["运动补水", "高温运动", "中暑预防", "电解质"],
+      "reference_urls": [
+        "https://www.sport.gov.cn/n20001280/n20001265/n20066978/c29789013/content.html"
+      ]
+    },
+    {
+      "slug": "fitness-heatstroke-risk",
+      "title": "高温运动中的重症中暑（热射病）风险",
+      "file": "fitness-heatstroke-risk.md",
+      "topics": ["热射病", "重症中暑", "高温", "急症就医"],
+      "reference_urls": [
+        "https://www.sport.gov.cn/n20001280/n20001265/n20066978/c24505017/content.html"
+      ]
+    },
+    {
+      "slug": "fitness-injury-red-flags",
+      "title": "运动损伤的就医信号",
+      "file": "fitness-injury-red-flags.md",
+      "topics": ["运动损伤", "骨折", "关节脱位", "就医信号"],
+      "reference_urls": [
+        "https://www.sport.gov.cn/n20001280/n20001265/n20067664/c28402530/content.html",
+        "https://www.sport.gov.cn/n20001280/n20001265/n20067664/c20100834/content.html"
+      ]
+    },
+    {
+      "slug": "fitness-equipment-venue-safety",
+      "title": "运动装备与场地安全",
+      "file": "fitness-equipment-venue-safety.md",
+      "topics": ["运动装备", "场地安全", "健身器材", "护具"],
+      "reference_urls": [
+        "https://www.sport.gov.cn/n20001280/n20001265/n20067664/c28402530/content.html",
+        "https://www.sport.gov.cn/n20001280/n20001265/n20066978/c29163450/content.html"
+      ]
+    },
+    {
+      "slug": "fitness-recovery-sleep",
+      "title": "运动后的恢复与睡眠",
+      "file": "fitness-recovery-sleep.md",
+      "topics": ["运动恢复", "整理活动", "睡眠", "肌肉酸痛"],
+      "reference_urls": [
+        "https://tyj.wuhan.gov.cn/ggfwsx_14800/tyjs/202602/t20260207_2726144.html",
+        "https://tyj.wuhan.gov.cn/ggfwsx_14800/tyjs/202601/t20260110_2709452.html"
+      ]
+    },
+    {
+      "slug": "tcm-daily-routine-sleep",
+      "title": "起居有常与睡眠习惯",
+      "file": "tcm-daily-routine-sleep.md",
+      "topics": ["起居有常", "睡眠", "作息规律", "睡眠时长"],
+      "reference_urls": [
+        "https://iehs.chinacdc.cn/jkfh/kpzs/202409/t20240911_299442.html",
+        "https://wjw.fujian.gov.cn/ztzl/jkjy/jkzgxd/202504/t20250417_6901525.htm"
+      ]
+    },
+    {
+      "slug": "tcm-emotional-regulation",
+      "title": "情志调养：情绪与压力的日常调节",
+      "file": "tcm-emotional-regulation.md",
+      "topics": ["情志养生", "情绪", "压力", "心理"],
+      "reference_urls": [
+        "http://www.natcm.gov.cn/bangongshi/gongzuodongtai/2018-03-25/5248.html",
+        "http://www.natcm.gov.cn/hudongjiaoliu/guanfangweixin/2019-05-22/9867.html"
+      ]
+    },
+    {
+      "slug": "tcm-seasonal-routine",
+      "title": "四季起居与顺时养生",
+      "file": "tcm-seasonal-routine.md",
+      "topics": ["顺时养生", "四季起居", "秋冻", "时令养生"],
+      "reference_urls": [
+        "https://wjw.fujian.gov.cn/xxgk/gzdt/mtbd/202609/t20260918_7214937.htm",
+        "http://www.natcm.gov.cn/bangongshi/gongzuodongtai/2018-03-25/5248.html"
+      ]
+    },
+    {
+      "slug": "tcm-moderate-eating",
+      "title": "饮食有节：规律进餐与不过饱",
+      "file": "tcm-moderate-eating.md",
+      "topics": ["饮食有节", "规律进餐", "晚餐", "细嚼慢咽"],
+      "reference_urls": [
+        "http://dg.cnsoc.org/article/04/wDCyy7cWSJCN6pwKHOo5Dw.html",
+        "http://www.natcm.gov.cn/bangongshi/gongzuodongtai/2018-03-25/5248.html"
+      ]
+    },
+    {
+      "slug": "tcm-foot-soak",
+      "title": "足浴（泡脚）的常见说法与禁忌",
+      "file": "tcm-foot-soak.md",
+      "topics": ["足浴", "泡脚", "糖尿病足", "静脉曲张"],
+      "reference_urls": [
+        "https://wsjkw.sh.gov.cn/jthl/20240301/177e6175c88748aca935a915f60ca627.html",
+        "http://www.natcm.gov.cn/hudongjiaoliu/guanfangweixin/2019-04-19/9626.html"
+      ]
+    },
+    {
+      "slug": "tcm-moxibustion",
+      "title": "艾灸的常见说法与风险边界",
+      "file": "tcm-moxibustion.md",
+      "topics": ["艾灸", "灸法", "烫伤风险", "非医疗机构禁止"],
+      "reference_urls": [
+        "http://www.natcm.gov.cn/zxyjhyssmzyys/gongzuodongtai/2023-05-06/30455.html",
+        "http://www.natcm.gov.cn/bangongshi/gongzuodongtai/2018-03-25/5248.html"
+      ]
+    },
+    {
+      "slug": "tcm-cupping-gua-sha",
+      "title": "拔罐与刮痧的常见说法与政策边界",
+      "file": "tcm-cupping-gua-sha.md",
+      "topics": ["拔罐", "刮痧", "医疗活动", "抗凝药"],
+      "reference_urls": [
+        "http://www.natcm.gov.cn/bangongshi/zhengcewenjian/2018-03-24/1151.html",
+        "https://wsjkw.sh.gov.cn/jthl/20240905/23c0e276240e45c6a69900fea40f57e3.html"
+      ]
+    },
+    {
+      "slug": "tcm-acupoint-pressing",
+      "title": "穴位按压的常见说法与安全提醒",
+      "file": "tcm-acupoint-pressing.md",
+      "topics": ["穴位按压", "经穴养生", "推拿按摩", "安全"],
+      "reference_urls": [
+        "http://www.natcm.gov.cn/bangongshi/gongzuodongtai/2018-03-25/5248.html",
+        "http://www.natcm.gov.cn/bangongshi/zhengcewenjian/2018-03-24/1151.html"
+      ]
+    },
+    {
+      "slug": "tcm-traditional-exercises",
+      "title": "太极拳、八段锦等传统健身功法",
+      "file": "tcm-traditional-exercises.md",
+      "topics": ["太极拳", "八段锦", "五禽戏", "健身气功", "防跌倒"],
+      "reference_urls": [
+        "https://www.sport.gov.cn/n20001280/n20745751/n20767239/c23442916/content.html",
+        "https://ncncd.chinacdc.cn/xzzq/202409/t20240923_311832.htm"
+      ]
+    },
+    {
+      "slug": "tcm-tonic-misconceptions",
+      "title": "药膳与进补的常见误区",
+      "file": "tcm-tonic-misconceptions.md",
+      "topics": ["进补", "药膳", "贴秋膘", "中药饮片"],
+      "reference_urls": [
+        "https://wjw.fujian.gov.cn/xxgk/gzdt/mtbd/202609/t20260918_7214937.htm",
+        "http://www.natcm.gov.cn/zxyjhyssmzyys/gongzuodongtai/2023-05-06/30455.html"
+      ]
+    },
+    {
+      "slug": "tcm-constitution-theory",
+      "title": "中医体质学说的科普",
+      "file": "tcm-constitution-theory.md",
+      "topics": ["中医体质", "九种体质", "体质辨识", "国家标准"],
+      "reference_urls": [
+        "http://www.natcm.gov.cn/bangongshi/gongzuodongtai/2018-03-25/5248.html",
+        "https://www.sac.gov.cn/xxgk/zcjd/art/2026/art_a872b24526954cf99fde48f9af3209aa.html"
+      ]
+    },
+    {
+      "slug": "tcm-sanfu-patch",
+      "title": "「冬病夏治」与三伏贴的说明",
+      "file": "tcm-sanfu-patch.md",
+      "topics": ["三伏贴", "冬病夏治", "穴位贴敷", "医疗机构"],
+      "reference_urls": [
+        "http://www.natcm.gov.cn/yizhengsi/gongzuodongtai/2018-03-24/2790.html",
+        "http://www.natcm.gov.cn/zxyjhyssmzyys/gongzuodongtai/2023-05-06/30455.html"
+      ]
+    },
+    {
+      "slug": "tcm-dampness-framing",
+      "title": "「湿气」说法的理性说明",
+      "file": "tcm-dampness-framing.md",
+      "topics": ["湿气", "祛湿", "中医理论", "理性看待"],
+      "reference_urls": [
+        "http://www.natcm.gov.cn/bangongshi/gongzuodongtai/2026-08-19/38506.html",
+        "http://www.natcm.gov.cn/hudongjiaoliu/guanfangweixin/2019-05-22/9867.html"
+      ]
+    },
+    {
+      "slug": "tcm-older-adults",
+      "title": "老年人养生的通用注意",
+      "file": "tcm-older-adults.md",
+      "topics": ["老年人", "跌倒预防", "用药安全", "养生"],
+      "reference_urls": [
+        "https://ncncd.chinacdc.cn/xzzq/202409/t20240923_311832.htm",
+        "https://www.chinacdc.cn/jiankang121/gdxw/202310/t20231020_270215.html"
+      ]
     }
   ]
 }

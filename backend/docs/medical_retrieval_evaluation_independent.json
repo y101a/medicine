@@ -2,7 +2,7 @@
   "schema_version": "1.0",
   "status": "independent_prototype_evaluation",
   "purpose": "独立题集：用于比较纯关键词 / 纯向量 / 混合检索的召回表现，不用于诊断或临床有效性声明。",
-  "method_note": "本文件与 medical_retrieval_evaluation.json 的区别是刻意的：那 10 道题与语料由同一开发过程设计，会高估效果。这里改用患者口语化的问法，尽量不照抄语料标题与小节词，并且覆盖全部 13 篇原型语料（原题集只覆盖最初 5 篇）。因此本文件上的漏召回更接近真实换词提问时的表现。",
+  "method_note": "本文件与 medical_retrieval_evaluation.json 的区别是刻意的：那 10 道题与语料由同一开发过程设计，会高估效果。这里改用患者口语化的问法，尽量不照抄语料标题与小节词，并且覆盖全部原型语料（原题集只覆盖最初 5 篇）。2026-10-03 追加养生健身 9 道、健身/养生 27 道后，本文件与配套题集合计覆盖全部 53 篇原型语料。因此本文件上的漏召回更接近真实换词提问时的表现。",
   "minimum_case_count": 15,
   "cases": [
     {
@@ -194,6 +194,222 @@
       "query": "经常听到三减三健，具体指什么，是谁提出来的",
       "expected_topics": ["三减三健", "全民健康生活方式行动"],
       "expected_document_slugs": ["wellness-healthy-lifestyle-action"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "fitness_how_hard_am_i_working",
+      "query": "跑步的时候怎么知道自己练得算不算中等强度",
+      "expected_topics": ["运动强度", "说话法"],
+      "expected_document_slugs": ["fitness-aerobic-intensity"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "fitness_want_to_train_strength",
+      "query": "想练点肌肉力量，一周练几次、要注意什么",
+      "expected_topics": ["力量训练", "抗阻训练"],
+      "expected_document_slugs": ["fitness-resistance-training"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "fitness_stretch_before_or_after",
+      "query": "运动前和运动后拉伸有什么区别，哪次该慢慢拉",
+      "expected_topics": ["拉伸", "柔韧性"],
+      "expected_document_slugs": ["fitness-stretching"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "fitness_add_load_faster",
+      "query": "刚开始锻炼，是不是一次加量加猛一点更快",
+      "expected_topics": ["运动量", "循序渐进"],
+      "expected_document_slugs": ["fitness-progression"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "fitness_child_daily_activity",
+      "query": "孩子每天要动多久，看屏幕的时间要控制到多少",
+      "expected_topics": ["儿童青少年", "每天60分钟"],
+      "expected_document_slugs": ["fitness-children-adolescents"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "fitness_elderly_fear_of_falling",
+      "query": "家里老人怕摔，做什么锻炼能帮助防跌倒",
+      "expected_topics": ["老年人", "防跌倒"],
+      "expected_document_slugs": ["fitness-older-adults-falls"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "fitness_pregnant_can_i_exercise",
+      "query": "怀孕了还能不能运动，要满足什么条件",
+      "expected_topics": ["孕期运动", "医生评估"],
+      "expected_document_slugs": ["fitness-pregnancy"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "fitness_chronic_disease_starting_out",
+      "query": "有高血压和糖尿病，想开始运动要注意什么",
+      "expected_topics": ["慢病运动", "医生评估"],
+      "expected_document_slugs": ["fitness-chronic-conditions"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "fitness_summer_outdoor_workout",
+      "query": "夏天在外面运动，喝水和防晒该怎么安排",
+      "expected_topics": ["运动补水", "高温运动"],
+      "expected_document_slugs": ["fitness-hydration-heat"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "fitness_heat_stroke_danger",
+      "query": "大热天运动到什么程度会有生命危险",
+      "expected_topics": ["热射病", "重症中暑"],
+      "expected_document_slugs": ["fitness-heatstroke-risk"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "urgent"
+    },
+    {
+      "id": "fitness_sprain_when_to_hospital",
+      "query": "运动时崴了一下，什么情况必须去医院",
+      "expected_topics": ["运动损伤", "就医信号"],
+      "expected_document_slugs": ["fitness-injury-red-flags"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "urgent"
+    },
+    {
+      "id": "fitness_night_neighbourhood_gym",
+      "query": "晚上在小区里锻炼，场地和器材有什么讲究",
+      "expected_topics": ["场地安全", "健身器材"],
+      "expected_document_slugs": ["fitness-equipment-venue-safety"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "fitness_sore_after_training",
+      "query": "练完之后肌肉酸痛，是不是睡一觉就好了",
+      "expected_topics": ["运动恢复", "睡眠"],
+      "expected_document_slugs": ["fitness-recovery-sleep"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "tcm_sleep_hours_and_timing",
+      "query": "作息很乱，成年人一般该睡几个小时、几点睡比较好",
+      "expected_topics": ["起居有常", "睡眠"],
+      "expected_document_slugs": ["tcm-daily-routine-sleep"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "tcm_emotion_regulation",
+      "query": "压力大情绪差，中医说的情志调养是做什么的",
+      "expected_topics": ["情志养生", "情绪"],
+      "expected_document_slugs": ["tcm-emotional-regulation"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "tcm_season_change_routine",
+      "query": "换季的时候起居要怎么调整，秋天要不要冻一冻",
+      "expected_topics": ["顺时养生", "秋冻"],
+      "expected_document_slugs": ["tcm-seasonal-routine"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "tcm_eating_with_moderation",
+      "query": "中医说的饮食有节，是不是就是少吃",
+      "expected_topics": ["饮食有节", "规律进餐"],
+      "expected_document_slugs": ["tcm-moderate-eating"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "tcm_foot_soak_cautions",
+      "query": "晚上泡脚有什么讲究，哪些人不能泡",
+      "expected_topics": ["足浴", "泡脚"],
+      "expected_document_slugs": ["tcm-foot-soak"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "tcm_moxibustion_at_home",
+      "query": "自己在家做艾灸可以吗，有什么风险",
+      "expected_topics": ["艾灸", "烫伤风险"],
+      "expected_document_slugs": ["tcm-moxibustion"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "tcm_cupping_is_medical",
+      "query": "外面小店做的拔罐刮痧算医疗行为吗",
+      "expected_topics": ["拔罐", "刮痧", "医疗活动"],
+      "expected_document_slugs": ["tcm-cupping-gua-sha"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "tcm_pressing_points_safely",
+      "query": "自己按穴位放松，有哪些地方不能乱按",
+      "expected_topics": ["穴位按压", "安全"],
+      "expected_document_slugs": ["tcm-acupoint-pressing"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "tcm_baduanjin_for_elderly",
+      "query": "八段锦和太极拳适合老年人练吗",
+      "expected_topics": ["八段锦", "太极拳", "防跌倒"],
+      "expected_document_slugs": ["tcm-traditional-exercises"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "tcm_autumn_tonic_myth",
+      "query": "秋天是不是都得贴秋膘、吃点补品",
+      "expected_topics": ["进补", "药膳"],
+      "expected_document_slugs": ["tcm-tonic-misconceptions"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "tcm_nine_constitutions",
+      "query": "中医说的九种体质是怎么分的，能当体检结论吗",
+      "expected_topics": ["中医体质", "体质辨识"],
+      "expected_document_slugs": ["tcm-constitution-theory"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "tcm_sanfu_patch_by_myself",
+      "query": "三伏贴可以自己买来贴吗",
+      "expected_topics": ["三伏贴", "冬病夏治"],
+      "expected_document_slugs": ["tcm-sanfu-patch"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "tcm_dampness_is_not_diagnosis",
+      "query": "总觉得自己湿气重，是不是一种病",
+      "expected_topics": ["湿气", "祛湿"],
+      "expected_document_slugs": ["tcm-dampness-framing"],
+      "candidate_source_keys": ["developer_prototype_knowledge"],
+      "safety_class": "education"
+    },
+    {
+      "id": "tcm_elderly_health_cautions",
+      "query": "家里老人养生最该注意什么，能不能自己停降压药",
+      "expected_topics": ["老年人", "用药安全"],
+      "expected_document_slugs": ["tcm-older-adults"],
       "candidate_source_keys": ["developer_prototype_knowledge"],
       "safety_class": "education"
     }

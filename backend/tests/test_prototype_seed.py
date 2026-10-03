@@ -80,10 +80,13 @@ def test_prototype_manifest_uses_only_local_markdown_files():
     directory = Path(__file__).resolve().parents[1] / "data" / "prototype_knowledge"
     manifest = load_manifest(directory)
 
-    assert len(manifest.documents) == 26
-    assert len({entry.slug for entry in manifest.documents}) == 26
+    # 清单应覆盖目录内除 README 说明外的全部 md（以后新增语料不必再改这个测试）。
+    assert {entry.file for entry in manifest.documents} == {
+        path.name for path in directory.glob("*.md")
+    } - {"README.md"}
+    assert len({entry.slug for entry in manifest.documents}) == len(manifest.documents)
     assert all((directory / entry.file).is_file() for entry in manifest.documents)
-    # 2026-10-03 追加了 wellness 批次（9 篇），排序在末尾，故第二批次显式取 [9:17]。
+    # 人体系统批次（第 10–17 条）保持原样：每条只归一个系统、参考入口只允许 https。
     new_entries = manifest.documents[9:17]
     assert {system: sum(system in entry.body_systems for entry in new_entries)
             for system in ("respiratory", "digestive", "cardiovascular", "endocrine")} == {
@@ -98,22 +101,31 @@ def test_prototype_manifest_uses_only_local_markdown_files():
 
 
 def test_wellness_batch_is_prototype_only_and_marks_unreviewed():
-    """2026-10-03 追加的养生健身批次：自编原型语料，正文自带「未经医学专业审核」声明。"""
+    """养生健身批次：自编原型语料，正文自带「未经医学专业审核」声明与「不用于诊断或治疗」边界。"""
     directory = Path(__file__).resolve().parents[1] / "data" / "prototype_knowledge"
     manifest = load_manifest(directory)
-    wellness = [entry for entry in manifest.documents if entry.slug.startswith("wellness-")]
+    batches = (
+        "wellness-",  # 2026-10-03 第一批：总体原则（9 篇）
+        "fitness-",  # 2026-10-03 第二批：健身（≥10 篇）
+        "tcm-",  # 2026-10-03 第二批：养生（≥10 篇）
+    )
+    per_batch = {
+        prefix: [entry for entry in manifest.documents if entry.slug.startswith(prefix)]
+        for prefix in batches
+    }
 
-    assert len(wellness) == 9
-    for entry in wellness:
-        assert entry.topics
-        assert entry.reference_urls, entry.slug
-        # 官方入口允许 http（膳食指南与中医药局站点当前为 http），只要求是绝对 URL。
-        assert all(urlsplit(url).scheme in {"http", "https"} for url in entry.reference_urls)
-        assert entry.body_systems == []
-        content = load_markdown(directory / entry.file)
-        assert "未经医学专业审核" in content
-        assert "不用于诊断或治疗" in content
-        assert len(chunk_markdown(content)) >= 2
+    for prefix, entries in per_batch.items():
+        assert len(entries) >= (9 if prefix == "wellness-" else 10), f"{prefix} 语料数量不足"
+        for entry in entries:
+            assert entry.topics, entry.slug
+            assert entry.reference_urls, entry.slug
+            # 官方入口允许 http（膳食指南与中医药局站点当前为 http），只要求是绝对 URL。
+            assert all(urlsplit(url).scheme in {"http", "https"} for url in entry.reference_urls)
+            assert entry.body_systems == [], entry.slug
+            content = load_markdown(directory / entry.file)
+            assert "未经医学专业审核" in content, entry.slug
+            assert "不用于诊断或治疗" in content, entry.slug
+            assert len(chunk_markdown(content)) >= 2, entry.slug
 
 
 def test_medicine_use_source_covers_leftovers_and_stopping_early():

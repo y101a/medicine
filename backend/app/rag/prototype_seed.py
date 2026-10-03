@@ -47,7 +47,9 @@ class PrototypeManifest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     version: str = Field(min_length=1, max_length=32)
-    documents: list[PrototypeDocumentEntry] = Field(min_length=1, max_length=50)
+    # 上限只用于拦住异常清单。2026-10-03 语料扩到 53 篇（养生健身第一批 9 + 健身 13 + 养生 14）
+    # 后由 50 调整为 80，避免正常扩充语料被护栏挡下。
+    documents: list[PrototypeDocumentEntry] = Field(min_length=1, max_length=80)
 
 
 @dataclass(frozen=True, slots=True)
