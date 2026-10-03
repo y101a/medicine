@@ -273,12 +273,11 @@ test('侧栏有独立入口，页面明示作用域与格式限制，且没有�
   await expect(page.locator('.format-hint')).toContainText('PDF / Word / PPT / TXT / Markdown')
   await expect(page.locator('.format-hint')).toContainText('图片不在这里处理')
   /*
-   * `/users/me/avatar` 不在公共 `support.ts` 的默认桩里，是本条规格开始前就存在的缺口
-   * （工作区布局会去取头像）。这里只证明「私人知识库用到的接口一个都没漏配」，
-   * 所以把这条既存缺口排除在外，而不是改公共文件替其它规格兜底。
+   * `/users/me/avatar` 与 `GET /private-knowledge/collections` 已补进公共默认桩（2026-10-03，DSH），
+   * 所以这里不再为任何既存缺口开例外：断言回到最严的「一个未配置接口都不能有」，
+   * 缺口一旦重新出现，这条用例就会红，而不是只在日志里打一行字。
    */
-  const missing = state.unmatched.filter(item => item !== 'GET /users/me/avatar')
-  expect(missing, `私人知识库用到的接口有未配置项：${missing.join('、')}`).toEqual([])
+  expect(state.unmatched, `有未配置的接口：${state.unmatched.join('、')}`).toEqual([])
 })
 
 test('空知识库显示空态，新建后出现在列表并被选中', async ({ page }) => {

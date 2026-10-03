@@ -146,6 +146,17 @@ function defaultStubs(authenticated: boolean, noticeSeen: boolean): StubTable {
     },
     'DELETE /users/me/model-credentials/*': { body: {} },
 
+    /*
+     * 工作区布局与主页在挂载时就会取头像和私人知识库列表，所以这两个必须放在**默认桩**里：
+     * 之前没配，每个没显式接管它们的规格都会打出「未配置的接口：GET /users/me/avatar」，
+     * 逼得 `private-knowledge.spec.ts` 专门为这条既存缺口写例外。
+     *
+     * 头像返回 404 是**有意的**：这里验的是「没有头像时界面回落到首字母」，而不是造假图；
+     * 两个用头像的模板都带 `@error="avatarFailed = true"`，404 走的就是回落分支。
+     */
+    'GET /users/me/avatar': { status: 404, body: { message: '端到端测试未设置头像' } },
+    'GET /private-knowledge/collections': { body: { items: [] } },
+
     'POST /navigation/nearby-hospitals': { body: HOSPITALS },
     'POST /navigation/hospitals-by-area': { body: HOSPITALS },
   }
