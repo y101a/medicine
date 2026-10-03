@@ -1,0 +1,129 @@
+{
+  "schema_version": "1.0",
+  "verified_at": "2026-10-03",
+  "status": "pending_qualified_medical_review",
+  "content_mode": "original_summary",
+  "candidates": [
+    {
+      "id": "who-physical-activity-benefits-2024",
+      "source_key": "who_zh_fact_sheets",
+      "document_kind": "international_fact_sheet",
+      "title": "Physical activity（WHO 身体活动实况报道，2024-06-26 更新）",
+      "canonical_url": "https://www.who.int/news-room/fact-sheets/detail/physical-activity",
+      "published_at": "2024-06-26",
+      "summary_draft": "世界卫生组织身体活动实况报道指出，规律身体活动可降低全因死亡、心血管病死亡、高血压、2 型糖尿病与部分癌症的发生风险，并改善心理健康、认知、睡眠与体脂水平；身体活动不足者的死亡风险比活动充足者高 20%~30%。报道同时给出全球现状：约 31% 的成年人未达到每周至少 150 分钟中等强度活动的建议量。项目拟用于「为什么要动、动多少算够」的通用科普，不用于为个人制定运动处方。",
+      "verbatim_quotes": [],
+      "status": "pending_qualified_medical_review"
+    },
+    {
+      "id": "who-sedentary-behaviour-2024",
+      "source_key": "who_zh_fact_sheets",
+      "document_kind": "international_fact_sheet",
+      "title": "Physical activity（WHO 久坐行为与不活动的健康风险）",
+      "canonical_url": "https://www.who.int/news-room/fact-sheets/detail/physical-activity",
+      "published_at": "2024-06-26",
+      "summary_draft": "同一实况报道指出，久坐行为指清醒状态下低能量消耗的坐、靠、躺等状态；证据显示久坐过多与成人全因死亡、心血管病死亡与癌症死亡，以及心血管病、癌症、2 型糖尿病发生相关；在儿童青少年则与体脂增加、心肺健康变差、睡眠时间减少相关。世界卫生组织建议所有年龄组都应限制久坐时间。项目拟用于久坐危害科普与「每小时起来动一动」的行为提示，不解释为具体疾病的诊断或治疗建议。",
+      "verbatim_quotes": [],
+      "status": "pending_qualified_medical_review"
+    },
+    {
+      "id": "cnsoc-dietary-guidelines-2022-principles",
+      "source_key": "cnsoc_dietary_guidelines_2022",
+      "document_kind": "dietary_guideline",
+      "title": "《中国居民膳食指南（2022）》平衡膳食八准则",
+      "canonical_url": "http://dg.cnsoc.org/article/04/J4-AsD_DR3OLQMnHG0-jZA.html",
+      "published_at": "2022-04-26",
+      "summary_draft": "中国营养学会发布的《中国居民膳食指南（2022）》以八条平衡膳食准则呈现核心推荐，覆盖食物多样与合理搭配、吃动平衡、多吃蔬果奶类全谷大豆、适量吃鱼禽蛋瘦肉、少盐少油控糖限酒、规律进餐足量饮水、会烹会选会看标签、公筷分餐杜绝浪费。项目拟用于把「怎么吃更合理」讲清楚的通用科普，只做人群层面的原则性说明，不据此为个人开饮食处方或计算个体营养素目标。",
+      "verbatim_quotes": [],
+      "status": "pending_qualified_medical_review"
+    },
+    {
+      "id": "cnsoc-dietary-guidelines-2022-eat-move-balance",
+      "source_key": "cnsoc_dietary_guidelines_2022",
+      "document_kind": "dietary_guideline",
+      "title": "《中国居民膳食指南（2022）》准则二：吃动平衡，健康体重",
+      "canonical_url": "http://dg.cnsoc.org/article/04/J4-AsD_DR3OLQMnHG0-jZA.html",
+      "published_at": "2022-04-26",
+      "summary_draft": "指南准则二提出：各年龄段人群都应天天进行身体活动并保持健康体重；坚持日常身体活动，每周至少进行 5 天中等强度身体活动、累计 150 分钟以上，主动身体活动最好每天约 6000 步；鼓励适当进行高强度有氧运动，并加强抗阻运动每周 2~3 天；同时减少久坐时间、每小时起来动一动。项目拟用于与中国居民膳食结构配套的运动量科普；这些量值属人群建议，慢病、孕产、术后与已有运动损伤的人群需另按医生意见调整。",
+      "verbatim_quotes": [],
+      "status": "pending_qualified_medical_review"
+    },
+    {
+      "id": "cnsoc-dietary-guidelines-2022-salt-oil-sugar",
+      "source_key": "cnsoc_dietary_guidelines_2022",
+      "document_kind": "dietary_guideline",
+      "title": "《中国居民膳食指南（2022）》准则五：少盐少油，控糖限酒",
+      "canonical_url": "http://dg.cnsoc.org/article/04/J4-AsD_DR3OLQMnHG0-jZA.html",
+      "published_at": "2022-04-26",
+      "summary_draft": "指南准则五建议成年人每天摄入食盐不超过 5 克、烹调油 25~30 克，添加糖每天不超过 50 克并最好控制在 25 克以下，反式脂肪酸每天不超过 2 克；不喝或少喝含糖饮料；儿童青少年、孕妇、乳母以及慢性病患者不应饮酒，成年人如饮酒一天饮用的酒精量不超过 15 克。项目拟用于日常饮食的定量科普与慢病风险提示，不用于个体化的限盐、限酒治疗目标设定。",
+      "verbatim_quotes": [],
+      "status": "pending_qualified_medical_review"
+    },
+    {
+      "id": "sport-gov-national-fitness-guide-2017",
+      "source_key": "sport_gov_fitness_guidance",
+      "document_kind": "national_fitness_guidance",
+      "title": "《全民健身指南》发布（国家体育总局，2017-08-11）",
+      "canonical_url": "https://www.sport.gov.cn/whzx/n5588/c900457/content.html",
+      "published_at": "2017-08-11",
+      "summary_draft": "国家体育总局 2017 年发布《全民健身指南》，这是国家层面首部体育健身活动指南，主要内容框架包括参加体育健身活动前的安全性评估、运动能力测试与评价、个性化运动处方制定、一次体育健身活动方案以及不同阶段的体育健身活动方案，并介绍不同活动方式的健身效果与强度监控方法。项目拟用于说明「科学健身要先评估再安排」的框架性科普，不复制其中的处方模板，也不替代医生或运动处方师对个人的评估。",
+      "verbatim_quotes": [],
+      "status": "pending_qualified_medical_review"
+    },
+    {
+      "id": "sport-gov-warmup-and-protection-2025",
+      "source_key": "sport_gov_fitness_guidance",
+      "document_kind": "national_sports_science_article",
+      "title": "季节交替身心疲 运动防护不能少（国家体育总局网站，来源中国体育报）",
+      "canonical_url": "https://www.sport.gov.cn/n20001280/n20001265/n20066978/c28503043/content.html",
+      "published_at": "2025-02-26",
+      "summary_draft": "该科普文章说明季节交替时肌肉松弛、韧带僵硬，突然剧烈运动容易受伤，并引用国家体育总局体育科学研究所人员解释热身的作用；文中给出可操作的通用建议：热身以心跳轻微加快为宜，可做原地踏步、抬膝、转腰、俯身、举臂绕圈、深呼吸等约 10 分钟，专业运动需配套拉伸主要肌群并活动肩、胯、膝、踝等关节；运动着装可采用分层「洋葱式穿衣法」以兼顾保暖、透气与灵活调节。项目拟用于热身与运动保暖的通用科普，不用于判断或处理运动损伤。",
+      "verbatim_quotes": [],
+      "status": "pending_qualified_medical_review"
+    },
+    {
+      "id": "natcm-tcm-health-literacy-2014-principles",
+      "source_key": "natcm_tcm_wellness",
+      "document_kind": "tcm_health_literacy",
+      "title": "《中国公民中医养生保健素养》（国家中医药管理局、国家卫生计生委，2014）",
+      "canonical_url": "http://www.natcm.gov.cn/bangongshi/gongzuodongtai/2018-03-25/5248.html",
+      "published_at": "2014-06-06",
+      "summary_draft": "国家中医药管理局与国家卫生计生委 2014 年发布《中国公民中医养生保健素养》，共 42 条，涵盖基本理念和知识、健康生活方式与行为、常用养生保健内容与简易方法；提出情志、饮食、起居、运动是中医养生的四大基石，强调顺应自然、因人而异与持之以恒，并给出起居有常、饮食均衡搭配、不抽烟慎饮酒等行为建议。项目拟用于中医养生一般理念的科普；涉及「功效」与「体质」的表述需按审核意见改写为中医理论表述，不得写成对个人的疗效承诺或治疗方案。",
+      "verbatim_quotes": [],
+      "status": "pending_qualified_medical_review"
+    },
+    {
+      "id": "natcm-tcm-health-literacy-2014-simple-methods",
+      "source_key": "natcm_tcm_wellness",
+      "document_kind": "tcm_health_literacy",
+      "title": "《中国公民中医养生保健素养》第三十三至四十二条（常用养生保健简易方法）",
+      "canonical_url": "http://www.natcm.gov.cn/bangongshi/gongzuodongtai/2018-03-25/5248.html",
+      "published_at": "2014-06-06",
+      "summary_draft": "该素养第三十三至四十二条列出叩齿、闭口调息、咽津、搓面、梳发、运目、凝耳、提气、摩腹、足心按摩等自我保健简易方法，并给出次数或时长。项目不建议直接采用：这些条目原文带有保健功效说法（如「清肝明目」「强腰固肾」「帮助消化」），部分涉及自行操作；如需保留，只能作为传统养生动作介绍并明确不治病、不替代治疗；艾灸、拔罐、刮痧等涉及器具与皮肤烫伤、损伤风险的项目不做操作指导，只提示应由专业人员进行。",
+      "verbatim_quotes": [],
+      "status": "pending_qualified_medical_review"
+    },
+    {
+      "id": "fujian-wjw-tcm-exercise-safety-2026",
+      "source_key": "fujian_wjw_repost",
+      "document_kind": "health_authority_repost",
+      "title": "运动是良医！中医健身可以这么练（福建省卫健委网站转载新华社报道）",
+      "canonical_url": "https://wjw.fujian.gov.cn/xxgk/gzdt/mtbd/202601/t20260122_7083845.htm",
+      "published_at": "2026-01-22",
+      "summary_draft": "该报道由国家中医药管理局组织专家解读八段锦、五禽戏、易筋经等中医养生保健功法，说明功法通过形体动作、呼吸吐纳与心理调节相结合进行锻炼；练习强调动静结合；冬季宜在室内、微汗即止，户外需向阳背风并避开日出前、深夜与大风雨雪天气；练习后肌肉酸痛与疲劳若超过 3 天不缓解或影响日常活动，应暂停并排查原因，必要时咨询医务人员；老年人练习前需排查高血压、糖尿病、骨质疏松等疾病并在医生指导下进行，不挑战高难度高强度动作，出现头晕、心慌、关节疼痛应立即停止。项目拟用于传统功法的安全练习与就医分流科普；文中按体质推荐具体式子属个体化建议，需按审核意见处理或删除。",
+      "verbatim_quotes": [],
+      "status": "pending_qualified_medical_review"
+    },
+    {
+      "id": "chinacdc-healthy-lifestyle-action",
+      "source_key": "china_cdc_health_education",
+      "document_kind": "public_health_action_intro",
+      "title": "全民健康生活方式行动（中国疾控中心）",
+      "canonical_url": "https://www.chinacdc.cn/jiankang121/mryw/",
+      "published_at": "2022-10-25",
+      "summary_draft": "中国疾控中心全民健康生活方式行动页面介绍：该行动 2007 年由原卫生部疾控局、全国爱国卫生运动委员会办公室和中国疾病预防控制中心共同发起，以「健康一二一」（每日一万步、吃动两平衡、健康一辈子）为切入点；2016 年提出「三减三健」，即减盐、减油、减糖与健康口腔、健康体重、健康骨骼，此后被写入《健康中国行动（2019—2030）》等国家级文件；第二阶段行动方案提出三减三健、适量运动、控烟限酒和心理健康等专项行动。项目拟用于健康生活方式的框架科普；该来源在注册表中标注需要授权后才可入库。",
+      "verbatim_quotes": [],
+      "status": "pending_qualified_medical_review"
+    }
+  ]
+}
