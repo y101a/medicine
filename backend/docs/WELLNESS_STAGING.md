@@ -107,3 +107,120 @@
 - 若走这条路，必须先做两件事：① 把带中医功效表述、自行操作（艾灸/拔罐/刮痧）和个体化建议的条目**剔除或改写**；
   ② 这批内容是对外部页面的摘要，若挂到「个人开发原型医学语料」这个来源下会**错标来源**，必须在文档元数据里
   显式写明真实出处与「未医学审核」状态。
+
+## 8. 来源登记提案（**未落地**——注册表我没有改，原因是硬约束）
+
+### 8.1 为什么不能直接加这 4 个来源
+
+`backend/tests/test_medical_source_registry.py::test_medical_source_registry_uses_unique_official_https_channels`
+对注册表里**每一个**来源都断言：`entry_url` 必须是 `https`，且**域名必须属于写死的 `TRUSTED_DOMAINS`**，
+当前只有 6 个：`app.gjzwfw.gov.cn`、`www.chinacdc.cn`、`www.ndcpa.gov.cn`、`www.nhc.gov.cn`、
+`www.nmpa.gov.cn`、`www.who.int`。我要用的 4 个域名一个都不在里面。
+
+直接加进去会：① 让这条测试立刻变红；② 等于顺手**放宽一个来源白名单**——「哪些机构算可信来源」是政策决定，
+不是实现细节，所以我不擅自改，改为提交提案 + 在 `COORDINATION.md` §6 请 Codex（该注册表与测试的归属方）确认。
+
+另一条测试 `test_approved_sources_remain_manual_summary_only` 断言白名单恰好是那 3 个来源、且所有来源
+`automated_collection` 为 `false`；**本提案不动白名单**，所以它不受影响。
+
+### 8.2 https 可用性（我实测到的，只写现象）
+
+| 域名 | https 实测 | 能否直接作 `entry_url` |
+| --- | --- | --- |
+| `www.sport.gov.cn` | ✅ 抓取成功（HTTP 200） | 可以 |
+| `wjw.fujian.gov.cn` | ✅ 抓取成功（HTTP 200） | 可以 |
+| `dg.cnsoc.org` | ❌ 本机抓取失败 | **未确认**（不能据此断定站点不支持 https，需复审时再验） |
+| `www.natcm.gov.cn` | ❌ 本机抓取失败 | **未确认** |
+
+### 8.3 提案内容（等白名单决定后再落盘）
+
+追加到 `medical_source_registry.json` 的 `sources[]`（**`policy.approved_for_ingestion` 保持 3 条不变**）：
+
+~~~json
+[
+  {
+    "id": "cnsoc_dietary_guidelines_2022",
+    "priority": 2,
+    "organization": "中国营养学会",
+    "authority_level": "national_academic_society",
+    "jurisdiction": "CN",
+    "language": "zh-CN",
+    "channel_name": "《中国居民膳食指南（2022）》",
+    "entry_url": "https://dg.cnsoc.org/",
+    "content_scope": ["平衡膳食原则", "食物与营养建议", "人群膳食指导"],
+    "rag_role": "nutrition_guideline_candidate",
+    "ingestion_status": "permission_required",
+    "automated_collection": false,
+    "review_interval_days": 90,
+    "notes": "2026-10-03 由 DSH 登记为候选来源（用户为养生健身储备要求先登记）：只做登记，未做版权与医学审核，也未加入 approved_for_ingestion。页面页脚声明「中国居民膳食指南 版权所有 Copyright © 2014 cnsoc.org」，未定位到独立版权声明页。定性建议：只做人群层面原则摘要，不得转成个人饮食处方或营养素目标。"
+  },
+  {
+    "id": "sport_gov_fitness_guidance",
+    "priority": 2,
+    "organization": "国家体育总局",
+    "authority_level": "national_sports_authority",
+    "jurisdiction": "CN",
+    "language": "zh-CN",
+    "channel_name": "国家体育总局全民健身科普与《全民健身指南》",
+    "entry_url": "https://www.sport.gov.cn/",
+    "content_scope": ["全民健身指导", "运动防护与热身", "科学健身科普"],
+    "rag_role": "fitness_guidance_candidate",
+    "ingestion_status": "permission_required",
+    "automated_collection": false,
+    "review_interval_days": 90,
+    "notes": "2026-10-03 由 DSH 登记为候选来源，未做版权与医学审核，也未加入 approved_for_ingestion。页面页脚标注「国家体育总局版权所有　国家体育总局体育信息中心承办」，未定位到独立版权声明页。定性建议：只讲通用热身与防护，不复制运动处方模板，不为个人开运动处方。"
+  },
+  {
+    "id": "natcm_tcm_wellness",
+    "priority": 2,
+    "organization": "国家中医药管理局",
+    "authority_level": "national_tcm_authority",
+    "jurisdiction": "CN",
+    "language": "zh-CN",
+    "channel_name": "国家中医药管理局中医养生保健素养与工作动态",
+    "entry_url": "https://www.natcm.gov.cn/",
+    "content_scope": ["中医养生保健素养", "治未病理念", "传统功法科普"],
+    "rag_role": "tcm_wellness_candidate",
+    "ingestion_status": "permission_required",
+    "automated_collection": false,
+    "review_interval_days": 90,
+    "notes": "2026-10-03 由 DSH 登记为候选来源，未做版权与医学审核，也未加入 approved_for_ingestion。页面页脚标注「版权所有：国家中医药管理局」。审核口径要求：中医「功效」类表述必须改写为理论表述，不得写成疗效承诺；艾灸、拔罐、刮痧等自施操作不做操作指导；个体化体质选式建议需删除或改写。"
+  },
+  {
+    "id": "fujian_wjw_repost",
+    "priority": 3,
+    "organization": "福建省卫生健康委员会",
+    "authority_level": "provincial_health_authority",
+    "jurisdiction": "CN",
+    "language": "zh-CN",
+    "channel_name": "福建省卫健委媒体报道转载",
+    "entry_url": "https://wjw.fujian.gov.cn/",
+    "content_scope": ["健康科普转载", "传统功法与运动科普"],
+    "rag_role": "repost_channel_candidate",
+    "ingestion_status": "permission_required",
+    "automated_collection": false,
+    "review_interval_days": 30,
+    "legal_notice_url": "http://wjw.fujian.gov.cn/bzzx/mzsm/",
+    "notes": "2026-10-03 由 DSH 登记为候选来源，未做版权与医学审核，也未加入 approved_for_ingestion。已抓取核对该站《免责声明》（2019-02-11）：注明「稿件来源：福建省卫生健康委员会」的稿件版权属该站、未经协议授权不得转载；未注明来源的均为转载稿，使用时必须保留其注明的稿件来源并自负版权等法律责任。对应候选条目《运动是良医！中医健身可以这么练》页面注明来源为新华网，属转载稿、权利在原媒体——入库前必须完成授权判断，建议优先改用国家中医药管理局的原始文件替代。"
+  }
+]
+~~~
+
+### 8.4 落盘时要一并改的（不属于注册表本体）
+
+1. `backend/tests/test_medical_source_registry.py` 的 `TRUSTED_DOMAINS`：加入 `www.sport.gov.cn`、
+   `wjw.fujian.gov.cn`（另两个域名 https 未确认，先不加）；
+2. `backend/docs/MEDICAL_KNOWLEDGE_SOURCES.md`：来源清单同步（该文件第 12 行指向机器可读注册表）。
+
+### 8.5 验证命令（落盘后必须跑）
+
+~~~powershell
+& .\.venv\Scripts\python.exe -m pytest tests/test_medical_source_registry.py -q
+& .\.venv\Scripts\python.exe -m pytest tests/test_controlled_ingestion.py -q
+~~~
+
+### 8.6 需要你决定的一件事
+
+**是否把这 4 家机构加入受信来源白名单**（中国营养学会 / 国家体育总局 / 国家中医药管理局 / 福建省卫健委）？
+这是把「谁算可信来源」从 6 个国家级机构 + WHO，放开到 4 个新机构，属于实质政策决定；决定后才能落盘提案，
+之后才轮到「登记 → 医学审核 → 加入 `approved_for_ingestion` → 导入」。
