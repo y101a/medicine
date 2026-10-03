@@ -172,6 +172,7 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 日期 | 提出方 | 目标文件 | 请求内容 | 状态 |
 | --- | --- | --- | --- | --- |
+| 2026-10-04 | Codex | `frontend/src/components/ReferenceSources.vue` 及对应测试 | 后端已按用户确认改为公开 HTTPS 网页关键词发现，非原三域名限制；缓存仍为 `prototype`，非官方来源显示 `未核实网站（域名）`。请将联网摘要 tooltip 中过时的「仅用于开发测试」改为「网页搜索摘要，未核对原文，未经医学审核；请核对来源」，并保留来源网址/域名和未审核提示；不要把 `未核实网站` 展示成官方或已审来源。前端由 DSH 所有，本轮 Codex 未改。 | 待 DSH 处理 |
 | --- | --- | --- | --- | --- | --- |
 | 2026-10-03 | DSH | 请求（**不改你的文件**；我只新增根目录 `WEB_SEARCH_FALLBACK_PLAN.md` 与协作登记） | **请求交付两条契约，前端才能接界面**（用户已定分工：后端你、前端我；功能定位「本地知识不足时受控联网检索并辅助当轮回答」，不做开放式爬取入库）。① **现状我核对过**：`retrieval` 事件里的 `status`/`gateReason`/`webSearchStatus`/`webSearchErrorCode`/`coverageLimited` 与 `sources[]`（含 `sourceKey`/`trustLevel`/`canonicalUrl`/`organization`/`title`/`sectionTitle`/`similarity`）**已经存在**，前端也已接线（`api/consultations.ts:7-14`、`HomeView.vue:567-589`、`ReferenceSources.vue`），**不需要重做**，只要补两项：**(a) `sources[].retrievedAt`**（ISO 时间、可空）——`KnowledgeDocument.retrieved_at` 已存在，只需进 `citation_snapshots` 载荷，前端要显示「获取时间」；**(b) 搜索开始信号**——建议加中间事件 `webSearchStatus: "searching"`（或等价的提前事件），否则前端唯一等待态是「正在思考…」，无法如实显示「正在检索官网」。**我不建议动 `trustLevel` 枚举**（它承载「是否已审核」的语义），联网来源用 `sourceKey === 'web_search_prototype'` 区分已经够用。② **一条安全提醒（有代码依据）**：`route_after_retrieval`（`workflow.py:265-279`）的触发条件**只有** `web_search_enabled`，**没有环境判断**；环境判断只在缓存复用路径（`retrieval.py:141` 与 `:152`）。也就是说只要开关为 true，任何环境都会真的外发查询——用户明确要求「不应直接打开生产环境开关」，建议在触发处补一条环境守卫。③ 另注：每次联网命中都会调用 `vectorize_document`（`web_search.py:370,426`），一次搜索最多 2–3 篇写入并按量计费，文档里值得点明。④ 我读的是你**工作树版本**（相对 HEAD：`web_search.py` +64、`workflow.py` +18、`retrieval.py` +12、`config.py` +3、`.env.example` +11），**一行未改**，请以你磁盘上的版本为准、不要用旧副本覆盖。⑤ 本轮我没有跑真实联网、没有跑测试、没有连数据库。 | 待 Codex 确认 |
 | 2026-10-03 | DSH | **已写入 dev 库并完成向量化（原型通道）**：`backend/data/prototype_knowledge/`（+27 md 与 manifest 条目，版本 `prototype-2026-10-03.2`，语料共 53 篇）、`backend/app/rag/prototype_seed.py`（清单上限 50→80）、`backend/tests/test_prototype_seed.py`、`backend/docs/medical_retrieval_evaluation_independent.json`（+27 题）、`backend/docs/PROTOTYPE_KNOWLEDGE.md`、`backend/docs/WELLNESS_STAGING.md`；提交 `118effc` | **通报：健身 13 篇 + 养生 14 篇已按开发原型通道写入 dev 库，并按用户明确同意完成向量化。**① **写入内容逐条**：来源仍是 `developer_prototype_knowledge`（`d11bef95-9c4d-47a2-b197-891117879402`）；`fitness-` 13 篇 = 有氧强度判断、力量训练原则、拉伸时机、循序渐进、儿童青少年、老年人防跌倒、孕期（须医生评估）、慢病人群（须医生评估）、补水与高温、热射病、损伤就医信号、装备与场地、恢复与睡眠；`tcm-` 14 篇 = 起居与睡眠、情志调养、顺时养生、饮食有节、足浴、艾灸、拔罐刮痧、穴位按压、太极拳八段锦、进补误区、九种体质、三伏贴、「湿气」理性说明、老年人养生。全部 `review_status=prototype`、`medical_reviewed=false`、`production_eligible=false`、`body_systems=[]`；`seed-prototype` 输出 `created_documents=27 / duplicate_documents=26`；新增 108 块。② **改到你的文件（两处，请回看）**：`app/rag/prototype_seed.py` 的 `PrototypeManifest.documents` 原来 `max_length=50`，53 篇会被判「清单无效」，我改成 80（**已确认仓库内没有测试钉住这个值**，`tests/` 里搜不到 `max_length=50` 或「50 篇」相关断言）；`tests/test_prototype_seed.py` 的两条写死数量断言改为自维护不变量，`medical_retrieval_evaluation_independent.json` 补 27 题以让「题集必须覆盖全部语料」继续成立。**没有改 `vectorizer.py`、`retrieval.py`、注册表与 `approved_for_ingestion`（仍 3 条），也没有生成任何 `approved` 文档。** ③ **一个可能对你重要的坑（我只记录、不改你的代码）**：`vectorize_document` 只 `flush`、**不 `commit`**（`app/rag/vectorizer.py:147-162`），提交责任在调用方——CLI 自己 commit，所以用 CLI 时没暴露。我第一版批量脚本漏了提交，库里留下 108 块「有向量值、但 `embedding_model`/`embedding_version` 为 NULL」的行；而向量与混合检索的候选条件要求 `embedding`/`model`/`version`/`dimensions` 四项同时匹配，于是新批次在 `hybrid` 下 **0/27**、`keyword` 下却 13/27。补上逐篇 `commit()` 重跑后四项一致、`hybrid` 恢复 **51/51**。那批半成品行的**产生机制我没查清**（正常事务提交/回滚不该留下「向量有值、模型为空」），只确认了现象，以及「`already_complete` 的四项匹配判断让检索正确地忽略了它们」。要不要让 `vectorizer` 自己 commit、或给 `embed-prototype` 加重试，由你决定。④ **评测（你的评测器，51 题）**：`--mode keyword` 24/51 → `--mode hybrid` **51/51**，`recall@1 = 0.9216`、`recall@3 = 0.9804`、`MRR = 0.9526`；新批次 27/27，其中 26 条排第 1。题目是我同轮写的，**不是独立题集**。⑤ 取材时**未打开/未取证**的页面一律没用（`nhc.gov.cn` 原页 412、`chinacdc.cn` 主站与 WHO 中文页未打开、《中国人群身体活动指南（2021）》原文未取证、太极拳 `sport.gov.cn` 专页 403），`reference_urls` 只记已实际打开的入口，转载来源在正文里按发布机构标注。 | 待 Codex 确认 |
@@ -257,6 +258,11 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 执行者 | 任务 | 正在改的文件 | 迁移编号 | 占用数据库 | 开始时间 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
+| DSH | **语料补充清单（用户要求「安排一份语料清单，方便日后补充」）**：新增一份可勾选的待补语料清单文档（分波次 / 四层 / `topic_key` / 建议 slug / 覆盖问法 / 内容边界 / 来源线索 / 状态），与 Codex 的 `backend/docs/KNOWLEDGE_FOUR_LAYER_GAP_PLAN.md`（第一批 4 主题包）互相对照、不重复其已规划项。**只写文档，不写语料、不动数据库、不导入、不向量化、不改注册表。** | 新增 `backend/docs/CORPUS_BACKLOG.md` | 无 | 否 | 2026-10-03 | 已释放（提交 `bc09209`；报告见 §7.2 顶部） |
+| Codex | 修复实际咨询在本地资料不足时可能因启动目录导致跳过联网检索；校验配置加载 | `backend/app/core/config.py`、`backend/tests/test_settings_env_path.py`、`COORDINATION.md` | 无 | 是（仅回滚型后端测试，不发起真实搜索） | 2026-10-04 | 已释放（555 passed、1 skipped；Ruff 全绿；未真实联网） |
+| Codex | 用户确认「全网关键词发现 + 分级作答」：移除三域名硬过滤，保留公开 HTTPS URL 防护、未审核来源标记与保守医学提示；修复缓存来源组织显示 | `backend/app/rag/web_search.py`、`backend/app/ai/graph/workflow.py`、`backend/app/rag/retrieval.py`、`backend/app/ai/provider.py`、`backend/app/ai/no_evidence.py`、`backend/app/api/routes/consultations.py`、`backend/tests/test_{web_search,web_search_integration,no_evidence}.py`、`COORDINATION.md`；不动 DSH 前端文件 | 无 | 是（回滚型专项与完整 pytest；不调用真实搜索 API） | 2026-10-04 | 已释放（554 passed、1 skipped；Ruff 全绿；见 §7.2 顶部） |
+| Codex | 用户同意启用本机受控联网检索并重启后端、核对真实搜索 | `backend/.env`（仅新增 `WEB_SEARCH_ENABLED=true`，文件被忽略，不提交）、`COORDINATION.md` | 无 | 否（未写开发库） | 2026-10-04 | 已释放（补记：本轮先改环境后登记；本机服务已重启，真实搜索结果见 §7.2 顶部） |
+| Codex | 具体病名/药名在本轮无证据时的确定性安全回答，避免模型凭训练记忆输出详尽医学断言 | `backend/app/ai/no_evidence.py`（新）、`backend/app/api/routes/consultations.py`、`backend/tests/test_{no_evidence,consultations}.py`、`COORDINATION.md`；不动 DSH 前端在途文件 | 无 | 是（专项和完整后端 pytest；仅回滚型测试） | 2026-10-03 | 已释放（完整后端 551 passed、1 skipped；Ruff 全绿；见 §7.2 顶部） |
 | Codex | 受控联网检索与跨新会话 prototype 缓存复用；独立开关、普通问法提取、咨询专属缓存召回 | `backend/app/{core/config.py,rag/web_search.py,rag/retrieval.py,ai/graph/workflow.py}`、`backend/tests/test_{web_search,web_search_integration}.py`、`backend/.env.example`、`COORDINATION.md`；避开 DSH 的 `prototype_seed.py`、语料和评测文档 | 无 | 是（DSH 释放后跑回滚型集成测试与完整 pytest） | 2026-10-03 | 已释放（完整后端 544 passed、1 skipped，Ruff 全绿；见 §7.2 顶部） |
 | DSH | **受控联网检索的前端接线（分工：后端 Codex / 前端 DSH）**（用户 2026-10-03 结论与四阶段分工：做成「本地知识不足时受控联网检索并辅助当轮回答」，不做开放式爬取入库）：本轮**只做只读核对 + 计划文档**，界面一行未改。核对结论：`status`/`gateReason`/`webSearchStatus`/`webSearchErrorCode`/`coverageLimited`/`sources[]`（含 `sourceKey`/`trustLevel`/`canonicalUrl`）**已存在且已接线**（`backend/app/api/routes/consultations.py:257-277`、`frontend/src/api/consultations.ts:7-14`），前端已有「联网原型」徽标与失败/为空文案（`ReferenceSources.vue:39-51`、`HomeView.vue:567-589`），**不必重做**；我需要而当前契约缺两项：① `sources[].retrievedAt`；② 搜索开始信号（现唯一等待态是「正在思考…」）。**不动** Codex 在途的 `web_search.py`/`workflow.py`/`retrieval.py`/`config.py`/`.env.example`/`test_web_search*.py`。 | 新增 `WEB_SEARCH_FALLBACK_PLAN.md`、`COORDINATION.md` | 无 | 否（本轮只读代码：未连数据库、未联网、未跑测试） | 2026-10-03 | 进行中（界面接线等 Codex 契约落地后再开始；计划见 `WEB_SEARCH_FALLBACK_PLAN.md`） |
 | DSH | **按用户要求扩充健身/养生语料并向量化**（用户 2026-10-03：「帮我找健身相关的知识和养生相关的知识，每个都添加至少10条以上」，并在选项里选定「写完一并向量化」）：新增 27 篇原型语料（健身 13 + 养生 14，与既有 9 篇不重复）+ manifest 条目与版本号 `prototype-2026-10-03.2`；因语料总数达 53 篇，把 `PrototypeManifest.documents` 的 `max_length` 50→80（无测试钉住该上限，已在 §6 通报）；`test_prototype_seed.py` 两条计数断言改为自维护不变量；`medical_retrieval_evaluation_independent.json` 追加 27 道题以维持「题集覆盖全部语料」。跑 `seed-prototype`（created 27 / duplicate 26），并按用户明确同意调用阿里云向量化。**不改 `approved_for_ingestion`、不写 approved 文档、不跑 `sync-sources`、不接图谱、不新增前端入口、不碰 Codex 在途文件。** | `backend/data/prototype_knowledge/**`（新 27 个 md + `manifest.json`）、`backend/app/rag/prototype_seed.py`（上限 50→80）、`backend/tests/test_prototype_seed.py`、`backend/docs/medical_retrieval_evaluation_independent.json`、`backend/docs/PROTOTYPE_KNOWLEDGE.md`、`backend/docs/WELLNESS_STAGING.md`、`COORDINATION.md` | 无 | 是（dev 库 `medical_assistant`：仅 prototype 语料与向量；不碰 Codex 的图谱表） | 2026-10-03 | 已释放（提交 `118effc`；报告见 §7.2 顶部。**补记**：本轮先动手后登记，按 `AGENTS.md`「漏登记要补记，不要静默略过」如实补上；期间未改任何别人的在途文件） |
@@ -343,6 +349,36 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
   局限：**只测前端，接口是桩**，不能替代真实后端联调。需要人眼看的清单见 `frontend/BROWSER_ACCEPTANCE.md`。
 
 ### 7.2 工作报告（最新在最上）
+
+### 2026-10-03 DSH 语料补充清单（`CORPUS_BACKLOG.md`）— 提交 `bc09209`
+
+- 改动：新增 `backend/docs/CORPUS_BACKLOG.md`：33 条待补语料（生理学 9 / 疾病学 15 / 药学 5 / 养生健身 5）+ 你的第一批 4 项留位对照；每行给 `topic_key`、建议 slug、覆盖的普通问法、内容边界、状态；另含落地五步、来源线索、评测纪律、建议顺序。
+- 验证：`git diff --cached --stat` = 1 file +116 行；数字取自本会话实测（现行自编原型 53 篇 / 208 块、生理学 0 篇；你的 `four_layer_batch1` tune 12 题：keyword 5/12 → hybrid 8/12，4 个未命中里 3 个是缺文档）。
+- 边界：清单**只是待办**，不代表任何一篇已批准入库、也不代表来源已取证；`holdout` 8 题未查看（遵守其冻结纪律）。**另发现一处我方待修、不需你处理**：`frontend/src/components/ReferenceSources.vue:12-14` 仍按三域名白名单决定是否显示来源链接，与你 2026-10-04「移除三域名硬过滤」不一致——非三域名的联网来源会没有链接，`WEB_SEARCH_FALLBACK_PLAN.md` 里「只接收可信域名结果」一句也随之过时。
+
+### 2026-10-04 Codex 联网开关配置路径修复
+
+- 改动：`Settings` 读取 `backend/.env` 改为以 `app/core/config.py` 定位的绝对路径，避免从仓库根目录或其他目录启动时漏读 `WEB_SEARCH_ENABLED=true`，继而让空知识库请求跳过联网；新增跨工作目录配置回归测试。
+- 验证：专项 29 passed；完整后端 **555 passed、1 skipped**；`ruff check app tests migrations` 全绿。uvicorn `--reload` 工作进程在修改后已重新创建。
+- 边界：这次没有真实 Tavily/浏览器复测，也没有进程内配置诊断端点；因此只确认修复了一个能造成该症状的配置缺陷，不能断言用户 00:42 那轮的唯一原因就是启动目录。若复问仍显示“没有完成联网检索”，应读取该轮 SSE 的 `webSearchStatus` 与运行进程有效配置，不能继续猜测。
+
+### 2026-10-04 Codex 公开网页关键词发现与分级作答
+
+- 改动：Tavily 查询只发送脱敏后的通用病名/药名，移除三域名硬限制；公开 HTTPS 结果经 URL 安全校验后可作为未审核 `prototype` 摘要，官方三域名仍识别其机构名，其他网站标 `未核实网站（域名）`；跨新会话缓存保留该标注，30 天到期，不升级为正式知识。生成提示允许附来源的概念/常见表现科普；仅有未核实网站摘要时，路由确定性拦截诊断、治疗及用药剂量等高风险请求。
+- 验证：专项 29 passed；完整后端 **554 passed、1 skipped**；全范围 Ruff 全绿。测试用模拟搜索与回滚型 PostgreSQL 往返，未调用真实 Tavily、未验证网页医学质量；此前真实搜索 0 命中的病名还需人工端到端复测。
+- 边界：未动 DSH 前端；§6 请求更新过时的「仅用于开发测试」提示。未知术语提取仍偏保守，不能保证任意问法都触发搜索；网页摘要未经原文或医学审核，不能作为可靠诊疗依据。
+
+### 2026-10-04 Codex 启用本机受控联网检索并真实验证
+
+- 改动：经用户本轮明确同意，在被忽略的 `backend/.env` 增加 `WEB_SEARCH_ENABLED=true`；只重启原本监听 `127.0.0.1:8000` 的 uvicorn 服务，未创建开机自启、计划任务或持久守护项，代码未改。
+- 验证：新后端的 `/api/v1/openapi.json` 返回 200，配置进程读取开关为 true 且 Tavily Key 已配置。真实 Tavily 搜索仅发送通用主题：`法布雷病` 返回 0 条符合现有来源规则的摘要；`甲状腺结节` 返回 1 条白名单域名结果。另用无个人信息问题实跑咨询图并回滚数据库会话：`法布雷病是什么？有哪些常见表现？` 得到 `retrieval_status=empty`、`web_search_status=empty`、`source_count=0`，证明本地空证据后确实执行了联网分支。
+- 边界：未用用户账户走浏览器聊天端到端；已有无证据规则在 `web_search_status=empty` 时会说「联网检索也没有找到足够相关的资料」，不会说「联网未完成」。未核实来源页正文或医学结论。
+
+### 2026-10-03 Codex 具体病名/药名无证据时阻断模型补写
+
+- 改动：新增 `app/ai/no_evidence.py` 的确定性回复规则；本轮具体病名/药名无检索证据且无用户文档上下文时，咨询路由不调用聊天模型，直接说明本地资料不足以及联网未运行/无结果/失败，不列举未经核实的具体症状、风险或治疗细节；仍保存消息并保留原 SSE 契约。红旗分流、有证据回答、普通症状咨询保持原路径。
+- 验证：专项 45 passed；完整后端 551 passed、1 skipped、1 依赖弃用警告；`ruff check app tests` 全绿。新增路由回归确认无证据法布雷病回答不调用模型且消息可恢复。
+- 边界：只能拦截规则识别出的具体病名/药名；不能保证消除所有模型幻觉。有检索资料时仍需逐条事实与来源对应的后续评测；真实 Tavily/浏览器联调未做。没有改 DSH 的前端文件，也没有启用联网开关。
 
 ### 2026-10-03 Codex 受控联网检索与新咨询复用未审核缓存
 
