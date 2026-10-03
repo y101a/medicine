@@ -13,10 +13,17 @@ CANDIDATES_PATH = (
 )
 TRUSTED_DOMAINS = {
     "app.gjzwfw.gov.cn",
+    # 2026-10-03 用户批准扩充：养生健身知识储备的 3 个国家级来源（中国营养学会 /
+    # 国家体育总局 / 国家中医药管理局）。这三条仅是**登记**，未加入
+    # approved_for_ingestion，仍需真实医学审核后才能导入。福建卫健委转载稿已按
+    # 用户决定暂缓，未加入本白名单。
+    "dg.cnsoc.org",
     "www.chinacdc.cn",
+    "www.natcm.gov.cn",
     "www.ndcpa.gov.cn",
     "www.nhc.gov.cn",
     "www.nmpa.gov.cn",
+    "www.sport.gov.cn",
     "www.who.int",
 }
 

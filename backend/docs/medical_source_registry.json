@@ -160,6 +160,78 @@
       "legal_notice_url": "https://www.who.int/about/policies/publishing/copyright",
       "review_interval_days": 30,
       "notes": "逐篇核对许可证和第三方材料；商业用途通常需许可。本地就医和用药建议优先采用中国大陆官方来源。"
+    },
+    {
+      "id": "cnsoc_dietary_guidelines_2022",
+      "priority": 2,
+      "organization": "中国营养学会",
+      "authority_level": "national_academic_society",
+      "jurisdiction": "CN",
+      "language": "zh-CN",
+      "channel_name": "《中国居民膳食指南（2022）》",
+      "entry_url": "https://dg.cnsoc.org/",
+      "content_scope": ["平衡膳食原则", "食物与营养建议", "人群膳食指导"],
+      "rag_role": "nutrition_guideline_candidate",
+      "ingestion_status": "permission_required",
+      "automated_collection": false,
+      "review_interval_days": 90,
+      "ingestion_policy": {
+        "allowed_content_modes": ["original_summary"],
+        "max_content_chars": 1600,
+        "max_verbatim_quotes": 2,
+        "max_verbatim_quote_chars_each": 60,
+        "max_verbatim_quote_chars_total": 100,
+        "require_source_attribution": true
+      },
+      "notes": "2026-10-03 由 DSH 按用户决定登记：仅登记来源，未加入 approved_for_ingestion，未经版权与医学审核。页面页脚声明「中国居民膳食指南 版权所有 Copyright © 2014 cnsoc.org」，未定位到独立版权声明页。https 可用性本机未能确认（抓取工具与 PowerShell 均失败，PowerShell 报 SSL/TLS 信任错误），按注册表 https 硬要求填写，复核时需实测。定性要求：只做人群层面原则摘要，不得转成个人饮食处方或营养素目标。"
+    },
+    {
+      "id": "sport_gov_fitness_guidance",
+      "priority": 2,
+      "organization": "国家体育总局",
+      "authority_level": "national_sports_authority",
+      "jurisdiction": "CN",
+      "language": "zh-CN",
+      "channel_name": "国家体育总局全民健身科普与《全民健身指南》",
+      "entry_url": "https://www.sport.gov.cn/",
+      "content_scope": ["全民健身指导", "运动防护与热身", "科学健身科普"],
+      "rag_role": "fitness_guidance_candidate",
+      "ingestion_status": "permission_required",
+      "automated_collection": false,
+      "review_interval_days": 90,
+      "ingestion_policy": {
+        "allowed_content_modes": ["original_summary"],
+        "max_content_chars": 1600,
+        "max_verbatim_quotes": 2,
+        "max_verbatim_quote_chars_each": 60,
+        "max_verbatim_quote_chars_total": 100,
+        "require_source_attribution": true
+      },
+      "notes": "2026-10-03 由 DSH 按用户决定登记：仅登记来源，未加入 approved_for_ingestion，未经版权与医学审核。页面页脚标注「国家体育总局版权所有　国家体育总局体育信息中心承办」，未定位到独立版权声明页。https 实测：抓取工具成功（HTTP 200），PowerShell 失败（本机网络/TLS 受限），以抓取工具结果为准。定性要求：只讲通用热身与防护，不复制运动处方模板，不为个人开运动处方。"
+    },
+    {
+      "id": "natcm_tcm_wellness",
+      "priority": 2,
+      "organization": "国家中医药管理局",
+      "authority_level": "national_tcm_authority",
+      "jurisdiction": "CN",
+      "language": "zh-CN",
+      "channel_name": "国家中医药管理局中医养生保健素养与工作动态",
+      "entry_url": "https://www.natcm.gov.cn/",
+      "content_scope": ["中医养生保健素养", "治未病理念", "传统功法科普"],
+      "rag_role": "tcm_wellness_candidate",
+      "ingestion_status": "permission_required",
+      "automated_collection": false,
+      "review_interval_days": 90,
+      "ingestion_policy": {
+        "allowed_content_modes": ["original_summary"],
+        "max_content_chars": 1600,
+        "max_verbatim_quotes": 2,
+        "max_verbatim_quote_chars_each": 60,
+        "max_verbatim_quote_chars_total": 100,
+        "require_source_attribution": true
+      },
+      "notes": "2026-10-03 由 DSH 按用户决定登记：仅登记来源，未加入 approved_for_ingestion，未经版权与医学审核。页面页脚标注「版权所有：国家中医药管理局」。https 可用性本机未能确认（抓取工具与 PowerShell 均失败），复核时需实测。审核口径要求：中医「功效」类表述必须改写为理论表述，不得写成疗效承诺；艾灸、拔罐、刮痧等自施操作不做操作指导；个体化体质选式建议需删除或改写。"
     }
   ]
 }

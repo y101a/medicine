@@ -5,10 +5,12 @@
 
 ## 0. 当前状态（先说清楚没做什么）
 
-- **没有**把任何来源写进 `medical_source_registry.json`，**没有**加入 `approved_for_ingestion` 白名单。
+- **没有**加入 `approved_for_ingestion` 白名单。**2026-10-03 更新**：经用户同意，已在 `medical_source_registry.json`
+  **登记**中国营养学会 / 国家体育总局 / 国家中医药管理局 3 条来源（状态均为「仅登记、未批准」）；福建卫健委
+  转载稿按用户决定**暂缓**，未登记。
 - **没有**导入知识库、**没有**生成向量、**没有**写数据库、**没有**接进问答或知识图谱。
-- 内容全部是**我自己的概括**（`content_mode: original_summary`），逐字引用为空数组；每条状态都是
-  `pending_qualified_medical_review`——**没有真实医学审核签名，因此按 `CONTROLLED_INGESTION.md` 现在一条都不能导入**。
+- 内容全部是**我自己的概括**（`content_mode: original_summary`），逐字引用为空数组；除福建那条已按用户决定改为
+  `deferred_source_not_registered` 外，其余 10 条状态都是 `pending_qualified_medical_review`——**没有真实医学审核签名，因此按 `CONTROLLED_INGESTION.md` 现在一条都不能导入**。
 - 这份储备**不会**自动生效：你不确认，它就只是两个文件。
 
 ## 1. 来源清单（都是我实际抓取到的页面）
@@ -33,19 +35,22 @@
 | --- | --- | --- | --- | --- |
 | who-physical-activity-benefits-2024 | 身体活动的益处与不足风险 | `who_zh_fact_sheets` | 已登记，`license_check_per_document`，**不在**批准白名单 | 注册表把该来源标为 `zh-CN`，而我抓的是英文页：要么补抓中文页，要么改登记语言 |
 | who-sedentary-behaviour-2024 | 久坐行为的健康风险 | `who_zh_fact_sheets` | 同上 | 同上 |
-| cnsoc-dietary-guidelines-2022-principles | 平衡膳食八准则总览 | `cnsoc_dietary_guidelines_2022`（**未登记**） | 需新增来源 + 版权审核 | 明确写这是**人群层面**建议，不得变成个人饮食处方 |
+| cnsoc-dietary-guidelines-2022-principles | 平衡膳食八准则总览 | `cnsoc_dietary_guidelines_2022`（**已登记，未批准**） | 已登记（未批准）：版权与医学审核待做 | 明确写这是**人群层面**建议，不得变成个人饮食处方 |
 | cnsoc-dietary-guidelines-2022-eat-move-balance | 准则二：运动量（150 分钟/周、6000 步、抗阻 2~3 天） | 同上 | 同上 | 慢病、孕产、术后、已有运动损伤者必须提示按医生意见调整 |
 | cnsoc-dietary-guidelines-2022-salt-oil-sugar | 准则五：盐 5 g、油 25~30 g、糖 25~50 g、酒精 15 g | 同上 | 同上 | 定量值是人群建议，不得当作个人的限盐限酒治疗目标 |
-| sport-gov-national-fitness-guide-2017 | 《全民健身指南》框架（先评估、再处方） | `sport_gov_fitness_guidance`（**未登记**） | 需新增来源 + 版权审核 | 只讲框架，不复制处方模板，不替代医生评估 |
+| sport-gov-national-fitness-guide-2017 | 《全民健身指南》框架（先评估、再处方） | `sport_gov_fitness_guidance`（**已登记，未批准**） | 已登记（未批准）：版权与医学审核待做 | 只讲框架，不复制处方模板，不替代医生评估 |
 | sport-gov-warmup-and-protection-2025 | 热身约 10 分钟、洋葱式穿衣法 | 同上 | 同上 | 原文有「运动中产热量可达静止时 10 倍」这类**未给文献的数字**，建议删掉无出处表述 |
-| natcm-tcm-health-literacy-2014-principles | 中医养生四大基石、治未病三阶段、九种体质 | `natcm_tcm_wellness`（**未登记**） | 需新增来源 + 版权审核 | 「功效」类表述要改写为中医理论表述，不得写成疗效承诺 |
+| natcm-tcm-health-literacy-2014-principles | 中医养生四大基石、治未病三阶段、九种体质 | `natcm_tcm_wellness`（**已登记，未批准**） | 已登记（未批准）：版权与医学审核待做 | 「功效」类表述要改写为中医理论表述，不得写成疗效承诺 |
 | natcm-tcm-health-literacy-2014-simple-methods | 第三十三至四十二条（叩齿、咽津、摩腹、足心按摩等） | 同上 | 同上 | **我建议整条不采用**：原文带疗效说法（清肝明目、强腰固肾）且涉及自行操作；艾灸、拔罐、刮痧有烫伤/皮肤损伤风险，不做操作指导 |
-| fujian-wjw-tcm-exercise-safety-2026 | 八段锦等功法怎么练、练后疲劳怎么办、老年人先排查疾病 | `fujian_wjw_repost`（**未登记**） | 需新增来源；且是**转载新华社稿**，要核对原始出处与版权 | 按体质推荐具体式子属个体化建议，建议删除或改写；「立即停止并咨询医务人员」这类分流提示应保留 |
+| fujian-wjw-tcm-exercise-safety-2026 | 八段锦等功法怎么练、练后疲劳怎么办、老年人先排查疾病 | `fujian_wjw_repost`（**未登记，已暂缓**） | **用户 2026-10-03 决定暂缓**：该来源是转载新华社稿、权利在原媒体，未加入受信来源白名单；候选状态已改为 `deferred_source_not_registered`，如要采用建议改用国家中医药管理局原始文件重新取证 | 按体质推荐具体式子属个体化建议，建议删除或改写；「立即停止并咨询医务人员」这类分流提示应保留 |
 | chinacdc-healthy-lifestyle-action | 三减三健与全民健康生活方式行动 | `china_cdc_health_education` | 已登记，但 `permission_required`（官网声明限制复制发表） | 未获授权前**只能人工阅读与核验事实**，不能入库 |
 
 ## 3. 你确认后我会做什么（每一步都有前置条件）
 
-1. **来源层面**：先在 `medical_source_registry.json` 里新增 4 个未登记来源（营养学会 / 体育总局 / 中医药局 / 福建卫健委转载），把要用的来源 id 加进 `approved_for_ingestion`。这属于 `backend/`（Codex 所有权），我会先走 §6 通报，**且必须你明确同意**。
+1. **来源层面（2026-10-03 已部分完成）**：用户已同意扩充受信来源白名单，我已在 `medical_source_registry.json`
+   **登记** 3 条来源（中国营养学会 / 国家体育总局 / 国家中医药管理局），并在
+   `tests/test_medical_source_registry.py` 的 `TRUSTED_DOMAINS` 同步这 3 个域名；福建卫健委转载稿按用户决定
+   **暂缓**（未登记）。**仍未把任何来源加入 `approved_for_ingestion`**——加入白名单前需要真实医学审核与授权判断。
 2. **逐篇文档**：按 `CONTROLLED_INGESTION.md` 产出 UTF-8 Markdown（自编摘要，卫健委类来源上限 1600 字、逐字引用 ≤2 条且合计 ≤100 字）+ 元数据 JSON（**版权审核人与时间、医学审核人与时间都是必填**，不能用占位文本）。
 3. **导入**：`app.rag.cli sync-sources` → `app.rag.cli import-markdown`（只写文本，**不生成向量**）。
 4. **向量化与接线**：另批决定（本地向量 P4 此前明确不启用；云端向量化「默认不把正文送云端」这条需要你单独确认）。
@@ -108,9 +113,15 @@
   ② 这批内容是对外部页面的摘要，若挂到「个人开发原型医学语料」这个来源下会**错标来源**，必须在文档元数据里
   显式写明真实出处与「未医学审核」状态。
 
-## 8. 来源登记提案（**未落地**——注册表我没有改，原因是硬约束）
+## 8. 来源登记提案（2026-10-03：**已按用户决定落地 3 条**）
 
-### 8.1 为什么不能直接加这 4 个来源
+**状态更新（2026-10-03）**：用户已决定「只加 3 家国家级机构（中国营养学会 / 国家体育总局 /
+国家中医药管理局），福建转载那条暂缓」。我已落盘：注册表 3 条来源 + `tests/test_medical_source_registry.py`
+的 `TRUSTED_DOMAINS` + `MEDICAL_KNOWLEDGE_SOURCES.md`；**未把任何来源加入 `approved_for_ingestion`**
+（仍需真实医学审核与授权判断）。落盘时 3 条的 `notes` 在下面提案的基础上补充了 https 实测结果与
+「按用户决定登记」的措辞，**以注册表实际内容为准**。下面的 8.1–8.6 保留提案原文与当时的待决问题，作为决策记录。
+
+### 8.1 为什么不能直接加这 4 个来源（当时发现的硬约束）
 
 `backend/tests/test_medical_source_registry.py::test_medical_source_registry_uses_unique_official_https_channels`
 对注册表里**每一个**来源都断言：`entry_url` 必须是 `https`，且**域名必须属于写死的 `TRUSTED_DOMAINS`**，
@@ -219,7 +230,7 @@
 & .\.venv\Scripts\python.exe -m pytest tests/test_controlled_ingestion.py -q
 ~~~
 
-### 8.6 需要你决定的一件事
+### 8.6 当时的待决问题（**2026-10-03 已决定**：只加 3 家国家级机构、福建那条暂缓）
 
 **是否把这 4 家机构加入受信来源白名单**（中国营养学会 / 国家体育总局 / 国家中医药管理局 / 福建省卫健委）？
 这是把「谁算可信来源」从 6 个国家级机构 + WHO，放开到 4 个新机构，属于实质政策决定；决定后才能落盘提案，
