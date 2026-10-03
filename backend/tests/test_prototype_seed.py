@@ -32,9 +32,8 @@ async def test_seed_prototype_corpus_is_labeled_and_idempotent(monkeypatch):
         f"https://prototype.invalid/test/{source_key}",
     )
     # 数量以清单为准，避免每次扩充语料都要改这里。
-    expected_documents = len(
-        load_manifest(Path(__file__).resolve().parents[1] / "data" / "prototype_knowledge").documents
-    )
+    corpus_directory = Path(__file__).resolve().parents[1] / "data" / "prototype_knowledge"
+    expected_documents = len(load_manifest(corpus_directory).documents)
     async with engine.connect() as connection:
         transaction = await connection.begin()
         sessions = async_sessionmaker(connection, expire_on_commit=False)

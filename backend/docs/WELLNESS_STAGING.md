@@ -7,8 +7,9 @@
 
 - **已写入 dev 数据库**：经用户要求，9 篇按**开发原型通道**导入（`review_status=prototype`、
   `medical_reviewed=false`、`production_eligible=false`，仅 `APP_ENVIRONMENT=development` 时参与检索）；
-  库内快照与召回实测见 `backend/docs/PROTOTYPE_KNOWLEDGE.md` 的「2026-10-03 wellness 批次」。**未向量化**
-  （不调用收费向量服务、不把正文送出本机），**未进入正式知识库**。
+  库内快照与召回实测见 `backend/docs/PROTOTYPE_KNOWLEDGE.md` 的「2026-10-03 wellness 批次」。
+  **已按用户明确同意完成向量化**（正文发送到阿里云并计费；38/38 块带向量，旧语料未重复计费），
+  但**未进入正式知识库**。
 - **没有**加入 `approved_for_ingestion` 白名单：已在 `medical_source_registry.json` **登记**中国营养学会 /
   国家体育总局 / 国家中医药管理局 3 条来源（状态均为「仅登记、未批准」）；福建卫健委转载稿按用户决定
   **暂缓**，未登记。
