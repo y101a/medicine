@@ -1,4 +1,8 @@
-"""Read-only health news portal contract; ingestion is intentionally not connected yet."""
+"""Read-only health news portal contract.
+
+资讯只读最近成功快照：没有来源时明确回 `sources_not_connected`，绝不伪造条目。
+来源级状态是受控码，不回传原始异常、页面 HTML 或抓取日志（`NEWS_UPDATE_PLAN.md` §3）。
+"""
 
 from datetime import datetime
 from typing import Literal
@@ -7,13 +11,18 @@ from pydantic import BaseModel, Field
 
 NewsCategory = Literal["all", "wellness", "fitness", "disease", "medication"]
 NewsItemCategory = Literal["wellness", "fitness", "disease", "medication"]
+NewsStatus = Literal[
+    "sources_not_connected", "ready", "partial", "stale", "empty", "failed"
+]
+NewsSourceStatus = Literal["ready", "empty", "stale", "failed"]
 
 
 class NewsItemOut(BaseModel):
     id: str
     category: NewsItemCategory
     title: str
-    summary: str
+    #: 摘要可能为空：写不出可靠摘要时只给标题、来源与链接，不编造内容。
+    summary: str | None = None
     source_name: str = Field(serialization_alias="sourceName")
     canonical_url: str = Field(serialization_alias="canonicalUrl")
     published_at: datetime | None = Field(serialization_alias="publishedAt")
@@ -29,9 +38,25 @@ class NewsTipOut(BaseModel):
     canonical_url: str = Field(serialization_alias="canonicalUrl")
 
 
+class NewsSourceStatusOut(BaseModel):
+    id: str
+    name: str
+    status: NewsSourceStatus
+    last_success_at: datetime | None = Field(default=None, serialization_alias="lastSuccessAt")
+    last_error_code: str | None = Field(default=None, serialization_alias="lastErrorCode")
+
+
 class NewsPageOut(BaseModel):
     category: NewsCategory
-    status: Literal["sources_not_connected"]
+    status: NewsStatus
+    #: 最近成功快照时间，不是接口调用时间。
     as_of: datetime | None = Field(default=None, serialization_alias="asOf")
+    next_refresh_at: datetime | None = Field(default=None, serialization_alias="nextRefreshAt")
     items: list[NewsItemOut] = Field(default_factory=list)
+    #: 小贴士与新闻分开治理：这里不把新闻自动改写成建议，未接入就保持为空。
     tips: list[NewsTipOut] = Field(default_factory=list)
+    source_statuses: list[NewsSourceStatusOut] = Field(
+        default_factory=list, serialization_alias="sourceStatuses"
+    )
+    total: int = 0
+    has_more: bool = Field(default=False, serialization_alias="hasMore")

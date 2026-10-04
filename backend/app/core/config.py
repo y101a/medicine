@@ -176,6 +176,15 @@ class Settings(BaseSettings):
     # privacy and medical-safety acceptance is completed for the deployment.
     web_search_enabled: bool = False
 
+    # 健康资讯门户（`backend/docs/NEWS_UPDATE_PLAN.md`）：默认关闭自动刷新，来源必须
+    # 逐站准入后才写库；这些参数只影响刷新器，不影响接口只读快照的行为。
+    news_portal_enabled: bool = False
+    news_update_hour: int = 4  # Asia/Shanghai，更新日在此刻切换
+    news_display_days: int = 7
+    news_items_per_source: int = 20
+    news_fetch_timeout_seconds: float = 8
+    news_refresh_lease_seconds: int = 900
+
     # Development-only, read-only MCP adapters. The server is never mounted in
     # production even when MCP_ENABLED is accidentally left on.
     mcp_enabled: bool = True

@@ -42,6 +42,7 @@ from app.models.knowledge_graph import (
     GraphReviewDecision,
 )
 from app.models.model_credential import UserModelCredential
+from app.models.news import NewsItem, NewsRefreshRun, NewsSource
 from app.models.phone_verification import (
     PhoneVerificationChallenge,
     PhoneVerificationPurpose,
@@ -94,6 +95,9 @@ __all__ = [
     "MessageAttachment",
     "MessagePrivateKnowledgeCitation",
     "MessagePrivateKnowledgeSelection",
+    "NewsItem",
+    "NewsRefreshRun",
+    "NewsSource",
     "PhoneVerificationChallenge",
     "PhoneVerificationPurpose",
     "PrivateKnowledgeChunk",

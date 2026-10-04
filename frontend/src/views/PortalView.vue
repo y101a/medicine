@@ -147,7 +147,7 @@ onMounted(() => void load())
               <strong>{{ item.title }}</strong>
               <span v-if="!item.medicalReviewed" class="badge">未经医学审核</span>
             </div>
-            <p class="card-summary">{{ item.summary }}</p>
+            <p v-if="item.summary" class="card-summary">{{ item.summary }}</p>
             <p class="card-meta">
               {{ item.sourceName }} · 发布 {{ formatTime(item.publishedAt) }} · 获取 {{ formatTime(item.retrievedAt) }}
             </p>
