@@ -399,6 +399,12 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 - 验证：新闻专项 1 passed，完整后端 **556 passed、1 skipped**；`ruff check app tests migrations` 全绿。
 - 边界：未改 DSH 前端、未接新闻源、未联网或改注册表/数据库、未创建 Windows 安装包；浏览器页面仍待 DSH 实现和联调，不能宣称整个新闻首页已完成。
 
+### 2026-10-04 DSH 前端 F2：门户资讯展示（同题多期聚合 + 来源级状态）
+
+- 改动：新增 `frontend/src/views/portalNews.ts`（纯函数：同题聚合 `groupNewsItems`、期号提取 `periodLabel`、来源状态中文、时间兜底格式化）与 `portalNews.test.ts`；`frontend/src/views/PortalView.vue` 改为按组渲染（同题多期折成一张卡 + 「同题更新 N 期：DON618（2026） · …」+ 可展开的较早各期）、顶部状态说明（最近更新/下次更新/部分来源暂时不可用）、来源级状态圆点、失败与过期空态。**本轮没有新增任何用户可见入口**，因此不涉及 AGENTS.md 的入口位置纪律。
+- 验证：`npx vitest run src/views/portalNews.test.ts src/views/portal.test.ts` **19 passed**；前端全量 **333 passed / 29 files**（上一轮 326/28，+7 条 F2 测试）；`npm run build` 通过；`npx playwright test e2e/portal.spec.ts` **9 passed**（上一轮 7，新增 1280px 与 375px 两条 F2 e2e：3 条桩数据渲染成 2 张卡、期号可见、来源状态可见、无横向溢出）。
+- 边界：分页未做（后端已支持 `limit`/`offset`，前端只显示首屏一页）；期号只从原文链接末段识别，识别不出就不显示（不编造期号）；标题仍是英文原题、无摘要；同题聚合**只影响展示，不合并也不改写后端数据**（库里 5 条仍各自独立）。
+
 ### 2026-10-04 DSH 资讯测试隔离 + WHO 来源保持启用（用户选 1+2）
 
 - 改动：`backend/tests/test_news.py`、`backend/tests/test_news_refresh.py` 各加 autouse 夹具 `_isolate_news_tables`——在**测试事务内**先清空 `news_items`/`news_sources`/`news_refresh_runs`（回滚后真实数据仍在），解决「测试与开发库共用同一个库、启用来源后空态断例失败」的结构性问题。按用户决定，`who_disease_outbreak_news` **保持启用**并在开发库有 5 条在展示期。
