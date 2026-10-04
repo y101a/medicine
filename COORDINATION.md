@@ -399,6 +399,16 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 - 验证：新闻专项 1 passed，完整后端 **556 passed、1 skipped**；`ruff check app tests migrations` 全绿。
 - 边界：未改 DSH 前端、未接新闻源、未联网或改注册表/数据库、未创建 Windows 安装包；浏览器页面仍待 DSH 实现和联调，不能宣称整个新闻首页已完成。
 
+### 2026-10-04 DSH 资讯抓取链路 N2（WHO 单源真实试跑成功）— 提交见下
+
+- **前提**：用户 2026-10-04 答复「是，开始实现」，批准首批 3 家来源并授权逐站外网核验，故继续动 Codex 所有权内的后端文件。**（补记：本轮未先登记 §7.1，与上一轮同样的疏漏，记录在此。）**
+- 改动：新增 `backend/app/services/news/{fetcher,adapters,refresh,catalog}.py` 与前台运维 CLI `backend/app/news_cli.py`。抓取层**在连接前把主机解析成 IP 再判一次**（补上 N1 只查字面量的 SSRF 盲区），逐跳校验重定向、限 2MB、只认 json/xml 类型、只抛受控错误码；适配器只做结构化解析，**不转存来源摘要、不镜像正文**；刷新器顺序抓取启用来源，失败只写受控错误码并**保留**旧快照；CLI 支持 `--catalog/--list/--enable/--disable/--delete-source/--purge-runs/--refresh/--items`，全部为前台进程，不落自启动。
+- **实测（N0/N2）**：`who.int/api/news/diseaseoutbreaknews` HTTP 200 JSON（`Title`/`UrlName`/`PublicationDateAndTime`），条目 URL 模式 `…/item/2026-DON618` HTTP 200；`nmpa.gov.cn/robots.txt` **403**（栏目页 200 但站点不希望被自动访问）；`chinacdc.cn/robots.txt` 404、`/jkzt/` **404**（路径已变）；`nhc.gov.cn/robots.txt` 404。**WHO 单源试跑成功**：抓 5 条、入库 5 条（原题、原文链接、发布时间正确，`medical_reviewed=false`）。试跑数据已用 `--delete-source` + `--purge-runs` 撤回，开发库回到「无来源」。
+- **发现并修正的真缺陷**：WHO 对同一疫情的多期更新**共用同一标题**（DON614–618 逐字相同），原「标题指纹去重」会把 5 期压成 1 条——已改为「标题相同**且发布时间一致**才合并」（`repository._find_syndicated_twin`）+ 回归测试。
+- **发现的环境问题（请 Codex 注意）**：后端测试与开发库**共用同一个数据库**，空态测试要求 `news_sources` 为空；只要启用任何来源并写入条目，`tests/test_news*.py` 会有若干断言失败。建议后续让资讯表在测试里隔离（或测试用独立库）。为此我在测试里加了「事务内先删同 id 行」的夹具处理（回滚后真实行仍在，不动环境数据）。
+- 验证：`pytest tests/test_news.py tests/test_news_refresh.py` **31 passed**；后端全量 **586 passed, 1 skipped**（上一轮 575+1，增量为本轮 11 条新测试）；`ruff check .` **All checks passed**；前端未改动（门户在有来源前仍显示「新闻源尚未接入」）。
+- 边界：**没有**启用任何来源（试跑后已删除）、**没有**翻转 `automated_collection_enabled`、**没有**接 N3 每日触发（`--trigger auto` 在 `news_portal_enabled=false` 时直接 skipped）、**没有**中文摘要或翻译（WHO 内容按英文原题呈现）、NMPA 与中国疾控**未启用**（许可/栏目地址未落实）。来源许可仍需你或法务确认；我记录的 `license_note` 明确写了「技术可读已实测、再利用许可未核验」。
+
 ### 2026-10-04 DSH 资讯来源候选清单（N0 输入，未启用任何来源）
 
 - 新增根目录 `NEWS_SOURCE_CANDIDATES.md`：按养生/健身/疾病/药物四个专区列出候选来源（国家卫健委、中国疾控中心、国家药监局、国家体育总局、中国营养学会、中华医学会、WHO 等）、可取渠道、主要障碍，并写明本机实测记录（`who.int/rss-feeds` **404**、`nhc.gov.cn/robots.txt` **404**；更早一轮探测的 412/403/未开标注为「需复测」）。**未联网抓取任何内容、未新增或启用任何来源。** 结论：国内政务/学会站普遍无 RSS/API，首批建议 3 家且必须逐站取得自动读取许可，拿不到许可就让专区保持空态。**请 Codex 在 N0 时以此为基础复核来源策略。**
