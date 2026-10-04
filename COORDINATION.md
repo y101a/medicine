@@ -399,6 +399,12 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 - 验证：新闻专项 1 passed，完整后端 **556 passed、1 skipped**；`ruff check app tests migrations` 全绿。
 - 边界：未改 DSH 前端、未接新闻源、未联网或改注册表/数据库、未创建 Windows 安装包；浏览器页面仍待 DSH 实现和联调，不能宣称整个新闻首页已完成。
 
+### 2026-10-04 DSH 资讯测试隔离 + WHO 来源保持启用（用户选 1+2）
+
+- 改动：`backend/tests/test_news.py`、`backend/tests/test_news_refresh.py` 各加 autouse 夹具 `_isolate_news_tables`——在**测试事务内**先清空 `news_items`/`news_sources`/`news_refresh_runs`（回滚后真实数据仍在），解决「测试与开发库共用同一个库、启用来源后空态断例失败」的结构性问题。按用户决定，`who_disease_outbreak_news` **保持启用**并在开发库有 5 条在展示期。
+- 验证：空库下 `tests/test_news*.py` **31 passed**；写入真实来源+条目后**仍 31 passed**（隔离夹具生效）；后端全量 **586 passed, 1 skipped**；`ruff check .` 全通过。**真实登录态打活接口**：`GET /api/v1/news?category=disease` → HTTP 200、`status=ready`、`total=5`、`asOf=2026-10-04T16:04:47Z`、`nextRefreshAt=2026-10-04T20:00:00Z`（= 北京时间次日 04:00，正确）、`sourceStatuses=[{who_disease_outbreak_news: ready}]`，5 条 `medicalReviewed=false` 且链接指向 WHO 原文。
+- 边界：5 条是**同一场疫情的多期更新**（标题逐字相同，仅期号与日期不同），门户会显得重复——同题聚合/期号属于前端 F2；内容为英文原题、无中文摘要；来源再利用许可仍未核验；N3 每日自动触发未开；其余三个专区仍无来源（空态）。
+
 ### 2026-10-04 DSH 资讯抓取链路 N2（WHO 单源真实试跑成功）— 提交见下
 
 - **前提**：用户 2026-10-04 答复「是，开始实现」，批准首批 3 家来源并授权逐站外网核验，故继续动 Codex 所有权内的后端文件。**（补记：本轮未先登记 §7.1，与上一轮同样的疏漏，记录在此。）**
