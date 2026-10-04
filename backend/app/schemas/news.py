@@ -60,3 +60,5 @@ class NewsPageOut(BaseModel):
     )
     total: int = 0
     has_more: bool = Field(default=False, serialization_alias="hasMore")
+    #: 是否有一轮自动刷新正在进行（当天首次访问触发；接口不等待它完成）。
+    refreshing: bool = False

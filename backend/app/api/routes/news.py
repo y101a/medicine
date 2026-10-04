@@ -1,18 +1,20 @@
 """Authenticated news portal read API.
 
-只读数据库里的最近成功快照，**不在请求里抓外网**：每日首次访问触发的一轮有界刷新由
-以后接入的刷新器负责（`NEWS_UPDATE_PLAN.md` §2），接口本身立刻返回。
+只读数据库里的最近成功快照，**不在请求里等待抓取**：当天首次访问时把「一轮有界刷新」挂到
+后台任务（`app/services/news/auto.py`），请求立刻返回；抓取是否成功都不影响这次响应。
+每日最多一轮由 `update_day` + 租约 + 唯一索引保证，服务停止就停止（无任何自启动）。
 """
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 
 from app.api.dependencies import DbSession, get_current_user
 from app.core.config import get_settings
 from app.schemas.news import NewsCategory as CategoryParam
 from app.schemas.news import NewsItemOut, NewsPageOut, NewsSourceStatusOut
 from app.services import news as news_service
+from app.services.news.auto import daily_auto_refresh
 
 router = APIRouter(
     prefix="/news", tags=["健康资讯"], dependencies=[Depends(get_current_user)]
@@ -37,6 +39,7 @@ def _overall_status(
 @router.get("", response_model=NewsPageOut)
 async def read_news(
     db: DbSession,
+    background_tasks: BackgroundTasks,
     category: CategoryParam = "all",
     limit: int = Query(default=20, ge=1, le=50),
     offset: int = Query(default=0, ge=0, le=10_000),
@@ -56,6 +59,11 @@ async def read_news(
     run = await news_service.latest_run(db)
     statuses = await news_service.source_statuses(db, now=now)
     failed_sources = sum(1 for item in statuses if item["status"] == "failed")
+    refreshing = await news_service.running_auto_run(db, now=now) is not None
+
+    if settings.news_portal_enabled:
+        # 每日首次访问触发一轮有界刷新：**不等待**，失败也只写来源状态。
+        background_tasks.add_task(daily_auto_refresh)
 
     return NewsPageOut(
         category=category,
@@ -93,4 +101,5 @@ async def read_news(
         ],
         total=page.total,
         has_more=offset + len(page.rows) < page.total,
+        refreshing=refreshing,
     )

@@ -43,6 +43,8 @@ const tips = ref<{ id: string; text: string; sourceName: string; canonicalUrl: s
 const asOf = ref<string | null>(null)
 const nextRefreshAt = ref<string | null>(null)
 const sourceStatuses = ref<NewsSourceStatusEntry[]>([])
+/** N3：当天首次访问触发的一轮自动刷新是否正在进行。 */
+const refreshing = ref(false)
 
 /** 同题多期折成一组：WHO 同一疫情的多期更新标题逐字相同，直接平铺会像重复条目。 */
 const groups = computed(() => groupNewsItems(items.value))
@@ -56,6 +58,8 @@ const emptyReason = computed(() => {
 
 /** 顶部状态说明：把「部分来源失败」「内容可能较旧」这类事实说清楚，不夸大也不隐藏。 */
 const statusNote = computed(() => {
+  // 正在更新就说正在更新：不把「刚触发刷新」说成「已是最新」。
+  if (refreshing.value) return '正在更新来源，稍后刷新可见新条目'
   if (status.value === 'ready' || status.value === 'partial') {
     const parts: string[] = []
     if (asOf.value) parts.push(`最近更新 ${formatMoment(asOf.value)}`)
@@ -80,6 +84,7 @@ async function load(category: NewsCategory = active.value) {
     asOf.value = page.asOf ?? null
     nextRefreshAt.value = page.nextRefreshAt ?? null
     sourceStatuses.value = page.sourceStatuses ?? []
+    refreshing.value = page.refreshing ?? false
   } catch (e) {
     // 失败时清空列表：上一个分类的条目留着会被当成当前分类的资讯。
     status.value = ''
@@ -88,6 +93,7 @@ async function load(category: NewsCategory = active.value) {
     asOf.value = null
     nextRefreshAt.value = null
     sourceStatuses.value = []
+    refreshing.value = false
     error.value = getApiErrorMessage(e)
   } finally {
     loading.value = false

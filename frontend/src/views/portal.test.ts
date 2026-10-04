@@ -124,6 +124,20 @@ describe('独立资讯门户（/portal，F1 页面框架）', () => {
     expect(wrapper.get('.cards .badge').text()).toBe('未经医学审核')
   })
 
+  it('N3：正在更新来源时如实说明，不把「刚触发刷新」说成已是最新', async () => {
+    vi.mocked(newsApi.page).mockResolvedValue({
+      category: 'disease',
+      status: 'ready',
+      asOf: '2026-10-04T16:04:47Z',
+      refreshing: true,
+      items: [{ ...baseItem, id: 'a' }],
+      tips: [],
+    })
+    const { wrapper } = await setup()
+
+    expect(wrapper.get('.status-line').text()).toContain('正在更新来源')
+  })
+
   it('F2：部分来源不可用时说明实情，不谎称全部正常', async () => {
     vi.mocked(newsApi.page).mockResolvedValue({
       category: 'disease',

@@ -4,6 +4,7 @@
 来源失败时保留最近成功快照并标 `partial`/`failed`，**不清空**已有条目。
 """
 
+import asyncio
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 
@@ -16,6 +17,16 @@ from app.services.news.adapters import parse_for_source
 from app.services.news.feeds import FeedParseError
 from app.services.news.fetcher import FetchError, fetch_document
 from app.services.news.updates import acquire_auto_run, finish_run, update_day_for
+
+# 轮内重试（N3 的「超时/轮内重试」）：只对瞬时错误重试一次，避免把有限的一次运行耗在坏源上。
+MAX_FETCH_ATTEMPTS = 2
+RETRY_DELAY_SECONDS = 2.0
+TRANSIENT_FETCH_CODES = ("FETCH_TIMEOUT", "FETCH_FAILED")
+
+
+def _is_transient(code: str) -> bool:
+    """超时、连接失败与服务端 5xx 值得重试；4xx、类型不对、体积超限重试也没用。"""
+    return code in TRANSIENT_FETCH_CODES or code.startswith("FETCH_HTTP_5")
 
 
 @dataclass
@@ -46,8 +57,12 @@ async def refresh_sources(
     source_ids: list[str] | None = None,
     limit: int | None = None,
     timeout_seconds: float | None = None,
-    fetcher=fetch_document,
+    fetcher=None,
 ) -> RefreshSummary:
+    """抓一轮。`fetcher=None` 时在**调用时**取默认抓取函数（便于测试注入替身）。
+
+    `trigger="auto"` 需要 `news_portal_enabled` 打开，且同一更新日只跑一次；手动触发不受开关限制。
+    """
     settings = get_settings()
     hour = settings.news_update_hour
     update_day = update_day_for(now, hour=hour)
@@ -86,6 +101,7 @@ async def refresh_sources(
         await db.flush()
 
     results: list[SourceResult] = []
+    fetch = fetcher or fetch_document
     for source in sources:
         source.last_attempt_at = now
         result = SourceResult(source_id=source.id, status="ok")
@@ -96,8 +112,25 @@ async def refresh_sources(
             source.last_error_code = result.error_code
             results.append(result)
             continue
+
+        payload: bytes | None = None
+        for attempt in range(MAX_FETCH_ATTEMPTS):
+            try:
+                _content_type, payload = await fetch(endpoint, timeout_seconds=timeout)
+                break
+            except FetchError as error:
+                if attempt + 1 < MAX_FETCH_ATTEMPTS and _is_transient(error.code):
+                    await asyncio.sleep(RETRY_DELAY_SECONDS)
+                    continue
+                result.status = "failed"
+                result.error_code = error.code
+                source.last_error_code = error.code
+                break
+        if payload is None:
+            results.append(result)
+            continue
+
         try:
-            _content_type, payload = await fetcher(endpoint, timeout_seconds=timeout)
             entries = parse_for_source(
                 source.id, payload, fetch_mode=source.fetch_mode
             )[:per_source]
@@ -115,10 +148,6 @@ async def refresh_sources(
             result.rejected = len(outcome.rejected)
             source.last_success_at = now
             source.last_error_code = None
-        except FetchError as error:
-            result.status = "failed"
-            result.error_code = error.code
-            source.last_error_code = error.code
         except FeedParseError as error:
             result.status = "failed"
             result.error_code = str(error)[:32] or "PARSE_FAILED"

@@ -60,6 +60,8 @@ export interface NewsPage {
   sourceStatuses?: NewsSourceStatusEntry[]
   total?: number
   hasMore?: boolean
+  /** N3：当天首次访问触发的一轮自动刷新正在进行（接口不等待它完成）。 */
+  refreshing?: boolean
 }
 
 export const newsApi = {
