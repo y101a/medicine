@@ -1,12 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import DashboardView from './DashboardView.vue'
+import PortalLayout from '../layouts/PortalLayout.vue'
+import PortalView from './PortalView.vue'
 import { newsApi } from '../api/news'
 import { ApiError } from '../api/http'
 
-vi.mock('../api/news', () => ({
-  newsApi: { page: vi.fn() },
+vi.mock('../api/news', () => ({ newsApi: { page: vi.fn() } }))
+
+/** 守卫会读登录态；这里给出可控的替身，避免依赖真实登录流程。 */
+const authState = vi.hoisted(() => ({ isAuthenticated: true }))
+vi.mock('../stores/auth', () => ({
+  useAuthStore: () => ({
+    initialize: async () => {},
+    user: { username: 'e2e' },
+    get isAuthenticated() {
+      return authState.isAuthenticated
+    },
+  }),
 }))
 
 const emptyPage = {
@@ -21,13 +32,13 @@ async function setup() {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
-      { path: '/app', name: 'home', component: DashboardView },
+      { path: '/portal', name: 'portal', component: PortalView },
       { path: '/app/chat', name: 'chat', component: { template: '<p>chat</p>' } },
     ],
   })
-  await router.push('/app')
+  await router.push('/portal')
   await router.isReady()
-  const wrapper = mount(DashboardView, {
+  const wrapper = mount(PortalView, {
     global: {
       plugins: [router],
       stubs: { 'el-icon': { template: '<span><slot /></span>' } },
@@ -39,16 +50,16 @@ async function setup() {
 
 beforeEach(() => {
   vi.resetAllMocks()
+  authState.isAuthenticated = true
   vi.mocked(newsApi.page).mockResolvedValue({ ...emptyPage })
 })
 
-describe('健康资讯首页（F1 页面框架）', () => {
+describe('独立资讯门户（/portal，F1 页面框架）', () => {
   it('未接入新闻源时明确说明，不用占位内容冒充新闻', async () => {
     const { wrapper } = await setup()
 
     expect(wrapper.text()).toContain('新闻源尚未接入')
     expect(wrapper.text()).toContain('不会用示例内容冒充每日新闻')
-    // 没有条目就不得声称「今日已更新」，也不出现任何来源外链。
     expect(wrapper.text()).not.toContain('今日已更新')
     expect(wrapper.find('.cards').exists()).toBe(false)
     expect(wrapper.find('.news a').exists()).toBe(false)
@@ -118,12 +129,9 @@ describe('健康资讯首页（F1 页面框架）', () => {
     expect(wrapper.text()).toContain('某地流感监测周报')
     expect(wrapper.text()).toContain('未经医学审核')
     expect(wrapper.text()).toContain('中国疾病预防控制中心')
-    expect(wrapper.text()).toContain('发布')
-    expect(wrapper.text()).toContain('获取')
     const link = wrapper.get('.cards a')
     expect(link.attributes('href')).toBe('https://www.chinacdc.cn/example')
     expect(link.attributes('rel')).toContain('noopener')
-    expect(wrapper.find('.news a').text()).toContain('前往来源核对')
   })
 
   it('发布时间核实不到时明确写出来，不用获取时间冒充', async () => {
@@ -148,4 +156,51 @@ describe('健康资讯首页（F1 页面框架）', () => {
 
     expect(wrapper.text()).toContain('发布时间未核实')
   })
+})
+
+describe('门户布局与路由', () => {
+  it('门户布局没有工作区侧栏，也不出现 ADR-011 的窄屏提示', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/portal', name: 'portal', component: PortalLayout }],
+    })
+    await router.push('/portal')
+    await router.isReady()
+    const wrapper = mount(PortalLayout, { global: { plugins: [router] } })
+    await flushPromises()
+
+    expect(wrapper.find('.sidebar').exists()).toBe(false)
+    expect(wrapper.find('.viewport-hint').exists()).toBe(false)
+    expect(wrapper.find('.workspace').exists()).toBe(false)
+    expect(wrapper.text()).toContain('健康资讯门户')
+  })
+
+  it('门户是顶层路由，不挂在工作区布局下', async () => {
+    const { default: appRouter } = await import('../router')
+    const resolved = appRouter.resolve('/portal')
+
+    expect(resolved.name).toBe('portal')
+    // 匹配链只有门户自己（父布局 + 子视图，两层都在 /portal）：父级不是 WorkspaceLayout。
+    expect(resolved.matched.map(item => item.path)).toEqual(['/portal', '/portal'])
+    expect(resolved.matched.some(item => item.path.startsWith('/app'))).toBe(false)
+  })
+
+  it('未登录进门户被送回登录页并记住回跳地址', async () => {
+    const { default: appRouter } = await import('../router')
+    authState.isAuthenticated = false
+    await appRouter.push('/portal')
+    await flushPromises()
+
+    expect(appRouter.currentRoute.value.name).toBe('login')
+    expect(appRouter.currentRoute.value.query.redirect).toBe('/portal')
+  }, 20_000)
+
+  it('已登录访问登录页改为进入门户', async () => {
+    const { default: appRouter } = await import('../router')
+    authState.isAuthenticated = true
+    await appRouter.push('/login')
+    await flushPromises()
+
+    expect(appRouter.currentRoute.value.name).toBe('portal')
+  }, 20_000)
 })

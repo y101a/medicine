@@ -25,6 +25,14 @@ const router = createRouter({
       meta: { guestOnly: true },
     },
     {
+      // 登录后的健康资讯门户：**独立布局**，不挂在 WorkspaceLayout 下，因此没有工作区侧栏，
+      // 也不受 ADR-011（工作区 min-width:1000px）约束。规格见 backend/docs/NEWS_PORTAL_IMPLEMENTATION.md。
+      path: '/portal',
+      component: () => import('../layouts/PortalLayout.vue'),
+      meta: { requiresAuth: true },
+      children: [{ path: '', name: 'portal', component: () => import('../views/PortalView.vue') }],
+    },
+    {
       path: '/app',
       component: () => import('../layouts/WorkspaceLayout.vue'),
       meta: { requiresAuth: true },
@@ -58,7 +66,7 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.guestOnly && authStore.isAuthenticated) {
-    return { name: 'home' }
+    return { name: 'portal' }
   }
 
   return true

@@ -12,7 +12,6 @@ import { consultationsApi } from '../api/consultations'
 import { modelsApi } from '../api/models'
 import { voiceApi } from '../api/voice'
 import { attachmentsApi } from '../api/attachments'
-import { newsApi } from '../api/news'
 import { ApiError } from '../api/http'
 import { VOICE_TIP_STORAGE_KEY, DOCUMENT_NOTICE_STORAGE_KEY } from '../stores/composerHints'
 import type { Attachment } from '../types/consultations'
@@ -26,8 +25,6 @@ vi.mock('../api/voice', () => ({ voiceApi: { transcribe: vi.fn() } }))
 vi.mock('../api/attachments', () => ({ attachmentsApi: {
   upload: vi.fn(), list: vi.fn(), remove: vi.fn(),
 } }))
-/** 首页（健康资讯）在 F1 阶段只会拿到「未接入新闻源」的空页。 */
-vi.mock('../api/news', () => ({ newsApi: { page: vi.fn() } }))
 /** 录音状态机的替身：让视图测试能直接驱动「待录 / 录音中 / 识别中」三种状态。 */
 const voiceHarness = vi.hoisted(() => ({
   supported: true,
@@ -106,16 +103,15 @@ beforeEach(() => {
   vi.mocked(modelsApi.list).mockResolvedValue(aiModels)
   vi.mocked(attachmentsApi.list).mockResolvedValue([])
   vi.mocked(attachmentsApi.upload).mockResolvedValue(attachment)
-  vi.mocked(newsApi.page).mockResolvedValue({
-    category: 'all', status: 'sources_not_connected', asOf: null, items: [], tips: [],
-  })
   vi.mocked(attachmentsApi.remove).mockResolvedValue(undefined)
   HTMLElement.prototype.scrollTo = vi.fn()
 })
 
 describe('真实咨询界面', () => {
-  it('健康资讯首页明说未接入新闻源，常用问法仍会把提问模板带入聊天', async () => {
+  it('首页展示当前用户与最近咨询，快捷入口会带入提问模板', async () => {
     const { pinia } = authSetup()
+    const store = useConsultationsStore()
+    store.items = [conversation]
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [
@@ -125,9 +121,8 @@ describe('真实咨询界面', () => {
     })
     await router.push('/app')
     const wrapper = mount(DashboardView, { global: { plugins: [pinia, router, ElementPlus] } })
-    await flushPromises()
-    expect(wrapper.text()).toContain('健康资讯首页')
-    expect(wrapper.text()).toContain('新闻源尚未接入')
+    expect(wrapper.text()).toContain('测试，你好')
+    expect(wrapper.text()).toContain('头痛')
     await wrapper.get('.quick-list button').trigger('click')
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/app/chat')

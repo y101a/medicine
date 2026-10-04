@@ -41,7 +41,7 @@ async function handleLogin() {
   try {
     await authStore.login({ username: form.username, password: form.password })
     ElMessage.success('登录成功')
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/app'
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/portal'
     await router.replace(redirect)
   } catch (error) {
     ElMessage.error(getApiErrorMessage(error))
