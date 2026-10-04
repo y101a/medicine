@@ -265,6 +265,7 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 执行者 | 任务 | 正在改的文件 | 迁移编号 | 占用数据库 | 开始时间 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
+| DSH | **门户四分区改平铺大卡片（用户 2026-10-04 要求「放大平铺在病理科普助手下面」）**：分区从列表顶部小标签改成四块大卡片（养生/健身/疾病/药物，各带一句范围说明与图标），桌面一行铺满、窄屏 2 列/单列；「全部」移到列表右上角小按钮。**不动后端。** | `frontend/src/views/PortalView.vue`、`frontend/src/views/portal.test.ts`、`frontend/e2e/portal.spec.ts`、`frontend/BROWSER_ACCEPTANCE.md` | 无 | 否 | 2026-10-04 | 已释放（提交 `0a3815d`；报告见 §7.2 顶部。**补记**：先动手后登记） |
 | DSH | **门户 AI 展示区占首屏一半 + 轻量动效（用户 2026-10-04 要求「占据一半屏幕、加特效显得不单调」）**：`.hero` 改 `min-height:50vh`，能力说明改三个标签 + 一行边界说明，新增纯 CSS 装饰动效（渐变流动/光斑漂浮/圆环旋转/星标呼吸），`prefers-reduced-motion` 下静止；e2e 增加高度与动效实测断言。**不动后端。** | `frontend/src/views/PortalView.vue`、`frontend/src/views/portal.test.ts`、`frontend/e2e/portal.spec.ts`、`frontend/BROWSER_ACCEPTANCE.md` | 无 | 否 | 2026-10-04 | 已释放（提交 `feffc64`；报告见 §7.2 顶部。**补记**：先动手后登记） |
 | DSH | **门户删掉顶部品牌栏、内容铺满整页（用户 2026-10-04 口头要求）**：`PortalLayout` 去掉我此前自己加的页头（「病理诊断科普助手 / 健康资讯门户」＋用户名），只留内容区与页脚；`PortalView` 去掉 1180px 居中限宽改整页铺满、右栏加宽、空态在面板内垂直居中。**不动后端。** | `frontend/src/layouts/PortalLayout.vue`、`frontend/src/views/PortalView.vue`、`frontend/src/views/portal.test.ts`、`frontend/BROWSER_ACCEPTANCE.md` | 无 | 否 | 2026-10-04 | 已释放（提交 `ce7d3cb`；报告见 §7.2 顶部。**补记**：本轮先动手后登记，如实补上） |
 | DSH | **F1 改造：资讯门户改为独立 `/portal`（用户 2026-10-04 推翻「工作区首页」方案；Codex 已更新规格并交接）**：新增顶层受保护路由 `/portal` 与**独立布局**（不挂 `WorkspaceLayout`、无侧栏），把 483edcc 的资讯原型**迁移**到门户并让 `/app` 恢复原概览（不删除原型代码，迁移过程写进 §7.2）；登录成功与已登录访问 `/login` 默认跳 `/portal`，`?redirect=` 仍优先；补 Vitest 与 Playwright（1280/375 无横向溢出、375 纵向排列，不用 ADR-011 提示代替门户适配）。**不动后端。** | `frontend/src/views/PortalView.vue`（新）、`frontend/src/layouts/PortalLayout.vue`（新）、`frontend/src/router/index.ts`、`frontend/src/views/LoginView.vue`、`frontend/src/views/DashboardView.vue`（恢复概览）、`frontend/src/views/consultations.test.ts`、`frontend/src/views/portal.test.ts`（新）、`frontend/e2e/portal.spec.ts`（新）、`frontend/BROWSER_ACCEPTANCE.md` | 无 | 否 | 2026-10-04 | 已释放（提交 `4283427`；报告见 §7.2 顶部） |
@@ -396,6 +397,12 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 - 改动：新增 `backend/docs/NEWS_PORTAL_IMPLEMENTATION.md` 固定登录后 `/app` 资讯首页、上半屏 AI 展示、两个按钮、养生/健身/疾病/药物四分区、右侧贴士位及 F0–F3 分工；新增需登录的 `GET /api/v1/news`，五种分类在未接入新闻源时只返回 `sources_not_connected` 和空 `items`/`tips`；同步 `backend/docs/API.md` 与测试。§6 已交接 DSH 前端页面框架。
 - 验证：新闻专项 1 passed，完整后端 **556 passed、1 skipped**；`ruff check app tests migrations` 全绿。
 - 边界：未改 DSH 前端、未接新闻源、未联网或改注册表/数据库、未创建 Windows 安装包；浏览器页面仍待 DSH 实现和联调，不能宣称整个新闻首页已完成。
+
+### 2026-10-04 DSH 门户四分区改平铺大卡片 — 提交 `0a3815d`
+
+- 改动：`frontend/src/views/PortalView.vue` 把分区从列表顶部那排小圆角标签（全部/养生/健身/疾病/药物）改成 **AI 展示区正下方四块平铺大卡片**：养生（`Sunny`，作息、饮食与日常调理）、健身（`Basketball`，运动方式与安全注意）、疾病（`FirstAidKit`，常见疾病科普与就医方向）、药物（`Memo`，药品用途与注意事项）；桌面 `grid` 一行四块铺满整行，≤900px 两列、≤480px 单列；卡片有悬停上浮与选中态。**「全部」移到列表右上角的小按钮**（不再占分区位置，避免与四块卡片混在一起）；列表标题显示当前分区名。图标名先在 `node_modules/@element-plus/icons-vue` 的类型声明里逐个核对存在（`Medicine`/`Stethoscope` 不存在，未使用）。
+- 验证：`npx vitest run` **28 files / 326 tests 全通过**（断言四块文案、`.hero + .categories` 的 DOM 顺序、点块请求 `category=wellness`、`aria-selected`、点「全部」回总览且 `aria-pressed=true`）；`npm run build` 通过；`npx playwright test e2e/portal.spec.ts` **7 passed**，其中新增实测：1280px 下四块**同一行**、每块宽 **≥200px**、四块合计占 `.categories` 宽度 **≥98%**、四块顶部**不低于 AI 展示区底部**；1280px 与 375px 仍无横向溢出。
+- 边界：① 四块卡片只是分类入口，**没有条目计数**（未接入新闻源，不编造数字）；② 卡片描述文字是「分区范围」而非医学结论，未涉及剂量/疗效；③ 门户仍是 F1 框架（无真实新闻、无安装包）；④ 观感仍未用人眼看过，只验证了坐标、尺寸与不溢出。
 
 ### 2026-10-04 DSH 门户 AI 展示区占首屏一半 + 轻量动效 — 提交 `feffc64`
 
