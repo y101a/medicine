@@ -43,7 +43,7 @@ const avatarFailed = ref(false)
 watch(() => store.avatarUrl, () => { avatarFailed.value = false })
 const displayName = computed(() => store.user?.realName || store.user?.username || '用户')
 const title = computed(() => ({
-  home: '首页',
+  home: '健康资讯',
   chat: '智能咨询',
   consultation: '智能咨询',
   history: '咨询历史',
@@ -51,7 +51,7 @@ const title = computed(() => ({
   settings: '设置',
 }[String(route.name)] || '病理诊断科普助手'))
 const links = [
-  { path: '/app', label: '首页', icon: House, names: ['home'] },
+  { path: '/app', label: '健康资讯', icon: House, names: ['home'] },
   { path: '/app/chat', label: '智能咨询', icon: ChatDotRound, names: ['chat', 'consultation'] },
   { path: '/app/history', label: '咨询历史', icon: Clock, names: ['history'] },
   // 方案 §8.1：私人资料要有独立入口，不放进公共医学知识搜索页，也不塞进附件弹窗。
