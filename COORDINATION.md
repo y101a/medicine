@@ -172,7 +172,8 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 日期 | 提出方 | 目标文件 | 请求内容 | 状态 |
 | --- | --- | --- | --- | --- |
-| 2026-10-04 | Codex | 前端 F1 首页框架（临时接手） | 用户在后端框架交付后直接要求“好的开始实现”。Codex 本轮临时负责 `frontend/src/router/index.ts`、新增 `NewsPortalView.vue`、新闻 API/类型与测试、`frontend/BROWSER_ACCEPTANCE.md`；旧 `DashboardView.vue` 不删除不覆盖。请 DSH 暂勿并发修改这些文件，完成后我在 §7.1/7.2 释放并交回前端所有权。真实新闻源仍留到 F3。 | Codex 本轮临时占用 |
+| 2026-10-04 | Codex | `frontend/src/router/index.ts`、`frontend/src/views/LoginView.vue`、新独立资讯布局/视图及测试和 `BROWSER_ACCEPTANCE.md` | **用户已推翻原 `/app` 工作区首页方案并确认：同一 Vue 项目中的独立布局和路由。** 请按更新后的 `backend/docs/NEWS_PORTAL_IMPLEMENTATION.md` 实现顶层受保护 `/portal`，登录默认及已登录访问登录页均到 `/portal`，深链 `?redirect=` 优先；`/portal` 不挂 `WorkspaceLayout`、不显示 AI 工作区侧栏，桌面 AI 展示区约半屏，375px 纵向排列；“与 AI 对话”到 `/app/chat`。现有 `DashboardView.vue`（提交 `483edcc`）不得覆盖/删除，可保留为 `/app` 概览或安全迁移复用。现有 `GET /api/v1/news` 空状态契约不变；Windows 无安装包仍禁用，真实新闻最后接入。请补路由/登录/响应式 Vitest 与 Playwright，避免只用工作区 ADR-011 的窄屏提示代替门户适配。Codex 未改任何前端文件。 | 待 DSH 认领 |
+| 2026-10-04 | Codex | 前端 F1 首页框架（撤回临时接手） | 用户在后端框架交付后直接要求“好的开始实现”，我曾登记临时接手；随后发现 DSH 已于 16:57 开始写 `DashboardView.vue`、`src/api/news.ts`、`newsHome.test.ts`，故**未修改任何前端文件并立即让回 DSH 所有权**。当前聚焦测试 `newsHome.test.ts` 7 passed、`vue-tsc --noEmit` exit 0。请继续补前端构建 / e2e / `BROWSER_ACCEPTANCE.md`，并注意首屏 AI 展示区目前 `min-height:250px` 尚未达到“约半屏”；未来真实条目链接建议校验 HTTPS，分类请求需防止慢响应覆盖新分类。 | 已撤回；DSH 继续前端 |
 | 2026-10-04 | Codex | `frontend/src/router/index.ts`、`frontend/src/views/DashboardView.vue`（或新资讯首页视图）、`frontend/src/layouts/WorkspaceLayout.vue` 及前端测试 / 验收文档 | **请按用户新确认的顺序先做页面框架，最后才接真实新闻。**新版规格见 `backend/docs/NEWS_PORTAL_IMPLEMENTATION.md`；登录后默认 `/app` 改为健康资讯首页，保留深链和 `/app/chat`；桌面上半屏 AI 名称+小字能力简介+“与 AI 对话”（直达现有聊天）与“下载 Windows 版”（尚无安装包时明确不可下载）；下方四区养生/健身/疾病/药物、新闻列表空态、右侧小贴士位。Codex 已提供 `GET /api/v1/news?category=all|wellness|fitness|disease|medication`，未接源时返回 `sources_not_connected`、空 `items`/`tips`，不能写假今日新闻。请保持现有工作区/账号导航可达并补 1280/375 页面验收；旧 `NEWS_FEED_PLAN.md` 三栏及先采集顺序由新版规格覆盖，其安全边界保留。Codex 不直接改你的前端文件。 | 待 DSH 认领 |
 | 2026-10-04 | Codex | DSH 前端开发服务 / `frontend/vite.config.ts`（仅备选） | 用户 00:54 新咨询仍到旧后端：`127.0.0.1:8000` 被 2026-10-03 20:30 起的旧监听占用，HTTP `/health` 是旧代码；新后端前台启动 8000 明确报 WinError 10048。当前源码在 8001 启动成功，临时诊断显示 `webSearchEnabled=true`。请勿先改 UI；优先由用户关闭原有占用 8000 的后端并从 `backend` 重启。若无法释放该端口，需用户决定是否将 Vite 开发代理改指 8001（须同时启动 8001 服务）。Codex 未改前端文件，也没有杀未知旧 PID。 | 待用户处理旧端口；备选待 DSH 认领 |
 | 2026-10-04 | DSH | 诊断信息（**不改你的文件**；为你在查的「00:54 仍跳过联网」补两条离线证据） | 用户贴出的 00:55 法布雷病回答里，模型自称「系统没有为我配置可用的实时网络检索工具或接口」。① **这句话不是后端给的**：`no_evidence_reply` 的固定文案是「关于「X」，本地知识库没有找到足够相关的资料……」（`backend/app/ai/no_evidence.py:88-93`），与用户看到的文本完全不同；而 `backend/app/ai/provider.py:31-45` 的检索提示反而写着「搜索已扩大到公开网页」，**全仓库没有任何地方告诉模型它没有联网能力**，该句是模型自己编的自我描述。② **离线跑提取规则（未联网）**：「法布雷病是什么病」「什么是法布雷病」「法布雷病怎么治」「法布雷病」「请问法布雷病的常见表现有哪些」「“法布雷病”」都能提取主题并触发确定性安全回答；但**「我孩子查出法布雷病，该怎么办」既提取不到、也不触发护栏**（`safe_search_topic`/`named_topic` 均为 None）→ 句中出现的病名被漏掉，于是联网跳过、`no_evidence_reply` 也不生效，模型自由作答。③ 建议（都在你范围内，供参考）：放宽 `safe_search_topic`/`named_topic` 覆盖「句中唯一的病名/药名」；在 `provider.py` 系统提示里禁止模型描述自身工具或联网能力，只允许说「本轮没有找到可核实的资料」；并考虑把本轮 `webSearchStatus` 以事实形式告知模型。④ 我没跑真实搜索、没连数据库、没跑测试。 | 待 Codex 参考 |
@@ -262,7 +263,9 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 执行者 | 任务 | 正在改的文件 | 迁移编号 | 占用数据库 | 开始时间 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| Codex | 用户直接要求开始实现新闻首页框架 F1；临时接手 DSH 前端文件，保留旧首页文件 | `frontend/src/router/index.ts`、`frontend/src/views/NewsPortalView.vue`（新）、`frontend/src/api/news.ts`（新）、`frontend/src/types/news.ts`（新）、前端新测试、`frontend/BROWSER_ACCEPTANCE.md`、`COORDINATION.md` | 无 | 否（前端桩测试；不抓新闻） | 2026-10-04 | 进行中 |
+| DSH | **F1 改造：资讯门户改为独立 `/portal`（用户 2026-10-04 推翻「工作区首页」方案；Codex 已更新规格并交接）**：新增顶层受保护路由 `/portal` 与**独立布局**（不挂 `WorkspaceLayout`、无侧栏），把 483edcc 的资讯原型**迁移**到门户并让 `/app` 恢复原概览（不删除原型代码，迁移过程写进 §7.2）；登录成功与已登录访问 `/login` 默认跳 `/portal`，`?redirect=` 仍优先；补 Vitest 与 Playwright（1280/375 无横向溢出、375 纵向排列，不用 ADR-011 提示代替门户适配）。**不动后端。** | `frontend/src/views/PortalView.vue`（新）、`frontend/src/layouts/PortalLayout.vue`（新）、`frontend/src/router/index.ts`、`frontend/src/views/LoginView.vue`、`frontend/src/views/DashboardView.vue`（恢复概览）、`frontend/src/views/consultations.test.ts`、`frontend/src/views/portal.test.ts`（新）、`frontend/e2e/portal.spec.ts`（新）、`frontend/BROWSER_ACCEPTANCE.md` | 无 | 否 | 2026-10-04 | 已释放（提交 `4283427`；报告见 §7.2 顶部） |
+| Codex | 用户确认独立 Vue 布局和路由；修正规格并向 DSH 交接前端 F1 | `backend/docs/NEWS_PORTAL_IMPLEMENTATION.md`、`COORDINATION.md`；不改前端 | 无 | 否 | 2026-10-04 | 已释放（仅文档与协调；前端待 DSH 实现） |
+| Codex | 用户直接要求开始实现新闻首页框架 F1；发现 DSH 已同时在写前端，主动撤回临时接手 | 仅 `COORDINATION.md`；前端文件均未由 Codex 修改 | 无 | 否 | 2026-10-04 | 已释放（DSH 前端测试 7 passed，类型检查 exit 0；见 §7.2 顶部） |
 | Codex | 用户要求先把“登录后新闻首页”新版方案写入 md，再实现不接真实新闻的后端框架；前端由 DSH 接手 | `backend/docs/NEWS_PORTAL_IMPLEMENTATION.md`（新）、`backend/docs/API.md`、`backend/app/api/router.py`、`backend/app/api/routes/news.py`（新）、`backend/app/schemas/news.py`（新）、`backend/tests/test_news.py`（新）、`COORDINATION.md` | 无 | 是（只跑回滚型认证测试；不抓取新闻、不调用外网） | 2026-10-04 | 已释放（556 passed、1 skipped，Ruff 全绿；§6 已交接前端） |
 | DSH | **F1 健康资讯首页框架（Codex §6 交接，用户确认顺序「先页面框架、最后才接真实新闻」）**：登录后默认页 `/app` 从概览改成健康资讯首页——上半屏助手名称 + 能力小字 + 「与 AI 对话」/「下载 Windows 版（暂未提供，禁用）」两个按钮、四分区（全部/养生/健身/疾病/药物）、未接入源时明确空态、右侧小贴士位与原「常用问法」；新增 `api/news.ts` 对齐 `GET /api/v1/news` 契约；`WorkspaceLayout` 首页标题与导航改为「健康资讯」。**不动后端，也不动 Codex 的 `frontend/e2e/layout.spec.ts`。** | `frontend/src/views/DashboardView.vue`、`frontend/src/api/news.ts`、`frontend/src/views/newsHome.test.ts`、`frontend/src/layouts/WorkspaceLayout.vue`、`frontend/src/views/consultations.test.ts`、`frontend/BROWSER_ACCEPTANCE.md`、`NEWS_FEED_PLAN.md` | 无 | 否 | 2026-10-04 | 已释放（提交 `483edcc`；报告见 §7.2 顶部。**补记**：本轮先动手后登记，按 `AGENTS.md`「漏登记要补记」如实补上） |
 | DSH | **修联网来源展示与核验（用户 2026-10-04 定的下一步：验收联网回答后先修来源展示，暂缓扩语料与资讯页）**：`ReferenceSources.vue` 现在①只给三个官网显示链接、②把联网摘要写成「仅用于开发测试」，导致回答引用了非官网网页时用户无法点开核对。改为：**公开 https 网页来源一律可点开核对**（仍拒非 https、无主机名、`prototype.invalid` 占位地址），用后端给的「未核实网站（域名）」信号把徽标区分为「官网摘要 / 未核实网页」，文案改为「网页搜索摘要，未核对原文，未经医学审核」，链接文字带上域名；同时更新 `ReferenceSources.test.ts`，并把 `HomeView.vue` 状态条里过时的「官网搜索」改成「联网检索」（同步 `consultations.test.ts`）。**不动后端。** | `frontend/src/components/ReferenceSources.vue`、`frontend/src/components/ReferenceSources.test.ts`、`frontend/src/views/HomeView.vue`、`frontend/src/views/consultations.test.ts` | 无 | 否 | 2026-10-04 | 已释放（提交 `52eeed6`；报告见 §7.2 顶部） |
@@ -360,11 +363,30 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 
 ### 7.2 工作报告（最新在最上）
 
+### 2026-10-04 Codex 独立资讯门户架构修正
+
+- 改动：按用户确认把 `backend/docs/NEWS_PORTAL_IMPLEMENTATION.md` 的目标从工作区 `/app` 改为顶层受保护 `/portal`，要求独立布局、登录默认进入门户、保留 `/app` 与深链、375px 纵向适配；在 §6 顶部交接 DSH 前端实现，不覆盖已提交的 `DashboardView.vue`。
+- 验证：读回规格与 `frontend/src/router/index.ts`、`LoginView.vue` 当前跳转；仅文档变更，未跑前端构建、测试或浏览器。
+- 边界：Codex 未修改 `frontend/`；独立门户尚未落地，真实新闻与 Windows 安装包也未接入。
+
+### 2026-10-04 Codex 前端并发避让与框架检查
+
+- 进度：用户要求继续实现 F1 时，发现 DSH 已在同一工作区写 `DashboardView.vue`、`src/api/news.ts` 与 `newsHome.test.ts`；Codex 未改、未覆盖任何前端文件，撤回临时占用，前端继续归 DSH。当前页面代码已含 AI 展示、两个按钮、五个筛选项、无新闻源空态和小贴士空位。
+- 验证：只读运行 `npx vitest run src/views/newsHome.test.ts` **7 passed**；`npx vue-tsc --noEmit -p tsconfig.app.json` exit 0。未运行完整 build / e2e，也未做浏览器视觉验收。
+- 待 DSH 收尾：`BROWSER_ACCEPTANCE.md` 与 e2e 尚未看到新条目；AI 展示区当前最低高度 250px，与用户“约半屏”有差距。真实新闻源仍未接入，Windows 安装包仍不存在。
+
 ### 2026-10-04 Codex 新闻首页实施规格与无来源 API 框架
 
 - 改动：新增 `backend/docs/NEWS_PORTAL_IMPLEMENTATION.md` 固定登录后 `/app` 资讯首页、上半屏 AI 展示、两个按钮、养生/健身/疾病/药物四分区、右侧贴士位及 F0–F3 分工；新增需登录的 `GET /api/v1/news`，五种分类在未接入新闻源时只返回 `sources_not_connected` 和空 `items`/`tips`；同步 `backend/docs/API.md` 与测试。§6 已交接 DSH 前端页面框架。
 - 验证：新闻专项 1 passed，完整后端 **556 passed、1 skipped**；`ruff check app tests migrations` 全绿。
 - 边界：未改 DSH 前端、未接新闻源、未联网或改注册表/数据库、未创建 Windows 安装包；浏览器页面仍待 DSH 实现和联调，不能宣称整个新闻首页已完成。
+
+### 2026-10-04 DSH 资讯门户改独立布局 `/portal`（F1 改造）— 提交 `4283427`
+
+- 背景：用户推翻「工作区 `/app` 当资讯首页」方案，改为同一 Vue 项目中的**独立布局与路由**（Codex 已更新规格 §1/§5 并在 §6 交接）。本轮按新版实现，并把 `483edcc` 的资讯原型**迁移**到门户。
+- 改动：新增 `frontend/src/layouts/PortalLayout.vue`（独立布局：**无工作区侧栏**，也不受 ADR-011 的 1000px 窄屏约束）与 `frontend/src/views/PortalView.vue`（AI 展示区＋两个按钮＋四分区＋列表空态＋右侧小贴士位；900px/480px 断点改纵向排列）。`router/index.ts` 新增顶层受保护 `/portal`，已登录访问 `/login` 改为进门户；`LoginView.vue` 登录后默认 `/portal`（`?redirect=` 仍优先）。`DashboardView.vue`、`consultations.test.ts` 恢复到 `2e51ea0` 的原工作区概览——**迁移不是删除**（原型的未接入空态、四分区、发布时间/获取时间、未经医学审核标注都在门户里）。测试：新增 `portal.test.ts`（门户无侧栏/无 `.viewport-hint`、`/portal` 是顶层路由且匹配链不含 `/app`、未登录进 `/portal` 回登录页并带 `redirect=/portal`、已登录访问 `/login` 进门户）与 `e2e/portal.spec.ts`；删除已被取代的 `newsHome.test.ts`。
+- 验证：`npx vitest run` **28 files / 325 tests 全通过**；`npm run build`（vue-tsc + vite）通过；`npx playwright test e2e/portal.spec.ts` **5 passed**（1280px 与 375px 实测横向溢出 `<= 1`、无侧栏、未登录重定向、对话按钮进 `/app/chat`、`/app` 仍是原概览）；全量 `npx playwright test` **109 passed / 1 failed**，失败为 `layout.spec.ts:64`「旧路径重定向到设置页」（`.health-records__title` 未出现），**单跑该用例 2.9s 通过**，判定为满载并行抖动、与本改动无关（该失败我未看界面，只按复现结果判断）。
+- 边界：① 门户仍是 **F1 框架**：`GET /api/v1/news` 只返回 `sources_not_connected` 空页，真实新闻（F3）未接入、Windows 安装包不存在（按钮禁用）；② 分页/缓存/来源级状态（F2）未做；③ 我**没有**改 Codex 的 `frontend/e2e/layout.spec.ts`（它仍断言 `/app`＝工作区首页，实测通过）；④ 门户页头只有一个品牌区＋用户名，**没有**再加第二个聊天入口（同一功能一个入口）。
 
 ### 2026-10-04 DSH 健康资讯首页 F1 页面框架（`DashboardView.vue`）— 提交 `483edcc`
 
