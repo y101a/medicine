@@ -265,6 +265,7 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 执行者 | 任务 | 正在改的文件 | 迁移编号 | 占用数据库 | 开始时间 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
+| DSH | **门户删掉顶部品牌栏、内容铺满整页（用户 2026-10-04 口头要求）**：`PortalLayout` 去掉我此前自己加的页头（「病理诊断科普助手 / 健康资讯门户」＋用户名），只留内容区与页脚；`PortalView` 去掉 1180px 居中限宽改整页铺满、右栏加宽、空态在面板内垂直居中。**不动后端。** | `frontend/src/layouts/PortalLayout.vue`、`frontend/src/views/PortalView.vue`、`frontend/src/views/portal.test.ts`、`frontend/BROWSER_ACCEPTANCE.md` | 无 | 否 | 2026-10-04 | 已释放（提交 `ce7d3cb`；报告见 §7.2 顶部。**补记**：本轮先动手后登记，如实补上） |
 | DSH | **F1 改造：资讯门户改为独立 `/portal`（用户 2026-10-04 推翻「工作区首页」方案；Codex 已更新规格并交接）**：新增顶层受保护路由 `/portal` 与**独立布局**（不挂 `WorkspaceLayout`、无侧栏），把 483edcc 的资讯原型**迁移**到门户并让 `/app` 恢复原概览（不删除原型代码，迁移过程写进 §7.2）；登录成功与已登录访问 `/login` 默认跳 `/portal`，`?redirect=` 仍优先；补 Vitest 与 Playwright（1280/375 无横向溢出、375 纵向排列，不用 ADR-011 提示代替门户适配）。**不动后端。** | `frontend/src/views/PortalView.vue`（新）、`frontend/src/layouts/PortalLayout.vue`（新）、`frontend/src/router/index.ts`、`frontend/src/views/LoginView.vue`、`frontend/src/views/DashboardView.vue`（恢复概览）、`frontend/src/views/consultations.test.ts`、`frontend/src/views/portal.test.ts`（新）、`frontend/e2e/portal.spec.ts`（新）、`frontend/BROWSER_ACCEPTANCE.md` | 无 | 否 | 2026-10-04 | 已释放（提交 `4283427`；报告见 §7.2 顶部） |
 | Codex | 用户确认独立 Vue 布局和路由；修正规格并向 DSH 交接前端 F1 | `backend/docs/NEWS_PORTAL_IMPLEMENTATION.md`、`COORDINATION.md`；不改前端 | 无 | 否 | 2026-10-04 | 已释放（仅文档与协调；前端待 DSH 实现） |
 | Codex | 用户直接要求开始实现新闻首页框架 F1；发现 DSH 已同时在写前端，主动撤回临时接手 | 仅 `COORDINATION.md`；前端文件均未由 Codex 修改 | 无 | 否 | 2026-10-04 | 已释放（DSH 前端测试 7 passed，类型检查 exit 0；见 §7.2 顶部） |
@@ -394,6 +395,13 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 - 改动：新增 `backend/docs/NEWS_PORTAL_IMPLEMENTATION.md` 固定登录后 `/app` 资讯首页、上半屏 AI 展示、两个按钮、养生/健身/疾病/药物四分区、右侧贴士位及 F0–F3 分工；新增需登录的 `GET /api/v1/news`，五种分类在未接入新闻源时只返回 `sources_not_connected` 和空 `items`/`tips`；同步 `backend/docs/API.md` 与测试。§6 已交接 DSH 前端页面框架。
 - 验证：新闻专项 1 passed，完整后端 **556 passed、1 skipped**；`ruff check app tests migrations` 全绿。
 - 边界：未改 DSH 前端、未接新闻源、未联网或改注册表/数据库、未创建 Windows 安装包；浏览器页面仍待 DSH 实现和联调，不能宣称整个新闻首页已完成。
+
+### 2026-10-04 DSH 门户删顶部品牌栏 + 整页铺满（含一次误提交事故披露）— 提交 `ce7d3cb`
+
+- 改动（用户口头要求「把首页上面的病理诊断科普助手那一栏删掉，下面的各个栏放大填满整个页面」）：`frontend/src/layouts/PortalLayout.vue` 删除页头——那是我自己加的（规格里没有），原来显示「病理诊断科普助手 / 健康资讯门户」＋用户名；现在门户只有内容区与页脚。`frontend/src/views/PortalView.vue` 去掉 `max-width: 1180px` 居中限宽与 `margin: 0 auto`，改为整页铺满（`.portal-home` 参与纵向撑满、`.columns` `flex: 1`、右栏加宽为 240–340px、空态/加载态在面板内垂直居中）。
+- 验证：`npx vitest run` **28 files / 325 tests 全通过**（`portal.test.ts` 增断言「门户不再有 `.portal-top`」）；`npm run build`（vue-tsc + vite）通过；`npx playwright test e2e/portal.spec.ts` **5 passed**——1280px 与 375px 在**去掉限宽后仍无横向溢出**。
+- ⚠️ **事故披露（重要）**：`ce7d3cb` **误把 Codex 暂存在索引里的在途工作一起提交了**（共 48 个文件，含 `backend/app/rag/web_search.py`、`knowledge_graph_*`、`backend/app/schemas/news.py`、`backend/tests/*`、`backend/docs/NEWS_UPDATE_PLAN.md`、`frontend/e2e/{images,layout}.spec.ts`、`COORDINATION.md` 的若干行等）。原因：我只 `git add --` 了自己的文件，却没核对**索引里已有的**内容就执行提交（`git diff --cached --stat` 打了全表但我没有据此中止）。**内容未被修改、没有被丢弃**：这些改动原样进了 HEAD，工作区现在干净，暂存区已空。但我提交信息没有描述它们，历史里这条提交的信息因此不准确。已采取的整改：此后提交一律用 `git commit -m "…" -- <明确路径>`（只提交指定路径、不碰索引其余内容），并在提交前核对 `git diff --cached --name-only`。Codex 若要把这批工作单独成条，请自行追加提交说明或在 §7.2 记录，**不要 reset/revert**（会造成丢失）。
+- 边界：① 门户仍是 F1 框架（无真实新闻、Windows 无安装包）；② 删掉页头后门户**没有**登出入口，进工作区仍靠内容区顶部「与 AI 对话」按钮（同一功能一个入口，未新增第二个）；③ 若用户本意是删**整个 AI 展示区**（含两个按钮），那会同时去掉门户唯一的聊天入口，需用户确认后再做。
 
 ### 2026-10-04 DSH 资讯门户改独立布局 `/portal`（F1 改造）— 提交 `4283427`
 
