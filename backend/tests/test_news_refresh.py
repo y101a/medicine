@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy import delete
 
-from app.models import NewsSource
+from app.models import NewsItem, NewsRefreshRun, NewsSource
 from app.services import news as news_service
 from app.services.news.adapters import parse_for_source, parse_who_outbreak_news
 from app.services.news.catalog import BLOCKED_SOURCES, CATALOG
@@ -15,6 +15,17 @@ from app.services.news.fetcher import FetchError, assert_public_endpoint
 from app.services.news.refresh import refresh_sources
 
 NOW = datetime(2026, 10, 4, 12, 0, tzinfo=UTC)
+
+
+@pytest.fixture(autouse=True)
+async def _isolate_news_tables(profile_context):
+    """同 `tests/test_news.py`：测试事务内先清空资讯三表，回滚后真实数据仍在。"""
+    _client, db, _users = profile_context
+    await db.execute(delete(NewsItem))
+    await db.execute(delete(NewsSource))
+    await db.execute(delete(NewsRefreshRun))
+    await db.flush()
+    yield
 
 WHO_SAMPLE = json.dumps(
     {

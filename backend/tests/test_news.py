@@ -7,9 +7,10 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from sqlalchemy import delete
 
 from app.core.security import create_access_token
-from app.models import NewsSource
+from app.models import NewsItem, NewsRefreshRun, NewsSource
 from app.services import news as news_service
 from app.services.auth import ACCESS_COOKIE
 from app.services.news.feeds import FeedEntry, FeedParseError, parse_feed
@@ -21,6 +22,22 @@ from app.services.news.validation import (
 )
 
 NOW = datetime(2026, 10, 4, 12, 0, tzinfo=UTC)
+
+
+@pytest.fixture(autouse=True)
+async def _isolate_news_tables(profile_context):
+    """让资讯测试不受库里既有数据影响。
+
+    后端测试与开发库共用同一个数据库，而这里的空态断例要求「没有启用来源」。开发库里可能有
+    真实试跑留下的来源/条目/运行记录，所以先清空资讯三表。删除发生在测试事务内，
+    回滚后真实数据仍在——不改测试环境以外的数据。
+    """
+    _client, db, _users = profile_context
+    await db.execute(delete(NewsItem))
+    await db.execute(delete(NewsSource))
+    await db.execute(delete(NewsRefreshRun))
+    await db.flush()
+    yield
 
 RSS_SAMPLE = """<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0"><channel><title>feed</title>
