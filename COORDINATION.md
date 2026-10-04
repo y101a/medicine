@@ -399,6 +399,13 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 - 验证：新闻专项 1 passed，完整后端 **556 passed、1 skipped**；`ruff check app tests migrations` 全绿。
 - 边界：未改 DSH 前端、未接新闻源、未联网或改注册表/数据库、未创建 Windows 安装包；浏览器页面仍待 DSH 实现和联调，不能宣称整个新闻首页已完成。
 
+### 2026-10-04 DSH 扩源第二轮：接入 WHO 新闻稿 + 中文站点实测结论（用户选「先扩来源」）
+
+- **补记**：本轮同样漏了先写 §7.1；收工**没有留下占用行**。
+- 改动：`backend/app/services/news/catalog.py` 新增来源 `who_news_releases`（`/api/news/newsitems`，条目地址 `https://www.who.int/news/item/<带日期前缀的 slug>`），并把 WHO 许可从「未核验」更新为**原文摘录**（`_WHO_LICENSE_NOTE`：WHO 版权页写明 CC BY-NC-SA 3.0 IGO、「Permission from WHO is not required」）；`BLOCKED_SOURCES` 从 2 条扩到 5 条并改写为**本轮实测**结论（卫健委/药监局首页 412 反爬、疾控 /jkzt/ 404、体育总局与营养学会无 RSS 且无授权；并更正「药监局 robots 403」这一已不复现的记录）。`adapters.py` 把 WHO 解析抽成 `_parse_who_odata`，**改用 `ItemDefaultUrl` 取 slug**（新闻稿地址带日期前缀，用 `UrlName` 会 404），新增 `parse_who_news_releases`。`backend/tests/test_news_refresh.py` 新增 1 项适配器测试。
+- 验证（全部实跑）：资讯三专项 **37 passed**；后端全量 **592 passed, 1 skipped**（上一轮 591+1，+1）；`ruff check .` **All checks passed**；新适配器构造的 3 条 WHO 新闻稿地址用真实请求逐个实测 **200**；真实抓取 `--refresh --source who_news_releases --limit 20` → `抓取=20 新增=20 拒收=0`，两个来源合计 `--items disease` **40 条**。
+- 边界：**中文四个站点一条也没接入**（无机器可读入口 + 无再利用授权，两条都不将就）；WHO 讲话频道实测可读但**故意不接**（总干事演讲稿不是给患者的科普内容）；新闻稿归入「疾病」专区是本项目的取舍；仍未做中文翻译与摘要；WHO 许可的最终判断（是否属非商业、新闻网页是否在许可范围内）留给用户/法务，写在 `NEWS_SOURCE_CANDIDATES.md` §9.1 与 §9.4 的函询清单里。
+
 ### 2026-10-04 DSH 资讯 N3：每日按需刷新（API 后台任务 + 轮内重试 + 前端「正在更新」）
 
 - **前提 / 补记**：用户 2026-10-04 明确「做N3」，并授权接口进程按需出网。**本轮又漏了先写 §7.1**（与前三轮同样的疏漏，如实记录）；收工时**没有留下任何占用行**，Codex 可随时接手这些文件。
