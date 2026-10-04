@@ -120,6 +120,7 @@ async def search_knowledge(
     top_k: int = 5,
     mode: RetrievalMode = "hybrid",
     embedder: QueryEmbedder | None = None,
+    include_web_cache: bool = False,
 ) -> RetrievalResult:
     if top_k < 1 or top_k > 10:
         raise RetrievalError(422, "RETRIEVAL_LIMIT_INVALID", "召回数量必须为 1-10")
@@ -144,6 +145,17 @@ async def search_knowledge(
                 KnowledgeDocument.review_status == "approved",
             ),
             and_(
+                KnowledgeSource.ingestion_status == "prototype",
+                KnowledgeDocument.review_status == "prototype",
+            ),
+        )
+    elif include_web_cache and settings.web_search_enabled:
+        # Only the consultation path may opt into unreviewed, expiring web
+        # excerpts. Knowledge API and document generation remain approved-only.
+        status_filter = or_(
+            status_filter,
+            and_(
+                KnowledgeSource.source_key == "web_search_prototype",
                 KnowledgeSource.ingestion_status == "prototype",
                 KnowledgeDocument.review_status == "prototype",
             ),
@@ -314,7 +326,11 @@ async def search_knowledge(
                 chunk_id=chunk.id,
                 document_id=document.id,
                 source_key=source.source_key,
-                organization=source.organization,
+                organization=(
+                    document.responsible_department
+                    if source.source_key == "web_search_prototype"
+                    else source.organization
+                ),
                 title=document.title,
                 canonical_url=document.canonical_url,
                 section_title=chunk.section_title,

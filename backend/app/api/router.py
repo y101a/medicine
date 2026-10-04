@@ -11,6 +11,7 @@ from app.api.routes import (
     knowledge,
     models,
     navigation,
+    news,
     phone_verification,
     private_knowledge,
     speech,
@@ -31,6 +32,7 @@ api_router.include_router(consultations.router)
 api_router.include_router(models.router)
 api_router.include_router(knowledge.router)
 api_router.include_router(navigation.router)
+api_router.include_router(news.router)
 api_router.include_router(health_records.router)
 api_router.include_router(voice.router)
 api_router.include_router(speech.router)

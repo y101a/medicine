@@ -172,7 +172,9 @@ describe('门户布局与路由', () => {
     expect(wrapper.find('.sidebar').exists()).toBe(false)
     expect(wrapper.find('.viewport-hint').exists()).toBe(false)
     expect(wrapper.find('.workspace').exists()).toBe(false)
-    expect(wrapper.text()).toContain('健康资讯门户')
+    // 2026-10-04 用户要求删掉顶部品牌栏：门户不再有页头，只有内容区与页脚。
+    expect(wrapper.find('.portal-top').exists()).toBe(false)
+    expect(wrapper.text()).toContain('开发原型')
   })
 
   it('门户是顶层路由，不挂在工作区布局下', async () => {

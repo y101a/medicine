@@ -93,6 +93,34 @@ async def enqueue_publication(db: AsyncSession, *, actor: str) -> PublicationRes
     )
 
 
+async def enqueue_snapshot_rebuild(db: AsyncSession, *, actor: str) -> PublicationResult | None:
+    """撤回、改名、来源失效后为完整当前图追加 revision；允许空图。"""
+
+    if not actor.strip():
+        raise KnowledgeGraphPublicationError("发布操作人不能为空")
+    highest_job = (await db.scalar(select(func.max(GraphPublicationJob.target_revision)))) or 0
+    if not highest_job:
+        return None  # 从未发布，无旧图需要清理。
+    count = (
+        await db.scalar(
+            select(func.count()).select_from(GraphClaim).where(
+                GraphClaim.status == GraphClaimStatus.PUBLISHED
+            )
+        )
+    ) or 0
+    revision = int(highest_job) + 1
+    job = GraphPublicationJob(
+        idempotency_key=f"graph-revision:{revision}",
+        target_revision=revision,
+        claim_count=int(count),
+        status=GraphPublicationStatus.QUEUED,
+        attempts=0,
+    )
+    db.add(job)
+    await db.flush()
+    return PublicationResult(revision, int(count), job.id, job.idempotency_key)
+
+
 async def claim_next_job(
     db: AsyncSession, *, owner: str, lease_seconds: int = 300
 ) -> ClaimedJob | None:
@@ -171,9 +199,7 @@ async def publication_status(db: AsyncSession) -> PublicationStatusView:
     counts: dict[str, int] = {}
     for job in jobs:
         counts[job.status] = counts.get(job.status, 0) + 1
-    expected_revision = (
-        await db.scalar(select(func.max(GraphClaim.published_revision)))
-    ) or 0
+    expected_revision = max((job.target_revision for job in jobs), default=0)
     succeeded = [
         job.target_revision
         for job in jobs

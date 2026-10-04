@@ -18,6 +18,7 @@ from app.ai.follow_up import (
 from app.ai.generated_image_context import build_generated_image_context
 from app.ai.graph import render_rag_context, run_consultation_generation
 from app.ai.graph.retrieval_gate import evaluate_retrieval_gate
+from app.ai.no_evidence import no_evidence_reply, unverified_web_risk_reply
 from app.ai.private_knowledge_context import (
     audit_private_citations,
     build_private_knowledge_context,
@@ -180,6 +181,18 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
         or None
     )
     rag_context = render_rag_context(graph_result["retrieval_items"])
+    safety_reply = no_evidence_reply(
+        user_text,
+        graph_result,
+        has_user_document=bool(attachment_context or private_knowledge_context),
+    )
+    safety_reply = safety_reply or unverified_web_risk_reply(
+        user_text,
+        graph_result,
+        has_user_document=bool(attachment_context or private_knowledge_context),
+    )
+    if safety_reply is not None:
+        answer_format = "plain"
     topic = generic_topic(user_text)
     coverage_limited = bool(
         graph_result["retrieval_items"]
@@ -222,6 +235,19 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
             )
         except Exception:  # noqa: BLE001 - 兜底：抽取调度失败不得影响对话
             pass
+
+    async def answer_chunks():
+        if safety_reply is not None:
+            yield safety_reply
+            return
+        async for chunk in provider.stream_chat(
+            history,
+            model,
+            answer_format,
+            rag_context,
+            private_context,
+        ):
+            yield chunk
 
     async def generate():
         parts: list[str] = []
@@ -278,13 +304,7 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
             }
         )
         try:
-            async for chunk in provider.stream_chat(
-                history,
-                model,
-                answer_format,
-                rag_context,
-                private_context,
-            ):
+            async for chunk in answer_chunks():
                 remaining = 12000 - total_length
                 if remaining <= 0:
                     break

@@ -61,6 +61,7 @@ def review_metadata(source_key: str) -> dict[str, object]:
         "medical_reviewed_at": "2026-09-11T08:30:00+08:00",
         "medical_reviewed_by": "医学测试审核员",
         "metadata": {"topic": "test"},
+        "classification": {"primary_layer": "disease", "topic_key": "test_topic"},
     }
 
 

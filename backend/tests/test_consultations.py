@@ -588,6 +588,59 @@ async def test_stream_without_evidence_never_persists_fake_citations(
     assert restored[-1]["answerFormat"] == expected_format
 
 
+async def test_named_disease_without_evidence_never_calls_model(profile_context, monkeypatch):
+    client, _, (user, _) = profile_context
+    client.cookies.set(ACCESS_COOKIE, create_access_token(user.id))
+    created = (
+        await client.post("/api/v1/consultations", json={"clientRequestId": str(uuid4())})
+    ).json()
+    url = f"/api/v1/consultations/{created['id']}"
+    await client.post(
+        url + "/messages",
+        json={"clientRequestId": str(uuid4()), "content": "法布雷病是什么？有哪些常见表现？"},
+    )
+    selected = ModelConfig(
+        id="test-model", name="测试模型", provider="test",
+        provider_name="测试", description="隔离测试",
+        base_url="https://example.test/v1", api_key=SecretStr("test-only"),
+    )
+    monkeypatch.setattr(
+        "app.api.routes.consultations.get_model_for_user",
+        AsyncMock(return_value=selected),
+    )
+
+    async def no_evidence(_text, _db):
+        return {
+            "triage_route": "continue", "triage_rule_version": "test",
+            "triage_rule_ids": [], "triage_result": None,
+            "next_step": "generation_ready", "retrieval_status": "empty",
+            "retrieval_items": [], "retrieval_error_code": None,
+            "retrieval_intent": True, "retrieval_gate_reason": "medical_content",
+            "web_search_status": "skipped", "web_search_error_code": None,
+        }
+
+    async def unexpected_model(*_args, **_kwargs):
+        raise AssertionError("无资料的具体病名不应调用模型补写医学事实")
+        yield ""  # pragma: no cover
+
+    monkeypatch.setattr(
+        "app.api.routes.consultations.run_consultation_generation", no_evidence,
+    )
+    monkeypatch.setattr("app.ai.provider.stream_chat", unexpected_model)
+    response = await client.post(
+        url + "/stream",
+        json={"clientRequestId": str(uuid4()), "modelId": selected.id},
+    )
+    assert response.status_code == 200
+    events = [json.loads(line) for line in response.text.splitlines()]
+    assert events[-1]["type"] == "done"
+    assert "没有完成联网检索" in events[-1]["message"]["content"]
+    assert "不能可靠地列出" in events[-1]["message"]["content"]
+    assert events[-1]["message"]["citations"] == []
+    saved = (await client.get(url + "/messages")).json()["items"][-1]
+    assert saved["content"] == events[-1]["message"]["content"]
+
+
 async def test_committed_messages_survive_new_connection_and_concurrent_retry():
     engine = create_async_engine(get_settings().database_url)
     sessions = async_sessionmaker(engine, expire_on_commit=False)

@@ -32,17 +32,23 @@ from app.rag.web_search import (
     SearchHit,
     WebSearchError,
     broad_coverage_limited,
-    generic_topic,
+    safe_search_topic,
     save_search_prototypes,
     search_generic_topic,
+    source_organization,
     topic_matches_text,
-    trusted_organization,
     web_hit_limit,
 )
 
 Retriever = Callable[..., Awaitable[RetrievalResult]]
 WebSearcher = Callable[[str], Awaitable[list[SearchHit]]]
 RAG_TOP_K = 4
+
+
+async def consultation_retriever(
+    db: AsyncSession, query: str, *, top_k: int
+) -> RetrievalResult:
+    return await search_knowledge(db, query, top_k=top_k, include_web_cache=True)
 
 
 def route_after_triage(
@@ -122,7 +128,7 @@ PLAIN_RELEVANCE_GATE = production_relevance_gate(
 
 
 def build_consultation_generation_graph(
-    retriever: Retriever = search_knowledge,
+    retriever: Retriever = consultation_retriever,
     web_searcher: WebSearcher = search_generic_topic,
 ):
     async def retrieval_node(
@@ -143,7 +149,7 @@ def build_consultation_generation_graph(
                 "web_search_error_code": None,
             }
         items = [_evidence_item(item) for item in result.items]
-        topic = generic_topic(state["user_text"])
+        topic = safe_search_topic(state["user_text"])
         if topic:
             items = filter_evidence(
                 [
@@ -166,7 +172,7 @@ def build_consultation_generation_graph(
     async def web_search_node(
         state: ConsultationGenerationGraphState,
     ) -> dict[str, object]:
-        topic = generic_topic(state["user_text"])
+        topic = safe_search_topic(state["user_text"])
         if not topic:
             return {"web_search_status": "skipped"}
         try:
@@ -184,7 +190,7 @@ def build_consultation_generation_graph(
         hits = [
             hit
             for hit in hits
-            if trusted_organization(hit.url) == hit.organization
+            if source_organization(hit.url) == hit.organization
             and topic_matches_text(topic, hit.title + hit.excerpt)
         ][: web_hit_limit(topic)]
         items: list[RetrievalEvidence] = [
@@ -259,13 +265,13 @@ def build_consultation_generation_graph(
     def route_after_retrieval(
         state: ConsultationGenerationGraphState,
     ) -> Literal["web_search", "generation_ready"]:
-        topic = generic_topic(state["user_text"])
+        topic = safe_search_topic(state["user_text"])
         coverage_limited = broad_coverage_limited(
             topic,
             [item["title"] + item["content"] for item in state["retrieval_items"]],
         )
         if (
-            get_settings().app_environment == "development"
+            get_settings().web_search_enabled
             and topic
             and (state["retrieval_status"] == "empty" or coverage_limited)
         ):

@@ -25,6 +25,7 @@ class StoredGeneratedImage:
 
 
 def _root() -> Path:
+
     root = Path(get_settings().image_storage_dir).resolve()
     root.mkdir(parents=True, exist_ok=True)
     return root

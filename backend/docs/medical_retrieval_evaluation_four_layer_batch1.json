@@ -1,0 +1,33 @@
+{
+  "schema_version": "1.0",
+  "status": "frozen_before_batch1_content",
+  "purpose": "四层首批主题的文档检索验收；只评估找对资料，不证明医学结论或回答安全。",
+  "case_count": 20,
+  "split_policy": "12 tune 可先跑关键词基线；8 holdout 在内容与检索配置冻结前不得查看结果或据此改写语料。",
+  "planned_document_slugs": ["physiology-temperature-regulation"],
+  "cases": [
+    {"id":"b1_d_fever_when_to_seek_care","query":"孩子发烧了，哪些变化说明不能只在家观察？","expected_topics":["儿童发热","就医分流"],"expected_document_slugs":["pediatric-fever"],"safety_class":"urgent","case_type":"supported","body_system":"pediatric","query_style":"colloquial","split":"tune","knowledge_layer":"disease"},
+    {"id":"b1_d_fever_poor_intake","query":"小孩发热时喝水明显少、精神也差，我应该重点留意什么？","expected_topics":["儿童发热","危险表现"],"expected_document_slugs":["pediatric-fever"],"safety_class":"urgent","case_type":"supported","body_system":"pediatric","query_style":"scenario","split":"tune","knowledge_layer":"disease"},
+    {"id":"b1_d_fever_recurrent","query":"孩子退热后又烧起来，需要记录哪些情况向医生说明？","expected_topics":["儿童发热","观察记录"],"expected_document_slugs":["pediatric-fever"],"safety_class":"education","case_type":"supported","body_system":"pediatric","query_style":"scenario","split":"tune","knowledge_layer":"disease"},
+    {"id":"b1_d_fever_very_young","query":"很小的婴儿量到体温升高，能像大孩子那样先等等看吗？","expected_topics":["婴儿发热","就医分流"],"expected_document_slugs":["pediatric-fever"],"safety_class":"urgent","case_type":"supported","body_system":"pediatric","query_style":"colloquial","split":"holdout","knowledge_layer":"disease"},
+    {"id":"b1_d_fever_confusion","query":"发烧的孩子突然很难叫醒，家里人说先睡一觉就好，应该怎么办？","expected_topics":["儿童发热","危险表现"],"expected_document_slugs":["pediatric-fever"],"safety_class":"emergency","case_type":"supported","body_system":"pediatric","query_style":"scenario","split":"holdout","knowledge_layer":"disease"},
+
+    {"id":"b1_p_temperature_control","query":"人的体温平时是怎么维持在一定范围内的？","expected_topics":["体温调节"],"expected_document_slugs":["physiology-temperature-regulation"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"broad_topic","split":"tune","knowledge_layer":"physiology"},
+    {"id":"b1_p_fever_chills","query":"已经感觉发热了却还觉得冷，这是怎么回事？","expected_topics":["体温调节","发热过程"],"expected_document_slugs":["physiology-temperature-regulation"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"colloquial","split":"tune","knowledge_layer":"physiology"},
+    {"id":"b1_p_temperature_variation","query":"为什么同一个人早上和晚上量到的体温不完全一样？","expected_topics":["体温调节","正常波动"],"expected_document_slugs":["physiology-temperature-regulation"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"colloquial","split":"tune","knowledge_layer":"physiology"},
+    {"id":"b1_p_sweating","query":"身体发热后出汗，是身体在做什么？","expected_topics":["体温调节","散热"],"expected_document_slugs":["physiology-temperature-regulation"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"colloquial","split":"holdout","knowledge_layer":"physiology"},
+    {"id":"b1_p_activity_vs_illness","query":"运动后觉得热和生病时发热，解释起来是一回事吗？","expected_topics":["体温调节","运动产热与发热区别"],"expected_document_slugs":["physiology-temperature-regulation"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"differential","split":"holdout","knowledge_layer":"physiology"},
+
+    {"id":"b1_m_cold_antibiotic","query":"普通感冒想吃点消炎药，为什么不建议自己随便用？","expected_topics":["合理用药","抗菌药物"],"expected_document_slugs":["medicine-use"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"colloquial","split":"tune","knowledge_layer":"pharmacology"},
+    {"id":"b1_m_leftover_antibiotic","query":"上次剩下的抗菌药，这次症状差不多能不能直接拿来吃？","expected_topics":["合理用药","剩余药品"],"expected_document_slugs":["medicine-use"],"safety_class":"urgent","case_type":"supported","body_system":"cross_system","query_style":"scenario","split":"tune","knowledge_layer":"pharmacology"},
+    {"id":"b1_m_stop_early","query":"医生开的抗菌药用了两天感觉好了，自己提前停掉会有什么问题？","expected_topics":["合理用药","按医嘱用药"],"expected_document_slugs":["medicine-use"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"scenario","split":"tune","knowledge_layer":"pharmacology"},
+    {"id":"b1_m_share_prescription","query":"家里人用过的阿莫西林还在，我发热咳嗽能照着他的用法吃吗？","expected_topics":["合理用药","不共用处方"],"expected_document_slugs":["medicine-use"],"safety_class":"urgent","case_type":"supported","body_system":"cross_system","query_style":"scenario","split":"holdout","knowledge_layer":"pharmacology"},
+    {"id":"b1_m_anti_inflammatory_term","query":"别人说抗菌药就是退烧消炎的，所有发热都能用，这种说法可靠吗？","expected_topics":["合理用药","抗菌药物适用边界"],"expected_document_slugs":["medicine-use"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"confusable","split":"holdout","knowledge_layer":"pharmacology"},
+
+    {"id":"b1_w_start_after_sedentary","query":"平时坐得多几乎不运动，打算开始锻炼时先从什么安排起？","expected_topics":["科学健身","起步评估"],"expected_document_slugs":["wellness-fitness-guide-framework"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"scenario","split":"tune","knowledge_layer":"wellness_fitness"},
+    {"id":"b1_w_assess_before_plan","query":"网上的运动计划能直接照搬吗，安排锻炼前需要考虑什么？","expected_topics":["科学健身","运动前评估"],"expected_document_slugs":["wellness-fitness-guide-framework"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"scenario","split":"tune","knowledge_layer":"wellness_fitness"},
+    {"id":"b1_w_chronic_condition","query":"有长期健康问题的人想开始锻炼，为什么不能只按别人的运动量做？","expected_topics":["科学健身","个体差异"],"expected_document_slugs":["wellness-fitness-guide-framework"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"scenario","split":"tune","knowledge_layer":"wellness_fitness"},
+    {"id":"b1_w_sudden_high_load","query":"很久没活动，明天开始每天跑十公里可以吗？","expected_topics":["科学健身","循序渐进"],"expected_document_slugs":["wellness-fitness-guide-framework"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"colloquial","split":"holdout","knowledge_layer":"wellness_fitness"},
+    {"id":"b1_w_copy_exercise_prescription","query":"老人有慢性病，能直接照网上给年轻人的运动处方练吗？","expected_topics":["科学健身","先评估再安排"],"expected_document_slugs":["wellness-fitness-guide-framework"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"scenario","split":"holdout","knowledge_layer":"wellness_fitness"}
+  ]
+}

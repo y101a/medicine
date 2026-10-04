@@ -6,7 +6,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import KnowledgeSource
+from app.models import KnowledgeDocument, KnowledgeSource
 
 DEFAULT_REGISTRY_PATH = (
     Path(__file__).resolve().parents[2] / "docs" / "medical_source_registry.json"
@@ -134,6 +134,30 @@ async def sync_approved_sources(
         updated += 1
 
     await db.flush()
+    if demoted:
+        from app.models.knowledge_graph import (
+            GraphClaim,
+            GraphClaimEvidence,
+            GraphClaimStatus,
+        )
+        from app.services.knowledge_graph_publication import enqueue_snapshot_rebuild
+        from app.services.knowledge_graph_review import retire_stale_claims
+
+        affected = await db.scalar(
+            select(GraphClaim.id)
+            .join(GraphClaimEvidence, GraphClaimEvidence.claim_id == GraphClaim.id)
+            .join(KnowledgeDocument, KnowledgeDocument.id == GraphClaimEvidence.document_id)
+            .join(KnowledgeSource, KnowledgeSource.id == KnowledgeDocument.source_id)
+            .where(
+                KnowledgeSource.ingestion_status != "approved",
+                GraphClaim.status == GraphClaimStatus.PUBLISHED,
+            )
+            .limit(1)
+        )
+        if affected is not None:
+            retired_ids = await retire_stale_claims(db, reviewer="source-registry-sync")
+            if affected not in retired_ids:
+                await enqueue_snapshot_rebuild(db, actor="source-registry-sync")
     return SourceSyncResult(
         approved_requested=len(entries),
         created=created,

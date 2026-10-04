@@ -60,6 +60,14 @@ const STUBS: StubTable = {
   // 同一个附件按钮也能传文档，所以这条链路也要有桩（图片满额时用它验收「不误伤文档入口」）。
   'POST /consultations/*/attachments': { status: 201, body: DOCUMENT },
   'GET /consultations/*/attachments': { body: { items: [] } },
+  'GET /consultations/*/document-generations': { body: { items: [] } },
+  'GET /consultations/*/image-generations': { body: { items: [] } },
+  'GET /speech/presets': {
+    body: {
+      default: 'mandarin_female',
+      items: [{ id: 'mandarin_female', label: '普通话·自然女声', language: 'zh-CN', dialect: null }],
+    },
+  },
 }
 
 /** 仓库里现成的真实 PNG：必须能被浏览器解码，不然本地预处理会直接判 `decode_failed`。 */
@@ -73,6 +81,22 @@ async function openComposer(page: Page) {
   await waitForRendered(page, '.composer')
   const tip = page.locator('.voice-tip')
   if (await tip.isVisible()) await tip.locator('.el-alert__close-btn').click()
+}
+
+async function stubAnswerStream(page: Page) {
+  await page.route('**/api/v1/consultations/c-e2e/stream', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/x-ndjson',
+      body: `${JSON.stringify({
+        type: 'done',
+        message: {
+          id: 'm-stream', role: 'assistant', content: '请结合报告参考范围咨询医生。',
+          sequence: 3, generationStatus: 'completed', createdAt: '2026-09-21T03:00:10Z',
+        },
+      })}\n`,
+    })
+  })
 }
 
 function moreMenuButton(page: Page) {
@@ -290,6 +314,7 @@ test.describe('图片上传与识别', () => {
         },
       },
     })
+    await stubAnswerStream(page)
     const bodies: string[] = []
     await page.route('**/api/v1/consultations/*/messages', async (route) => {
       if (route.request().method() !== 'POST') {
@@ -362,10 +387,15 @@ test.describe('图片上传与识别', () => {
 
   test('仅图片也能发送，并带上图片版的默认提问', async ({ page }) => {
     await installApiStubs(page, { extra: STUBS })
+    await stubAnswerStream(page)
+    // 历史消息重挂载后会读取图片原件；这里返回可解码字节。
+    await page.route('**/api/v1/attachments/img-1/content', async route => {
+      await route.fulfill({ status: 200, contentType: 'image/png', body: PNG_BYTES })
+    })
     const bodies: string[] = []
     // 发完第一条会重挂载并从服务端读回消息，桩要像真实服务端一样把这条回显出来。
     let sentContent = ''
-    await page.route('**/api/v1/consultations/*/messages', async (route) => {
+    await page.route(/\/api\/v1\/consultations\/[^/]+\/messages(?:\?.*)?$/, async (route) => {
       if (route.request().method() !== 'POST') {
         await route.fulfill({
           status: 200,
@@ -503,11 +533,15 @@ test.describe('图片上传与识别', () => {
         },
       },
     })
+    await page.route('**/api/v1/attachments/img-1/content', async route => {
+      await route.fulfill({ status: 200, contentType: 'image/png', body: PNG_BYTES })
+    })
     let sendBody = ''
     await page.route('**/api/v1/consultations/*/messages', async (route) => {
       if (route.request().method() === 'POST') sendBody = route.request().postData() ?? ''
       await route.fallback()
     })
+    await stubAnswerStream(page)
 
     await page.goto('/app/consultations/c-e2e')
     await settle(page)

@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated, Self
 from urllib.parse import quote_plus, urlparse
 
@@ -8,7 +9,9 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # Uvicorn/reload may be launched from the repository root. Resolve the
+        # backend environment file from this module, not the process cwd.
+        env_file=Path(__file__).resolve().parents[2] / ".env",
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
@@ -169,6 +172,9 @@ class Settings(BaseSettings):
     # Only generic, locally extracted medical topics may leave the server.
     tavily_api_key: SecretStr | None = None
     tavily_base_url: str = "https://api.tavily.com"
+    # Explicit rollout switch, independent of APP_ENVIRONMENT. Disabled until
+    # privacy and medical-safety acceptance is completed for the deployment.
+    web_search_enabled: bool = False
 
     # Development-only, read-only MCP adapters. The server is never mounted in
     # production even when MCP_ENABLED is accidentally left on.

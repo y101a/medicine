@@ -27,6 +27,11 @@ const ROUTE_NAMES: Record<string, string> = {
 /** 未登录访客能访问、且已做移动端适配的页面。 */
 const MOBILE_ROUTES = ['/login', '/register']
 
+const SPEECH_PRESETS = {
+  default: 'mandarin_female',
+  items: [{ id: 'mandarin_female', label: '普通话·自然女声', language: 'zh-CN', dialect: null }],
+}
+
 const MATRIX = [
   ...Object.keys(ROUTE_NAMES).map(path => ({ path, width: 1280, label: '桌面' })),
   ...MOBILE_ROUTES.map(path => ({ path, width: 375, label: '手机' })),
@@ -35,7 +40,10 @@ const MATRIX = [
 for (const item of MATRIX) {
   test(`${item.label} ${item.width}px：${ROUTE_NAMES[item.path]} ${item.path} 无横向溢出`, async ({ page }) => {
     const authenticated = !['/login', '/register'].includes(item.path)
-    await installApiStubs(page, { authenticated })
+    await installApiStubs(page, {
+      authenticated,
+      extra: item.path === '/app/chat' ? { 'GET /speech/presets': { body: SPEECH_PRESETS } } : {},
+    })
 
     await page.setViewportSize({ width: item.width, height: item.width === 375 ? 720 : 800 })
     await page.goto(item.path)
@@ -71,7 +79,7 @@ test('旧路径重定向到设置页的对应分栏', async ({ page }) => {
 })
 
 test('右上角账号菜单提供附近医院导航，并保留定位说明', async ({ page }) => {
-  await installApiStubs(page)
+  await installApiStubs(page, { extra: { 'GET /speech/presets': { body: SPEECH_PRESETS } } })
   await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto('/app/chat')
   await waitForRendered(page)
@@ -101,6 +109,10 @@ test('历史聊天固定视口页面，只允许消息区滚动', async ({ page 
         },
       },
       'GET /consultations/c-e2e/messages': { body: { items: [], hasMore: false } },
+      'GET /consultations/c-e2e/attachments': { body: { items: [] } },
+      'GET /consultations/c-e2e/document-generations': { body: { items: [] } },
+      'GET /consultations/c-e2e/image-generations': { body: { items: [] } },
+      'GET /speech/presets': { body: SPEECH_PRESETS },
     },
   })
   await page.setViewportSize({ width: 1280, height: 800 })

@@ -145,6 +145,20 @@ async def rename_concept(
     await db.flush()
     result = await _add_aliases(db, concept, (previous_name,))
     result.renamed = True
+    from sqlalchemy import func
+
+    from app.models.knowledge_graph import GraphClaim, GraphClaimStatus
+    from app.services.knowledge_graph_publication import enqueue_snapshot_rebuild
+
+    live_uses = await db.scalar(
+        select(func.count()).select_from(GraphClaim).where(
+            GraphClaim.status == GraphClaimStatus.PUBLISHED,
+            (GraphClaim.subject_concept_id == concept.id)
+            | (GraphClaim.object_concept_id == concept.id),
+        )
+    )
+    if live_uses:
+        await enqueue_snapshot_rebuild(db, actor="concept-rename")
     return result
 
 

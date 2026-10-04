@@ -12,9 +12,19 @@ from app.rag.web_search import (
     SearchHit,
     WebSearchError,
     generic_topic,
+    safe_search_topic,
     search_generic_topic,
+    source_organization,
     trusted_organization,
 )
+
+
+@pytest.fixture(autouse=True)
+def enabled_workflow_search(monkeypatch):
+    from app.ai.graph import workflow
+
+    settings = workflow.get_settings().model_copy(update={"web_search_enabled": True})
+    monkeypatch.setattr(workflow, "get_settings", lambda: settings)
 
 
 def test_only_fixed_generic_topics_are_extracted():
@@ -29,11 +39,36 @@ def test_only_fixed_generic_topics_are_extracted():
     assert generic_topic("我甲状腺有点不舒服") is None
 
 
+def test_unknown_topic_requires_one_explicit_standalone_medical_term():
+    assert safe_search_topic("我叫张三，手机号13812345678，‘阿尔法综合征’是什么") is None
+    assert safe_search_topic("我叫张三，手机号13812345678，什么是“阿尔法综合征”") == "阿尔法综合征"
+    assert safe_search_topic("“阿尔法胶囊”的副作用") == "阿尔法胶囊"
+    assert safe_search_topic("我最近头疼，药叫阿尔法胶囊") is None
+    assert safe_search_topic("“张三”是什么病") is None
+    assert safe_search_topic("“甲病”和“乙病”有什么区别") is None
+    assert safe_search_topic("什么是阿尔法综合征？") == "阿尔法综合征"
+    assert safe_search_topic("阿尔法胶囊有什么副作用") == "阿尔法胶囊"
+    question = "我叫张三，手机号13812345678，请问阿尔法胶囊有什么副作用"
+    assert safe_search_topic(question) == "阿尔法胶囊"
+    assert safe_search_topic("我住北京市朝阳区，阿尔法胶囊有什么副作用") is None
+    assert safe_search_topic("我最近头疼三天，想知道为什么") is None
+
+
 def test_only_official_https_domains_are_eligible():
     assert trusted_organization("https://www.nhc.gov.cn/example") == "国家卫生健康委员会"
     assert trusted_organization("https://nhc.gov.cn.evil.test/example") is None
     assert trusted_organization("http://nhc.gov.cn/example") is None
     assert trusted_organization("https://nhc.gov.cn:444/example") is None
+
+
+def test_public_https_sources_are_labeled_without_claiming_review():
+    assert source_organization("https://rare-medical.org/article") == (
+        "未核实网站（rare-medical.org）"
+    )
+    assert source_organization("https://www.nhc.gov.cn/article") == "国家卫生健康委员会"
+    assert source_organization("https://nhc.gov.cn.evil.com/article") is None
+    assert source_organization("http://rare-medical.org/article") is None
+    assert source_organization("https://127.0.0.1/article") is None
 
 
 async def test_tavily_only_receives_fixed_topic_and_ignores_untrusted_results(monkeypatch):
@@ -51,7 +86,8 @@ async def test_tavily_only_receives_fixed_topic_and_ignores_untrusted_results(mo
 
         async def post(self, url, *, headers, json):
             assert url == "https://api.tavily.com/search"
-            assert json["query"] == "甲状腺结节 健康科普 就医"
+            assert json["query"] == "甲状腺结节"
+            assert "include_domains" not in json
             assert json["include_answer"] is False
             assert json["include_raw_content"] is False
             assert headers["Authorization"] == "Bearer test-only"
@@ -93,6 +129,7 @@ async def test_tavily_only_receives_fixed_topic_and_ignores_untrusted_results(mo
         "get_settings",
         lambda: SimpleNamespace(
             app_environment="development",
+            web_search_enabled=True,
             tavily_api_key=SimpleNamespace(get_secret_value=lambda: "test-only"),
             tavily_base_url="https://api.tavily.com",
         ),
@@ -103,6 +140,87 @@ async def test_tavily_only_receives_fixed_topic_and_ignores_untrusted_results(mo
     assert hits[0].organization == "国家卫生健康委员会"
     assert "甲状腺结节" in hits[1].excerpt
     assert "李四" not in repr(hits)
+
+
+async def test_normal_drug_question_sends_only_term_when_enabled_in_production(monkeypatch):
+    from app.rag import web_search
+
+    class FakeClient:
+        def __init__(self, **_kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            pass
+
+        async def post(self, url, *, headers, json):
+            assert url == "https://api.tavily.com/search"
+            assert json["query"] == "阿尔法胶囊"
+            assert "张三" not in str(json)
+            assert "13812345678" not in str(json)
+            assert "include_domains" not in json
+            return httpx.Response(
+                200,
+                request=httpx.Request("POST", url),
+                json={"results": [{
+                    "title": "阿尔法胶囊药品资料",
+                    "url": "https://www.nmpa.gov.cn/drug",
+                    "content": "阿尔法胶囊药品资料以药品说明书和医生药师意见为准。" * 2,
+                }]},
+            )
+
+    monkeypatch.setattr(
+        web_search,
+        "get_settings",
+        lambda: SimpleNamespace(
+            app_environment="production",
+            web_search_enabled=True,
+            tavily_api_key=SimpleNamespace(get_secret_value=lambda: "test-only"),
+            tavily_base_url="https://api.tavily.com",
+        ),
+    )
+    monkeypatch.setattr(web_search.httpx, "AsyncClient", FakeClient)
+    question = "我叫张三，手机号13812345678，请问阿尔法胶囊有什么副作用"
+    hits = await search_generic_topic(safe_search_topic(question))
+    assert len(hits) == 1
+    assert hits[0].organization == "国家药品监督管理局"
+
+
+async def test_search_accepts_relevant_public_site_as_unverified(monkeypatch):
+    from app.rag import web_search
+
+    class FakeClient:
+        def __init__(self, **_kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            pass
+
+        async def post(self, url, *, json, **_kwargs):
+            assert json["query"] == "法布雷病"
+            assert "include_domains" not in json
+            return httpx.Response(200, request=httpx.Request("POST", url), json={
+                "results": [{
+                    "title": "法布雷病科普",
+                    "url": "https://rare-medical.org/fabry",
+                    "content": "法布雷病的常见表现应结合医学机构信息核实。" * 3,
+                }],
+            })
+
+    monkeypatch.setattr(web_search, "get_settings", lambda: SimpleNamespace(
+        web_search_enabled=True,
+        tavily_api_key=SimpleNamespace(get_secret_value=lambda: "test-only"),
+        tavily_base_url="https://api.tavily.com",
+    ))
+    monkeypatch.setattr(web_search.httpx, "AsyncClient", FakeClient)
+    hits = await search_generic_topic(safe_search_topic("法布雷病是什么"))
+    assert len(hits) == 1
+    assert hits[0].organization == "未核实网站（rare-medical.org）"
 
 
 async def test_broad_topic_sends_only_fixed_query_and_accepts_disease_specific_pages(monkeypatch):
@@ -156,6 +274,7 @@ async def test_broad_topic_sends_only_fixed_query_and_accepts_disease_specific_p
         "get_settings",
         lambda: SimpleNamespace(
             app_environment="development",
+            web_search_enabled=True,
             tavily_api_key=SimpleNamespace(get_secret_value=lambda: "test-only"),
             tavily_base_url="https://api.tavily.com",
         ),
@@ -276,6 +395,52 @@ async def test_graph_never_searches_for_symptom_without_fixed_topic():
     assert result["web_search_status"] == "skipped"
 
 
+async def test_unknown_quoted_term_searches_only_after_local_miss():
+    calls = []
+
+    async def empty_retriever(_db, _query, *, top_k):
+        return RetrievalResult(False, "test", "v1", [])
+
+    async def fake_search(topic):
+        calls.append(topic)
+        return [SearchHit(
+            "阿尔法胶囊药品信息", "https://www.nmpa.gov.cn/drug",
+            "阿尔法胶囊的公开药品信息应以药品监管部门发布内容及说明书为准。" * 2,
+            "国家药品监督管理局",
+        )]
+
+    graph = build_consultation_generation_graph(empty_retriever, fake_search)
+    result = await graph.ainvoke({
+        "user_text": "我叫李四，手机号13812345678，“阿尔法胶囊”是什么药？",
+        "db": object(),
+    })
+    assert calls == ["阿尔法胶囊"]
+    assert result["retrieval_items"][0]["trust_level"] == "prototype"
+    assert "李四" not in str(result)
+
+
+async def test_production_can_search_only_when_explicitly_enabled(monkeypatch):
+    from app.ai.graph import workflow
+
+    settings = workflow.get_settings().model_copy(
+        update={"app_environment": "production", "web_search_enabled": True}
+    )
+    monkeypatch.setattr(workflow, "get_settings", lambda: settings)
+    calls = []
+
+    async def empty_retriever(_db, _query, *, top_k):
+        return RetrievalResult(False, "test", "v1", [])
+
+    async def fake_search(topic):
+        calls.append(topic)
+        return []
+
+    graph = build_consultation_generation_graph(empty_retriever, fake_search)
+    result = await graph.ainvoke({"user_text": "阿尔法胶囊有什么副作用", "db": object()})
+    assert calls == ["阿尔法胶囊"]
+    assert result["web_search_status"] == "empty"
+
+
 async def test_graph_rejects_non_official_citation_even_if_searcher_returns_it():
     async def fake_retriever(_db, _query, *, top_k):
         return RetrievalResult(False, "test", "v1", [])
@@ -334,6 +499,7 @@ async def test_search_client_classifies_timeout_without_exposing_the_key(monkeyp
         web_search, "get_settings",
         lambda: SimpleNamespace(
             app_environment="development",
+            web_search_enabled=True,
             tavily_api_key=SimpleNamespace(get_secret_value=lambda: "test-only"),
             tavily_base_url="https://api.tavily.com",
         ),
@@ -345,12 +511,15 @@ async def test_search_client_classifies_timeout_without_exposing_the_key(monkeyp
     assert "test-only" not in str(error.value)
 
 
-@pytest.mark.parametrize("question", ("甲状腺结节是什么", "甲状腺相关疾病有哪些"))
+@pytest.mark.parametrize(
+    "question",
+    ("甲状腺结节是什么", "甲状腺相关疾病有哪些", "“阿尔法胶囊”是什么药"),
+)
 async def test_production_never_runs_online_search(monkeypatch, question):
     from app.ai.graph import workflow
 
     monkeypatch.setattr(
-        workflow, "get_settings", lambda: SimpleNamespace(app_environment="production"),
+        workflow, "get_settings", lambda: SimpleNamespace(web_search_enabled=False),
     )
 
     async def no_local_evidence(_db, _text, *, top_k):
@@ -386,6 +555,7 @@ async def test_invalid_provider_response_is_not_mislabeled_as_no_results(monkeyp
         web_search, "get_settings",
         lambda: SimpleNamespace(
             app_environment="development",
+            web_search_enabled=True,
             tavily_api_key=SimpleNamespace(get_secret_value=lambda: "test-only"),
             tavily_base_url="https://api.tavily.com",
         ),

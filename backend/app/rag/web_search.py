@@ -1,6 +1,7 @@
-"""Development-only search of generic medical topics; never send patient text."""
+"""Opt-in search of generic medical topics; never send patient text."""
 
 import hashlib
+import ipaddress
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -11,11 +12,20 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.core.privacy import redact_direct_identifiers
 from app.models import KnowledgeChunk, KnowledgeDocument, KnowledgeSource
 from app.rag.vectorizer import ControlledVectorizationError, vectorize_document
 
 SOURCE_KEY = "web_search_prototype"
-ALLOWED_DOMAINS = ("nhc.gov.cn", "chinacdc.cn", "nmpa.gov.cn")
+RECOGNIZED_DOMAINS = (
+    ("nhc.gov.cn", "国家卫生健康委员会"),
+    ("chinacdc.cn", "中国疾病预防控制中心"),
+    ("nmpa.gov.cn", "国家药品监督管理局"),
+)
+BLOCKED_SUFFIXES = ("local", "internal", "test", "invalid", "example", "onion")
+PUBLIC_HOST = re.compile(
+    r"(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}"
+)
 TOPICS = (
     "甲状腺结节",
     "甲状腺功能亢进",
@@ -146,6 +156,57 @@ def generic_topic(patient_text: str) -> str | None:
     )
 
 
+UNKNOWN_TERM = re.compile(r"[\u4e00-\u9fff]{2,10}(?:综合征|注射液|胶囊|颗粒|片|病|炎|癌|症)")
+QUOTED_TERM = re.compile(r"[“《]([\u4e00-\u9fff]{2,14})[”》]")
+LEADING_TERM = re.compile(
+    r"(?:^|[，。？！；\s])(?:什么是|了解|关于|得了|患有|确诊为|药名是|药品是|"
+    r"想问|请问)\s*([\u4e00-\u9fff]{2,10}(?:综合征|注射液|胶囊|颗粒|片|病|炎|癌|症))"
+    r"(?=是什么|有什么副作用|怎么治|怎么办|严重吗|能吃吗|[？，。！；]|$)"
+)
+TRAILING_TERM = re.compile(
+    r"^([\u4e00-\u9fff]{2,14})(?:是什么|有哪些|有什么副作用|怎么治|怎么办|严重吗|能吃吗)"
+)
+
+
+def safe_search_topic(patient_text: str) -> str | None:
+    """Extract one generic term; never pass the patient's sentence to a provider."""
+    known = generic_topic(patient_text)
+    if known:
+        return known
+    sanitized, _ = redact_direct_identifiers(patient_text)
+    quoted = [match.group(1) for match in QUOTED_TERM.finditer(sanitized)]
+    if quoted:
+        candidates = quoted
+    else:
+        candidates = [match.group(1) for match in LEADING_TERM.finditer(sanitized)]
+        if not candidates:
+            candidates = [match.group(1) for match in TRAILING_TERM.finditer(sanitized)]
+    if len(set(candidates)) != 1:
+        return None
+    term = candidates[0]
+    personal_markers = ("姓名", "地址", "电话", "身份证", "我叫")
+    if not allowed_search_topic(term) or any(word in term for word in personal_markers):
+        return None
+    return term
+
+
+def allowed_search_topic(topic: str) -> bool:
+    if topic in TOPICS:
+        return True
+    personal_markers = ("姓名", "地址", "电话", "身份证", "我叫")
+    sanitized, redacted = redact_direct_identifiers(topic)
+    return (
+        not redacted
+        and sanitized == topic
+        and not any(word in topic for word in personal_markers)
+        and bool(UNKNOWN_TERM.fullmatch(topic))
+    )
+
+
+def web_search_enabled() -> bool:
+    return get_settings().web_search_enabled
+
+
 def is_broad_topic(topic: str | None) -> bool:
     return topic in BROAD_TOPIC_TERMS
 
@@ -171,32 +232,56 @@ def broad_coverage_limited(topic: str | None, texts: list[str]) -> bool:
 
 
 def web_hit_limit(topic: str) -> int:
-    return 3 if is_broad_topic(topic) else 2
+    return 4 if is_broad_topic(topic) else 3
 
 
 def trusted_organization(url: str) -> str | None:
+    host = public_search_host(url)
+    if host is None:
+        return None
+    for domain, name in RECOGNIZED_DOMAINS:
+        if host == domain or host.endswith("." + domain):
+            return name
+    return None
+
+
+def public_search_host(url: str) -> str | None:
+    """Reject local, malformed and official-lookalike URLs before using results."""
+    if any(ord(char) < 32 for char in url) or len(url) > 1900:
+        return None
     try:
         parsed = urlsplit(url)
         host = (parsed.hostname or "").lower().rstrip(".")
         if parsed.scheme != "https" or parsed.username or parsed.password or parsed.port:
             return None
-        for domain, name in (
-            ("nhc.gov.cn", "国家卫生健康委员会"),
-            ("chinacdc.cn", "中国疾病预防控制中心"),
-            ("nmpa.gov.cn", "国家药品监督管理局"),
-        ):
-            if host == domain or host.endswith("." + domain):
-                return name
+        if not PUBLIC_HOST.fullmatch(host) or host.split(".")[-1] in BLOCKED_SUFFIXES:
+            return None
+        try:
+            ipaddress.ip_address(host)
+        except ValueError:
+            pass
+        else:
+            return None
+        for domain, _name in RECOGNIZED_DOMAINS:
+            if domain in host and host != domain and not host.endswith("." + domain):
+                return None
     except ValueError:
         return None
-    return None
+    return host
+
+
+def source_organization(url: str) -> str | None:
+    host = public_search_host(url)
+    if host is None:
+        return None
+    return trusted_organization(url) or f"未核实网站（{host}）"
 
 
 async def search_generic_topic(topic: str) -> list[SearchHit]:
-    """Only values from the local allowlist may reach Tavily."""
+    """Only validated generic terms may reach Tavily when explicitly enabled."""
     settings = get_settings()
     key = settings.tavily_api_key
-    if settings.app_environment != "development" or topic not in TOPICS:
+    if not settings.web_search_enabled or not allowed_search_topic(topic):
         return []
     if (
         not key
@@ -210,11 +295,9 @@ async def search_generic_topic(topic: str) -> list[SearchHit]:
                 "https://api.tavily.com/search",
                 headers={"Authorization": f"Bearer {key.get_secret_value()}"},
                 json={
-                    "query": BROAD_SEARCH_QUERIES.get(topic, f"{topic} 健康科普 就医"),
+                    "query": BROAD_SEARCH_QUERIES.get(topic, topic),
                     "search_depth": "basic",
                     "max_results": 8,
-                    "include_domains": list(ALLOWED_DOMAINS),
-                    "include_domains_mode": "filter",
                     "language": "zh-cn",
                     "include_answer": False,
                     "include_raw_content": False,
@@ -245,7 +328,7 @@ async def search_generic_topic(topic: str) -> list[SearchHit]:
         # thyroid mentions. Require the disease topic in the page title as well.
         if is_broad_topic(topic) and not topic_matches_text(topic, title):
             continue
-        organization = trusted_organization(url)
+        organization = source_organization(url)
         searchable = re.sub(r"\s+", " ", re.sub(r"<[^>]*>", " ", content)).strip()
         positions = (searchable.find(term) for term in topic_terms(topic))
         position = min((index for index in positions if index >= 0), default=-1)
@@ -253,19 +336,29 @@ async def search_generic_topic(topic: str) -> list[SearchHit]:
         excerpt = searchable[start : start + 480]
         if organization and topic_matches_text(topic, title + excerpt) and len(excerpt) >= 30:
             hits.append(SearchHit(title[:300], url[:1900], excerpt, organization))
-        if not is_broad_topic(topic) and len(hits) == web_hit_limit(topic):
+    hits.sort(
+        key=lambda hit: (
+            trusted_organization(hit.url) is not None,
+            topic_coverage_count(topic, [hit.title, hit.excerpt]),
+        ),
+        reverse=True,
+    )
+    diverse_hits = []
+    seen_hosts = set()
+    for hit in hits:
+        host = public_search_host(hit.url)
+        if host in seen_hosts:
+            continue
+        diverse_hits.append(hit)
+        seen_hosts.add(host)
+        if len(diverse_hits) >= web_hit_limit(topic):
             break
-    if is_broad_topic(topic):
-        hits.sort(
-            key=lambda hit: topic_coverage_count(topic, [hit.title, hit.excerpt]),
-            reverse=True,
-        )
-    return hits[: web_hit_limit(topic)]
+    return diverse_hits
 
 
 async def save_search_prototypes(db: AsyncSession, topic: str, hits: list[SearchHit]) -> None:
     """Store short attributed snippets, never full fetched pages or approved material."""
-    if get_settings().app_environment != "development" or topic not in TOPICS:
+    if not web_search_enabled() or not allowed_search_topic(topic):
         return
     if not hits:
         return
@@ -276,8 +369,8 @@ async def save_search_prototypes(db: AsyncSession, topic: str, hits: list[Search
         source = KnowledgeSource(
             source_key=SOURCE_KEY,
             priority=9,
-            organization="官方网站搜索摘要",
-            channel_name="Tavily 开发原型搜索",
+            organization="联网搜索摘要（未经医学审核）",
+            channel_name="Tavily 未审核搜索缓存",
             authority_level="web_search_prototype",
             jurisdiction="CN",
             language="zh-CN",
@@ -297,7 +390,7 @@ async def save_search_prototypes(db: AsyncSession, topic: str, hits: list[Search
     now = datetime.now(UTC)
     expires = (now + timedelta(days=30)).isoformat()
     for hit in hits:
-        if trusted_organization(hit.url) != hit.organization or not topic_matches_text(
+        if source_organization(hit.url) != hit.organization or not topic_matches_text(
             topic, hit.title + hit.excerpt
         ):
             continue
@@ -343,7 +436,7 @@ async def save_search_prototypes(db: AsyncSession, topic: str, hits: list[Search
             retrieved_at=now,
             review_status="prototype",
             license_type="unverified_search_excerpt",
-            license_notes="搜索摘要，仅开发环境使用；非网页全文，版权与医学内容均未经审核",
+            license_notes="搜索摘要缓存；非网页全文，版权与医学内容均未经审核",
             content_hash=fingerprint,
             content_text=hit.excerpt,
             supersedes_document_id=previous.id if previous else None,

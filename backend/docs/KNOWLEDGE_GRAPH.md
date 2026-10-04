@@ -1,4 +1,16 @@
-# 知识图谱治理层（G1）运维与验收
+# 知识图谱治理层与 G2 全量投影
+
+## G2 增量说明（2026-10-03）
+
+已增加 `app/knowledge_graph_worker.py`：从 PostgreSQL 已发布且证据有效的公共 Claim 构造完整快照，用固定参数化 Cypher 在**单个 Neo4j 写事务**里替换旧图。概念改名、关系撤回、已审核文档被取代、来源注册表降级都会产生新 revision；空图也可投影以清除旧知识。图中只含概念、关系、证据定位 ID，不复制正文，不含用户/患者或健康记录。
+
+新审核文档的四层用途分类见 `KNOWLEDGE_CLASSIFICATION.md`。分类不等于审核，未审核候选不能投影。
+
+本地已安装 `neo4j` Python driver 6.3.1，并拉取 `neo4j:5-community` 镜像。`compose.yaml` 的 `neo4j` profile 默认关闭、只监听 `127.0.0.1`，`restart: "no"`；联调后容器已停止。启动时必须由操作者在当前 shell 设置 `NEO4J_AUTH=neo4j/<强密码>`，同时向 worker 提供 `NEO4J_URI`、`NEO4J_USERNAME`、`NEO4J_PASSWORD`（可选 `NEO4J_DATABASE`），不要将密码写进仓库。对已初始化的 Docker volume，重新设置 `NEO4J_AUTH` **不会更改旧密码**。运行 `docker compose --profile neo4j up -d --no-deps neo4j` 后，可前台运行 `python -m app.knowledge_graph_worker --owner neo4j-worker`；该命令一次只处理一个 outbox 任务，部署时需另配与项目同生共死的调度。漏掉事件或需手动重建时运行 `python -m app.knowledge_graph_cli rebuild-snapshot --actor 管理员`。G3–G5 仍未接入线上问答，原有 RAG 不受影响。Neo4j Community Edition 不具备细粒度读写角色隔离时，必须仅本地监听并限制网络访问。
+
+2026-10-03 的真实联调：显式开启 `NEO4J_TEST_ALLOW_RESET=1` 后跑 `tests/test_knowledge_graph_neo4j_integration.py`，验证 PG 审核事实 → outbox 领任务 → Neo4j 5 条 Claim 全量快照 → 撤回后只剩 4 条 → 故障时任务失败且保留事实 → 恢复后重试成功 → 空图清除旧事实。测试结束再次清空测试图节点（`PublicMedicalGraph` 数量 0），停止容器。**不要将这个重置开关用于有正式投影的 Neo4j 实例。**
+
+以下章节保留 G1 建成时的历史说明，其中“G2 未做”是当时状态，不代表当前代码状态。
 
 对应规划稿 `NEO4J_KNOWLEDGE_GRAPH_PLAN.md` 的 **G0 + G1**。本文只描述**已经落地**的部分，
 以及 G2 需要接着做什么；没有落地的一律写成「未做」，不要按规划稿的将来时理解现状。

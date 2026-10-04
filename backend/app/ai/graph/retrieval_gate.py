@@ -3,7 +3,7 @@ import unicodedata
 from dataclasses import dataclass
 from typing import Literal
 
-from app.rag.web_search import generic_topic
+from app.rag.web_search import safe_search_topic
 
 RetrievalGateReason = Literal["medical_content", "non_medical_content"]
 
@@ -52,7 +52,7 @@ def evaluate_retrieval_gate(text: str) -> RetrievalGateDecision:
         return RetrievalGateDecision(False, "non_medical_content")
 
     has_medical_signal = bool(
-        generic_topic(normalized)
+        safe_search_topic(normalized)
         or SYMPTOM_OR_CONDITION.search(normalized)
         or MEDICAL_ENTITY.search(normalized)
         or DISEASE_SUFFIX.search(normalized)

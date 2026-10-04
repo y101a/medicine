@@ -156,7 +156,7 @@ onMounted(() => void load())
 </template>
 
 <style scoped>
-.portal-home { width: 100%; max-width: 1180px; margin: 0 auto; padding: 26px clamp(16px, 5vw, 48px) 44px; }
+.portal-home { display: flex; flex: 1; flex-direction: column; width: 100%; padding: 18px clamp(14px, 2.5vw, 36px) 30px; }
 .hero { position: relative; display: flex; justify-content: space-between; gap: 24px; padding: clamp(24px, 4vw, 34px) clamp(20px, 4vw, 44px); overflow: hidden; border: 1px solid #dfeaf4; border-radius: 20px; background: linear-gradient(120deg, #f4f9fd 0%, #eaf4fc 62%, #e2f0fa 100%); }
 .hero::after { content: ''; position: absolute; width: 260px; height: 260px; right: -70px; top: -108px; border-radius: 50%; border: 38px solid rgb(255 255 255 / 35%); }
 .eyebrow { margin: 0 0 10px; color: #367cb5; font-size: 12px; letter-spacing: 2px; }
@@ -169,16 +169,16 @@ h1 { margin: 0; color: #24445f; font-size: clamp(22px, 3vw, 28px); font-weight: 
 .ghost { border: 1px dashed #b9cbdb; background: rgb(255 255 255 / 72%); color: #7d8fa0; cursor: not-allowed; }
 .hero-art { z-index: 1; display: grid; place-items: center; flex: 0 0 126px; }
 .hero-art span { display: grid; place-items: center; width: 88px; height: 88px; border-radius: 24px; background: rgb(255 255 255 / 65%); color: #2a7fc3; font-size: 42px; }
-.columns { display: grid; grid-template-columns: minmax(0, 1fr) 288px; gap: 20px; margin-top: 20px; }
+.columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 340px); gap: 18px; flex: 1; min-height: 0; margin-top: 18px; }
 .news, .rail-card { border: 1px solid #e6edf3; border-radius: 16px; background: #fff; }
-.news { padding: 20px 22px 24px; min-height: 300px; }
+.news { display: flex; flex-direction: column; padding: 22px 26px 26px; }
 .tabs { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 16px; border-bottom: 1px solid #eef2f5; }
 .tabs button { padding: 7px 15px; border: 1px solid #dde7f0; border-radius: 999px; background: #f8fafc; color: #5b748c; font-size: 12px; cursor: pointer; }
 .tabs button.selected { border-color: #9ec8e6; background: #eaf4fc; color: #1e6ba8; font-weight: 600; }
-.state { margin: 28px 0; color: #8798a8; font-size: 12px; }
+.state { flex: 1; margin: 28px 0; color: #8798a8; font-size: 12px; }
 .state--error { color: #b0653c; }
 .retry { border: 0; background: none; color: #237ac2; font-size: 12px; cursor: pointer; }
-.empty { display: flex; flex-direction: column; align-items: center; padding: 40px 18px; color: #8798a8; text-align: center; }
+.empty { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; padding: 40px 18px; color: #8798a8; text-align: center; }
 .empty strong { color: #5f7487; font-size: 14px; }
 .empty p { max-width: 560px; margin: 10px 0 0; font-size: 12px; line-height: 1.85; }
 .cards { display: grid; gap: 4px; margin: 0; padding: 6px 0 0; list-style: none; }

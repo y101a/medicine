@@ -16,7 +16,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.knowledge import KnowledgeChunk, KnowledgeDocument
+from app.models.knowledge import KnowledgeChunk, KnowledgeDocument, KnowledgeSource
 from app.models.knowledge_graph import (
     GraphClaim,
     GraphClaimEvidence,
@@ -136,18 +136,21 @@ async def _load_evidence(
         return grouped
     rows = (
         await db.execute(
-            select(GraphClaimEvidence, KnowledgeChunk, KnowledgeDocument)
+            select(GraphClaimEvidence, KnowledgeChunk, KnowledgeDocument, KnowledgeSource)
             .join(KnowledgeChunk, KnowledgeChunk.id == GraphClaimEvidence.chunk_id)
             .join(KnowledgeDocument, KnowledgeDocument.id == GraphClaimEvidence.document_id)
+            .join(KnowledgeSource, KnowledgeSource.id == KnowledgeDocument.source_id)
             .where(GraphClaimEvidence.claim_id.in_(claim_ids))
             .order_by(GraphClaimEvidence.created_at)
         )
     ).all()
-    for evidence, chunk, document in rows:
+    for evidence, chunk, document, source in rows:
         hash_matches = chunk.content_hash == evidence.chunk_content_hash
         reasons: list[str] = []
         if document.review_status != APPROVED_DOCUMENT_STATUS:
             reasons.append(f"来源文档状态是 {document.review_status}")
+        if source.ingestion_status != APPROVED_DOCUMENT_STATUS:
+            reasons.append(f"来源状态是 {source.ingestion_status}")
         if not hash_matches:
             reasons.append("知识块正文已变更，需要重新审核")
         grouped[evidence.claim_id].append(
@@ -350,11 +353,16 @@ async def retire_claim(
         raise KnowledgeGraphReviewError("这条关系已经撤回过了")
     if claim.status not in (GraphClaimStatus.REVIEWED, GraphClaimStatus.PUBLISHED):
         raise KnowledgeGraphReviewError("只能撤回已审核或已发布的关系；候选请用 reject 或 return")
+    was_published = claim.status == GraphClaimStatus.PUBLISHED
     claim.status = GraphClaimStatus.RETIRED
     claim.retired_at = datetime.now(UTC)
     claim.retired_by = actor
     claim.retire_reason = why
     await db.flush()
+    if was_published:
+        from app.services.knowledge_graph_publication import enqueue_snapshot_rebuild
+
+        await enqueue_snapshot_rebuild(db, actor=actor)
     evidence = (await _load_evidence(db, [claim.id])).get(claim.id, [])
     return ClaimReviewResult(
         claim_id=claim.id,
@@ -398,9 +406,11 @@ async def retire_stale_claims(
     concepts = await _load_concepts(db)
     evidence_by_claim = await _load_evidence(db, [claim.id for claim in claims])
     retired: list[UUID] = []
+    published_retired = False
     for claim in claims:
         if _blocking_reason(claim, concepts, evidence_by_claim.get(claim.id, [])) is None:
             continue
+        published_retired |= claim.status == GraphClaimStatus.PUBLISHED
         claim.status = GraphClaimStatus.RETIRED
         claim.retired_at = datetime.now(UTC)
         claim.retired_by = actor
@@ -408,6 +418,10 @@ async def retire_stale_claims(
         retired.append(claim.id)
     if retired:
         await db.flush()
+    if published_retired:
+        from app.services.knowledge_graph_publication import enqueue_snapshot_rebuild
+
+        await enqueue_snapshot_rebuild(db, actor=actor)
     return retired
 
 
@@ -469,6 +483,9 @@ async def graph_status(db: AsyncSession) -> GraphStatus:
         .where(GraphPublicationJob.status == GraphPublicationStatus.SUCCEEDED)
         .order_by(GraphPublicationJob.target_revision.desc())
     )
+    expected_revision = (
+        await db.scalar(select(func.max(GraphPublicationJob.target_revision)))
+    ) or 0
     return GraphStatus(
         concepts_by_type=_count_by(concept.concept_type for concept in concepts),
         concepts_by_status=_count_by(concept.status for concept in concepts),
@@ -477,7 +494,7 @@ async def graph_status(db: AsyncSession) -> GraphStatus:
         live_claims=len(live),
         stale_live_claims=stale,
         evidence_rows=int(evidence_rows),
-        expected_revision=max((claim.published_revision or 0 for claim in claims), default=0),
+        expected_revision=expected_revision,
         last_published_revision=last_job.target_revision if last_job else None,
         last_job_status=last_job.status if last_job else None,
     )
@@ -564,7 +581,9 @@ async def verify_graph(db: AsyncSession) -> VerificationReport:
         ],
     )
 
-    expected_revision = max((claim.published_revision or 0 for claim in claims), default=0)
+    expected_revision = (
+        await db.scalar(select(func.max(GraphPublicationJob.target_revision)))
+    ) or 0
     last_published = await db.scalar(
         select(func.max(GraphPublicationJob.target_revision)).where(
             GraphPublicationJob.status == GraphPublicationStatus.SUCCEEDED

@@ -2,6 +2,12 @@
 
 统一前缀：`/api/v1`。请求与响应使用 JSON；登录状态由 HttpOnly Cookie 管理。
 
+## 健康资讯首页框架
+
+`GET /news?category=all|wellness|fitness|disease|medication`，缺省分类为 `all`，要求登录 Cookie。
+当前只提供页面接线用的空状态：`{"category":"all","status":"sources_not_connected","asOf":null,"items":[],"tips":[]}`。
+非法分类返回 422，未登录返回 401。**尚未接入任何新闻源、自动更新或小贴士内容**；前端必须据此显示“新闻源尚未接入”，不得显示虚构的当日新闻。后续字段与交付阶段见 `NEWS_PORTAL_IMPLEMENTATION.md`。
+
 ## 注册
 
 `POST /auth/register`

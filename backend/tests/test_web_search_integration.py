@@ -16,10 +16,12 @@ async def test_web_prototype_is_indexed_and_reused_without_a_second_search(monke
     from app.rag import web_search
 
     assert get_settings().app_environment == "development"
+    monkeypatch.setattr(get_settings(), "web_search_enabled", True)
     topic = "甲状腺结节"
-    url = "https://www.nhc.gov.cn/prototype-roundtrip-test"
+    url = "https://rare-medical.org/prototype-roundtrip-test"
+    organization = "未核实网站（rare-medical.org）"
     snippet = "甲状腺结节健康知识原型搜索摘要。仅供测试知识库入库和查询向量的往返过程。"
-    hits = [SearchHit("甲状腺结节测试摘要", url, snippet, "国家卫生健康委员会")]
+    hits = [SearchHit("甲状腺结节测试摘要", url, snippet, organization)]
     searches: list[str] = []
     query_vector = [1.0] + [0.0] * 1023
     # Real Chinese snippets can rank around 0.66: verify a short exact-topic
@@ -69,9 +71,12 @@ async def test_web_prototype_is_indexed_and_reused_without_a_second_search(monke
             assert document.medical_reviewed_at is None
             assert document.document_metadata["production_eligible"] is False
             assert document.document_metadata["web_expires_at"]
+            assert document.responsible_department == organization
 
             async def indexed_retriever(db, text, *, top_k):
-                return await search_knowledge(db, text, top_k=top_k, embedder=fake_embedder)
+                return await search_knowledge(
+                    db, text, top_k=top_k, embedder=fake_embedder, include_web_cache=True
+                )
 
             async def no_second_search(_topic):
                 raise AssertionError("已索引的原型摘要应先从本地召回")
@@ -83,11 +88,28 @@ async def test_web_prototype_is_indexed_and_reused_without_a_second_search(monke
             assert reused["web_search_status"] == "skipped"
             assert any(item["canonical_url"] == url for item in reused["retrieval_items"])
             assert any(
+                item["organization"] == organization
+                for item in reused["retrieval_items"]
+                if item["canonical_url"] == url
+            )
+            assert any(
                 0.6 < item["similarity"] < 0.72
                 for item in reused["retrieval_items"]
                 if item["canonical_url"] == url
             )
             assert searches == [topic]
+
+            # A fresh consultation in production has no prior chat history but
+            # may reuse this expiring, explicitly unreviewed cache when enabled.
+            from app.rag import retrieval
+
+            production = get_settings().model_copy(
+                update={"app_environment": "production", "web_search_enabled": True}
+            )
+            monkeypatch.setattr(retrieval, "get_settings", lambda: production)
+            again = await second.ainvoke({"user_text": f"{topic}是什么", "db": db})
+            assert again["web_search_status"] == "skipped"
+            assert any(item["canonical_url"] == url for item in again["retrieval_items"])
         finally:
             # Never persist test-only snippets to the developer's knowledge base.
             await db.rollback()

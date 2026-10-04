@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import IngestionJob, KnowledgeChunk, KnowledgeDocument, KnowledgeSource
+from app.rag.knowledge_classification import KnowledgeClassification
 
 MAX_MARKDOWN_BYTES = 2 * 1024 * 1024
 DEFAULT_CHUNK_CHARS = 1000
@@ -48,6 +49,7 @@ class DocumentReviewMetadata(BaseModel):
     content_mode: Literal["licensed_full_text", "original_summary"] = "licensed_full_text"
     verbatim_quotes: list[str] = Field(default_factory=list, max_length=10)
     metadata: dict[str, object] = Field(default_factory=dict)
+    classification: KnowledgeClassification | None = None
 
     @field_validator("canonical_url")
     @classmethod
@@ -119,6 +121,8 @@ def _load_metadata(path: Path) -> DocumentReviewMetadata:
     now = datetime.now(UTC) + timedelta(minutes=5)
     if metadata.legal_reviewed_at > now or metadata.medical_reviewed_at > now:
         raise ControlledImportError("审核时间不能晚于当前时间")
+    if metadata.classification is None:
+        raise ControlledImportError("新导入的已审核公共文档必须填写四层知识分类")
     return metadata
 
 
@@ -326,6 +330,28 @@ async def import_markdown_document(
             )
             if previous is not None:
                 previous.review_status = "superseded"
+                from app.models.knowledge_graph import (
+                    GraphClaim,
+                    GraphClaimEvidence,
+                    GraphClaimStatus,
+                )
+                from app.services.knowledge_graph_publication import enqueue_snapshot_rebuild
+                from app.services.knowledge_graph_review import retire_stale_claims
+
+                affected = await db.scalar(
+                    select(GraphClaim.id)
+                    .join(GraphClaimEvidence, GraphClaimEvidence.claim_id == GraphClaim.id)
+                    .where(
+                        GraphClaimEvidence.document_id == previous.id,
+                        GraphClaim.status == GraphClaimStatus.PUBLISHED,
+                    )
+                    .limit(1)
+                )
+                if affected is not None:
+                    await db.flush()
+                    retired_ids = await retire_stale_claims(db, reviewer="document-superseded")
+                    if affected not in retired_ids:
+                        await enqueue_snapshot_rebuild(db, actor="document-superseded")
 
             document = KnowledgeDocument(
                 source_id=source.id,
@@ -351,6 +377,8 @@ async def import_markdown_document(
                 supersedes_document_id=previous.id if previous else None,
                 document_metadata={
                     **metadata.metadata,
+                    "classification": metadata.classification.model_dump(mode="json")
+                    if metadata.classification else None,
                     "content_mode": metadata.content_mode,
                     "verbatim_quotes": metadata.verbatim_quotes,
                     "parser_version": PARSER_VERSION,

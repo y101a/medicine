@@ -107,6 +107,9 @@ def build_parser() -> argparse.ArgumentParser:
     publish_parser = subparsers.add_parser("publish", help="把已审核关系登记为新 revision")
     publish_parser.add_argument("--actor", required=True)
 
+    rebuild_parser = subparsers.add_parser("rebuild-snapshot", help="强制排队全量快照重建")
+    rebuild_parser.add_argument("--actor", required=True)
+
     subparsers.add_parser("status", help="图谱治理状态")
     subparsers.add_parser("verify", help="硬门槛校验（有违规时退出码 1）")
     subparsers.add_parser("publication-status", help="发布 outbox 状态")
@@ -190,6 +193,8 @@ async def run_command(args: argparse.Namespace) -> int:
                 result = {"evidence_id": evidence_id}
             elif args.command == "publish":
                 result = await publication.enqueue_publication(db, actor=args.actor)
+            elif args.command == "rebuild-snapshot":
+                result = await publication.enqueue_snapshot_rebuild(db, actor=args.actor)
             elif args.command == "status":
                 result = await review.graph_status(db)
             elif args.command == "publication-status":
