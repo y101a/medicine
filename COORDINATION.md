@@ -399,6 +399,13 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 - 验证：新闻专项 1 passed，完整后端 **556 passed、1 skipped**；`ruff check app tests migrations` 全绿。
 - 边界：未改 DSH 前端、未接新闻源、未联网或改注册表/数据库、未创建 Windows 安装包；浏览器页面仍待 DSH 实现和联调，不能宣称整个新闻首页已完成。
 
+### 2026-10-04 DSH 修「新闻点不进去」+ 中文来源第三轮探测（用户反馈两条）
+
+- 改动：`frontend/src/views/PortalView.vue` 卡片标题改成**原文链接**（此前只有右下角小字「前往来源核对」可点，用户第一反应点标题时没反应），并用 `.card-title` 做 hover/focus 反馈；`portal.test.ts` 加 2 条断言（标题 href/target）；`e2e/portal.spec.ts` 新增 1 条用例：点标题 → 新标签打开**与卡片 href 完全一致**的来源地址。
+- 验证：门户 e2e **10 passed**（上一轮 9，+1）；前端全量 **334 passed / 29 files**；`npm run build` 通过；`npx vitest run` 目标文件 20 passed。另：`NEWS_SOURCE_CANDIDATES.md` 新增 §9.5（中文源第三轮实测）与 §9.6（是否做标题机器翻译的两个选项，**待用户决定**）。
+- **中文源第三轮实测（都无解）**：WHO 中文站 `/zh`、`/zh/news` 200 但只有 HTML 列表页，`/zh/api/...` 404、`$filter=Language` 400；联合国新闻中文三个 feed 全 404；香港政府新闻公报中文 RSS 200 但**无主题分类**（含「卫生」条目 0）、`health_zh.xml` 404；香港卫生防护中心无 RSS 入口。→ 没有「中文 + 机器可读 + 有授权」的来源。
+- 边界：本轮**没有**动翻译（涉及「生成内容 + 医学术语准确性」，属产品决策，已在 §9.6 列 A/B 选项问用户）；**没有**改后端；新闻条目仍是英文原题；`NEWS_SOURCE_CANDIDATES.md` 文件本轮多次报 `ReplaceFileW EIO (Win32 1175)`，重试后成功（共用工作目录下可能被别的进程占用）。
+
 ### 2026-10-04 DSH 扩源第二轮：接入 WHO 新闻稿 + 中文站点实测结论（用户选「先扩来源」）
 
 - **补记**：本轮同样漏了先写 §7.1；收工**没有留下占用行**。
