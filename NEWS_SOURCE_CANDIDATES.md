@@ -40,9 +40,16 @@
 | `https://www.nmpa.gov.cn/xxgk/ggtg/index.html` | HTTP **200** `text/html`（页面可读，但 robots 403 表示不希望被自动访问） | 2026-10-04 |
 | `https://www.chinacdc.cn/robots.txt` | HTTP **404** | 2026-10-04 |
 | `https://www.chinacdc.cn/jkzt/` | HTTP **404**（路径已变更） | 2026-10-04 |
-| `https://www.nhc.gov.cn/robots.txt` | HTTP **404**（nginx 直接 404） | 2026-10-04 |
-| nhc.gov.cn 栏目页 | 此前探测 HTTP 412（**需复测**） | 更早一轮 |
-| 中国疾控中心主站 / WHO 中文页 / sport.gov.cn | 此前探测：未开 / 未开 / 403（**需复测**） | 更早一轮 |
+| `https://www.nhc.gov.cn/robots.txt` | HTTP **404** | 2026-10-04 |
+| `https://www.nhc.gov.cn/`、`https://www.nmpa.gov.cn/` | 首页 HTTP **412**（反爬拦截） | 2026-10-04 |
+| `https://www.nmpa.gov.cn/robots.txt` | HTTP **404**（此前记录的 403 本轮复测未重现） | 2026-10-04 |
+| `https://www.chinacdc.cn/`、`https://www.sport.gov.cn/`、`https://www.cnsoc.org/` | 首页 200，**均无 RSS/Atom 声明** | 2026-10-04 |
+| `https://www.cnsoc.org/robots.txt` | 200，只对若干爬虫 Disallow，`User-agent: *` 无 Disallow | 2026-10-04 |
+| `https://www.who.int/api/news/newsitems?$top=3&$orderby=…` | HTTP **200** `application/json`（WHO 新闻稿） | 2026-10-04 |
+| `https://www.who.int/api/news/speeches?$top=3` | HTTP **200** JSON（总干事讲话；不适合本门户，未接入） | 2026-10-04 |
+| `https://www.who.int/news/item/02-10-2026-…` | HTTP **200**（新闻稿条目地址模式；适配器实构造 3 条全部 200） | 2026-10-04 |
+| `https://www.who.int/zh/api/news/newsitems`、`https://www.who.int/zh/news-room/news-releases` | HTTP **404**（没有可用的中文接口） | 2026-10-04 |
+| `https://www.who.int/about/policies/publishing/copyright` | HTTP **200**（许可原文，见第 9 节） | 2026-10-04 |
 
 **重要发现（2026-10-04 单源试跑）**：WHO 对**同一疫情的多期更新共用完全相同的标题**
 （实测 DON614–DON618 五条标题逐字相同，仅 URL 与发布时间不同）。因此
@@ -117,8 +124,8 @@ CLI 是**前台进程**，跑完即退出：不注册计划任务、不装服务
 - **N1 数据层**已完成：三表 + 迁移 `20261004_0029`、校验/SSRF/去重/过期/撤回、`GET /api/v1/news` 读最近成功快照。
 - **N2 单源链路**已完成：抓取层（连接时重做 SSRF 校验、逐跳校验重定向、限体积与类型）、WHO 适配器、
   刷新器（受控错误码、失败不清空旧数据）、前台 CLI。**已对 WHO 单源真实试跑成功**（5 条，标题/链接/发布时间正确）。
-- **当前运行状态**：`who_disease_outbreak_news` **已启用**并在开发库里有 5 条在展示期（`disease` 分区），
-  门户登录后即可看到；测试基线仍全绿（见上一节的隔离夹具）。同题多期的展示优化（期号/折叠）属于前端 F2。
+- **当前运行状态（2026-10-04 扩源后）**：`who_disease_outbreak_news` 与 `who_news_releases` 两个来源都已启用，
+  开发库 `disease` 分区共 **40 条**在展示期（同题多期会被前端折成一组）；测试基线仍全绿（见上一节的隔离夹具）。
 - **前端 F2 已完成**（2026-10-04）：同题多期折成一组并标出期号（如 `DON618（2026）`，识别不出就不显示）、来源级状态用中文加圆点展示、
   顶部说明「最近更新 / 下次更新 / 部分来源暂时不可用」、失败与过期各有空态、每条标注「未经医学审核」并给出发布与获取两种时间。
 - **N3 每日按需更新已完成**（2026-10-04）：当天首次访问 `/api/v1/news` 时把**一轮有界刷新挂到后台任务**，接口不等待抓取；
@@ -128,3 +135,49 @@ CLI 是**前台进程**，跑完即退出：不注册计划任务、不装服务
   测试侧：`tests/conftest.py` 默认关掉这条派发，测试既不真联网也不读开发者 `.env`。
 - **未做**：N0 对 NMPA/中国疾控的许可争取与栏目地址复核、资讯分页（后端已有 `limit`/`offset`，前端暂只显示首屏一页）、
   摘要与中文呈现（当前只显示原题，WHO 内容为英文）。
+## 9. 扩源第二轮实测与结论（2026-10-04）
+
+### 9.1 许可：WHO 的再利用条款已核到原文
+
+WHO 版权页（上面表中最后一个地址，实测 200）原文两句：
+
+> WHO's open access applies to: all publications published by WHO — CC BY-NC-SA 3.0 IGO
+>
+> Permission from WHO is not required for the use of WHO materials issued under the Creative Commons
+> Attribution-NonCommercial-ShareAlike 3.0 IGO (CC BY-NC-SA 3.0 IGO) licence.
+
+含义：**非商业使用无需另行申请许可**，但必须署名、以相同方式共享、不得用于推广。
+本项目只存原文标题、来源机构、原文链接、发布时间与获取时间，不镜像正文、不转存来源摘要字段。
+**仍需用户或法务确认的一点**：门户是否属于「非商业」，以及「新闻网页」是否都在该许可范围内
+（页面分别用了「WHO 出版物」与「WHO materials」两种措辞）。此前 catalog 里的「再利用许可未核验」
+已按本条更新为原文摘录。
+
+### 9.2 已接入来源（2 个，都归入「疾病」专区）
+
+| source_id | 名称 | 接口 | 条目地址 |
+| --- | --- | --- | --- |
+| `who_disease_outbreak_news` | WHO 疾病暴发新闻 | `/api/news/diseaseoutbreaknews` | `…/emergencies/disease-outbreak-news/item/<DonId>` |
+| `who_news_releases` | WHO 新闻稿 | `/api/news/newsitems` | `https://www.who.int/news/item/<带日期前缀的 slug>` |
+
+实测：两个来源各抓 20 条并入库（`--items disease` 共 40 条）；新适配器构造的 3 条新闻稿地址逐个实测 **200**。
+新闻稿覆盖公共卫生多个话题，「疾病」专区是本项目的归类取舍，不是来源自带的分类。
+
+### 9.3 中文官方站点：为什么这一轮一条也没进
+
+| 站点 | 实测障碍 |
+| --- | --- |
+| 国家卫健委 nhc.gov.cn | 首页 **412**（反爬） |
+| 国家药监局 nmpa.gov.cn | 首页 **412**（反爬）；robots.txt 404（此前的 403 未重现） |
+| 中国疾控中心 chinacdc.cn | 首页 200，但健康主题路径 `/jkzt/` **404**，无 RSS |
+| 国家体育总局 sport.gov.cn | 首页 200，无 RSS |
+| 中国营养学会 cnsoc.org | robots 允许通用爬虫，但无 RSS、无授权说明 |
+
+**共同点**：既没有机器可读的订阅/接口，也没有能引用的再利用授权 → 只剩「逐页抓取 + 无授权转载」，
+这两件都不做。**这是产品边界与许可问题，不是技术能力问题。**
+
+### 9.4 需要用户/法务出面的事（一次问清三件套：许可 + 稳定入口 + 更新方式）
+
+1. **国家卫健委 / 中国疾控中心（科普与健康主题）**：申请「在健康科普门户中转载标题并链接回原文」的书面许可，同时索取官方 RSS/JSON 入口或稳定的栏目地址。
+2. **国家药监局（药品公告与安全信息）**：同上门路；说明只做科普提示、不作用药推荐。
+3. **国家体育总局 / 中国营养学会（健身、养生）**：同上门路。
+4. 拿不到许可时的退路：请对方提供**每周一次的公开数据或邮件简报**，我们按其内容人工录入并标注来源。

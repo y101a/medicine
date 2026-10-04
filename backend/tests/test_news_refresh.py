@@ -178,6 +178,26 @@ async def test_refresh_without_enabled_sources_is_skipped(profile_context):
     assert summary.results == []
 
 
+def test_who_news_releases_adapter_uses_date_prefixed_slug():
+    """新闻稿的真实地址带日期前缀（实测 200），必须用 ItemDefaultUrl 而不是 UrlName。"""
+    payload = (
+        b'{"value": ['
+        b'{"Title": "New WHO estimates show changing global health landscape",'
+        b' "UrlName": "new-who-estimates-show-changing-global-health-landscape",'
+        b' "ItemDefaultUrl": "/02-10-2026-new-who-estimates-show-changing-global-health-landscape",'
+        b' "PublicationDateAndTime": "2026-10-02T08:09:03Z"},'
+        b'{"Title": "", "UrlName": "empty-title"}]}'
+    )
+
+    entries = parse_for_source("who_news_releases", payload, fetch_mode="official_api")
+
+    assert [entry.url for entry in entries] == [
+        "https://www.who.int/news/item/02-10-2026-new-who-estimates-show-changing-global-health-landscape"
+    ]
+    assert entries[0].published_raw == "2026-10-02T08:09:03Z"
+    assert entries[0].summary_raw is None
+
+
 async def test_same_title_updates_are_kept_when_published_times_differ(profile_context):
     """回归：WHO 同一疫情的多期更新共用标题，只有发布时间不同——不能压成一条。"""
     _client, db, _users = profile_context
