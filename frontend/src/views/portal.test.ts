@@ -79,13 +79,14 @@ describe('独立资讯门户（/portal，F1 页面框架）', () => {
     expect(wrapper.find('.hero .ghost').exists()).toBe(true)
   })
 
-  it('四个分区平铺可切换，并按分类请求资讯', async () => {
+  it('五个分区（含全部）平铺可切换，并按分类请求资讯', async () => {
     const { wrapper } = await setup()
     expect(newsApi.page).toHaveBeenCalledWith('all')
 
     const tiles = wrapper.findAll('.category-tile')
-    expect(tiles).toHaveLength(4)
+    expect(tiles).toHaveLength(5)
     expect(tiles.map(item => item.text().replace(/\s+/g, ''))).toEqual([
+      '全部所有分区的资讯总览',
       '养生作息、饮食与日常调理',
       '健身运动方式与安全注意',
       '疾病常见疾病科普与就医方向',
@@ -93,18 +94,22 @@ describe('独立资讯门户（/portal，F1 页面框架）', () => {
     ])
     // 分区卡片排在 AI 展示区之后（用户要求「平铺在病理科普助手下面」）。
     expect(wrapper.element.querySelector('.hero + .categories')).not.toBeNull()
+    // 「全部」既保留为第一块卡片，就不该再有第二个做同一件事的按钮。
+    expect(wrapper.find('.all-chip').exists()).toBe(false)
 
-    const wellness = tiles[0]
+    const wellness = tiles[1]
     await wellness.trigger('click')
     await flushPromises()
     expect(newsApi.page).toHaveBeenLastCalledWith('wellness')
     expect(wellness.attributes('aria-selected')).toBe('true')
     expect(wrapper.get('.panel-head h2').text()).toBe('养生')
 
-    await wrapper.get('.all-chip').trigger('click')
+    const all = tiles[0]
+    await all.trigger('click')
     await flushPromises()
     expect(newsApi.page).toHaveBeenLastCalledWith('all')
-    expect(wrapper.get('.all-chip').attributes('aria-pressed')).toBe('true')
+    expect(all.attributes('aria-selected')).toBe('true')
+    expect(wrapper.get('.panel-head h2').text()).toBe('全部')
   })
 
   it('没有安装包时下载入口保持不可用，也不跳外链', async () => {

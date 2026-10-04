@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowRight, Basketball, FirstAidKit, Memo, Sunny } from '@element-plus/icons-vue'
+import { ArrowRight, Basketball, FirstAidKit, Grid, Memo, Sunny } from '@element-plus/icons-vue'
 import { getApiErrorMessage } from '../api/http'
 import { newsApi, type NewsCategory, type NewsItem, type NewsStatus } from '../api/news'
 
@@ -13,8 +13,9 @@ import { newsApi, type NewsCategory, type NewsItem, type NewsStatus } from '../a
  */
 const router = useRouter()
 
-/** 四个分区做成平铺大卡片（用户 2026-10-04 要求放大平铺在 AI 展示区下面）。 */
+/** 五个分区做成平铺大卡片（用户 2026-10-04：四块放大的同时「把全部也保留」）。 */
 const categories: { value: NewsCategory; label: string; icon: unknown; text: string }[] = [
+  { value: 'all', label: '全部', icon: Grid, text: '所有分区的资讯总览' },
   { value: 'wellness', label: '养生', icon: Sunny, text: '作息、饮食与日常调理' },
   { value: 'fitness', label: '健身', icon: Basketball, text: '运动方式与安全注意' },
   { value: 'disease', label: '疾病', icon: FirstAidKit, text: '常见疾病科普与就医方向' },
@@ -118,12 +119,6 @@ onMounted(() => void load())
       <section class="news">
         <div class="panel-head">
           <h2>{{ activeLabel }}</h2>
-          <button
-            class="all-chip"
-            :class="{ selected: active === 'all' }"
-            :aria-pressed="active === 'all'"
-            @click="load('all')"
-          >全部</button>
         </div>
 
         <p v-if="loading" class="state" role="status">正在读取资讯…</p>
@@ -216,8 +211,8 @@ h1 { margin: 0; color: #24445f; font-size: clamp(24px, 3.4vw, 34px); font-weight
 .columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 340px); gap: 18px; flex: 1; min-height: 0; margin-top: 18px; }
 .news, .rail-card { border: 1px solid #e6edf3; border-radius: 16px; background: #fff; }
 .news { display: flex; flex-direction: column; padding: 22px 26px 26px; }
-/* 四分区：平铺在 AI 展示区下方，桌面一行铺满（窄屏 2 列 / 单列）。 */
-.categories { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
+/* 五个分区：平铺在 AI 展示区下方；桌面一行铺满，窄屏 3 列 / 2 列 / 单列。 */
+.categories { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
 .category-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 18px 18px 16px; border: 1px solid #e2eaf1; border-radius: 16px; background: #fff; color: inherit; text-align: left; cursor: pointer; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
 .category-tile:hover { transform: translateY(-3px); border-color: #bcd8ee; box-shadow: 0 12px 24px rgb(52 116 168 / 12%); }
 .category-tile.selected { border-color: #7fb6de; background: linear-gradient(150deg, #f2f9ff, #e7f3fc); box-shadow: 0 10px 22px rgb(52 116 168 / 14%); }
@@ -226,8 +221,6 @@ h1 { margin: 0; color: #24445f; font-size: clamp(24px, 3.4vw, 34px); font-weight
 .category-tile small { color: #8b9aa8; font-size: 11px; line-height: 1.6; }
 .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid #eef2f5; }
 .panel-head h2 { margin: 0; color: #3d566d; font-size: 15px; }
-.all-chip { padding: 5px 13px; border: 1px solid #dde7f0; border-radius: 999px; background: #f8fafc; color: #5b748c; font-size: 12px; cursor: pointer; }
-.all-chip.selected { border-color: #9ec8e6; background: #eaf4fc; color: #1e6ba8; font-weight: 600; }
 .state { flex: 1; margin: 28px 0; color: #8798a8; font-size: 12px; }
 .state--error { color: #b0653c; }
 .retry { border: 0; background: none; color: #237ac2; font-size: 12px; cursor: pointer; }
@@ -258,6 +251,9 @@ h1 { margin: 0; color: #24445f; font-size: clamp(24px, 3.4vw, 34px); font-weight
 button:focus-visible, a:focus-visible { outline: 2px solid #398ad0; outline-offset: 3px; }
 
 /* 独立门户不受 ADR-011 约束：窄屏改纵向排列，不留横向滚动。 */
+@media (max-width: 1180px) {
+  .categories { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 @media (max-width: 900px) {
   .hero { flex-direction: column; align-items: flex-start; min-height: 46vh; }
   .hero-art { display: none; }
