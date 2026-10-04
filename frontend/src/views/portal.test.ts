@@ -28,6 +28,18 @@ const emptyPage = {
   tips: [],
 }
 
+/** F2 用：一条真实形状的资讯条目（WHO 疾病暴发新闻）。 */
+const baseItem = {
+  category: 'disease' as const,
+  title: 'Ebola disease caused by Bundibugyo virus - Democratic Republic of the Congo',
+  summary: null,
+  sourceName: 'WHO 疾病暴发新闻',
+  canonicalUrl: 'https://www.who.int/emergencies/disease-outbreak-news/item/2026-DON618',
+  publishedAt: '2026-09-25T15:16:26Z',
+  retrievedAt: '2026-10-04T16:04:47Z',
+  medicalReviewed: false,
+}
+
 async function setup() {
   const router = createRouter({
     history: createMemoryHistory(),
@@ -64,6 +76,98 @@ describe('独立资讯门户（/portal，F1 页面框架）', () => {
     expect(wrapper.find('.cards').exists()).toBe(false)
     expect(wrapper.find('.news a').exists()).toBe(false)
     expect(wrapper.text()).toContain('小贴士尚未接入来源')
+  })
+
+  it('F2：同题多期折成一组并标出期号，来源状态用中文显示', async () => {
+    vi.mocked(newsApi.page).mockResolvedValue({
+      category: 'disease',
+      status: 'ready',
+      asOf: '2026-10-04T16:04:47Z',
+      nextRefreshAt: '2026-10-04T20:00:00Z',
+      items: [
+        { ...baseItem, id: 'a' },
+        {
+          ...baseItem,
+          id: 'b',
+          publishedAt: '2026-09-10T08:16:08Z',
+          canonicalUrl: 'https://www.who.int/emergencies/disease-outbreak-news/item/2026-DON617',
+        },
+        {
+          ...baseItem,
+          id: 'c',
+          title: 'Cholera - Haiti',
+          publishedAt: '2026-08-01T10:13:28Z',
+          canonicalUrl: 'https://www.who.int/emergencies/disease-outbreak-news/item/2026-DON614',
+        },
+      ],
+      tips: [],
+      sourceStatuses: [
+        {
+          id: 'who_disease_outbreak_news',
+          name: 'WHO 疾病暴发新闻',
+          status: 'ready',
+          lastSuccessAt: '2026-10-04T16:04:47Z',
+          lastErrorCode: null,
+        },
+      ],
+    })
+    const { wrapper } = await setup()
+
+    // 同题两条折成一组：3 条 → 2 张卡（注意用直接子元素，卡片内「较早更新」列表也是 li）
+    expect(wrapper.findAll('.cards > li')).toHaveLength(2)
+    expect(wrapper.get('.card-updates').text()).toContain('同题更新 2 期')
+    expect(wrapper.get('.card-updates').text()).toContain('DON618（2026）')
+    expect(wrapper.get('.card-more summary').text()).toContain('另有 1 期较早更新')
+    expect(wrapper.get('.card-more a').attributes('href')).toContain('2026-DON617')
+    expect(wrapper.get('.source-status').text()).toContain('WHO 疾病暴发新闻：正常')
+    expect(wrapper.get('.status-line').text()).toContain('最近更新')
+    expect(wrapper.get('.cards .badge').text()).toBe('未经医学审核')
+  })
+
+  it('F2：部分来源不可用时说明实情，不谎称全部正常', async () => {
+    vi.mocked(newsApi.page).mockResolvedValue({
+      category: 'disease',
+      status: 'partial',
+      asOf: '2026-10-04T16:04:47Z',
+      nextRefreshAt: null,
+      items: [{ ...baseItem, id: 'a' }],
+      tips: [],
+      sourceStatuses: [
+        {
+          id: 'source_ok',
+          name: '甲来源',
+          status: 'ready',
+          lastSuccessAt: '2026-10-04T16:04:47Z',
+          lastErrorCode: null,
+        },
+        {
+          id: 'source_bad',
+          name: '乙来源',
+          status: 'failed',
+          lastSuccessAt: null,
+          lastErrorCode: 'FETCH_TIMEOUT',
+        },
+      ],
+    })
+    const { wrapper } = await setup()
+
+    expect(wrapper.get('.status-line').text()).toContain('部分来源暂时不可用')
+    expect(wrapper.get('.source-status').text()).toContain('乙来源：更新失败')
+    expect(wrapper.get('.source-status').text()).toContain('FETCH_TIMEOUT')
+  })
+
+  it('F2：来源更新失败且没有条目时给失败空态，不用旧内容冒充更新', async () => {
+    vi.mocked(newsApi.page).mockResolvedValue({
+      category: 'disease',
+      status: 'failed',
+      asOf: null,
+      items: [],
+      tips: [],
+    })
+    const { wrapper } = await setup()
+
+    expect(wrapper.text()).toContain('来源更新失败')
+    expect(wrapper.find('.cards').exists()).toBe(false)
   })
 
   it('AI 展示区保留规格要求的能力说明与两个按钮', async () => {

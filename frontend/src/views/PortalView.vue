@@ -3,7 +3,14 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowRight, Basketball, FirstAidKit, Grid, Memo, Sunny } from '@element-plus/icons-vue'
 import { getApiErrorMessage } from '../api/http'
-import { newsApi, type NewsCategory, type NewsItem, type NewsStatus } from '../api/news'
+import {
+  newsApi,
+  type NewsCategory,
+  type NewsItem,
+  type NewsSourceStatusEntry,
+  type NewsStatus,
+} from '../api/news'
+import { formatMoment, groupNewsItems, periodLabel, sourceStatusText } from './portalNews'
 
 /**
  * 独立资讯门户（F1：只有页面框架，真实新闻源最后接入）。
@@ -32,11 +39,33 @@ const error = ref('')
 const status = ref<NewsStatus | ''>('')
 const items = ref<NewsItem[]>([])
 const tips = ref<{ id: string; text: string; sourceName: string; canonicalUrl: string }[]>([])
+/** 最近成功快照时间、下次更新时间与来源级状态（后端契约；测试桩可不带后两项）。 */
+const asOf = ref<string | null>(null)
+const nextRefreshAt = ref<string | null>(null)
+const sourceStatuses = ref<NewsSourceStatusEntry[]>([])
+
+/** 同题多期折成一组：WHO 同一疫情的多期更新标题逐字相同，直接平铺会像重复条目。 */
+const groups = computed(() => groupNewsItems(items.value))
 
 const emptyReason = computed(() => {
   if (status.value === 'sources_not_connected') return 'sources_not_connected'
   if (status.value === 'stale') return 'stale'
+  if (status.value === 'failed') return 'failed'
   return 'no_update'
+})
+
+/** 顶部状态说明：把「部分来源失败」「内容可能较旧」这类事实说清楚，不夸大也不隐藏。 */
+const statusNote = computed(() => {
+  if (status.value === 'ready' || status.value === 'partial') {
+    const parts: string[] = []
+    if (asOf.value) parts.push(`最近更新 ${formatMoment(asOf.value)}`)
+    if (nextRefreshAt.value) parts.push(`下次更新 ${formatMoment(nextRefreshAt.value)}`)
+    if (status.value === 'partial') parts.push('部分来源暂时不可用，下面是最近成功的条目')
+    return parts.join(' · ')
+  }
+  if (status.value === 'stale') return '最近一次成功更新较早，下面的内容可能已过期'
+  if (status.value === 'failed') return '来源更新失败，下面是最近一次成功的内容'
+  return ''
 })
 
 async function load(category: NewsCategory = active.value) {
@@ -48,11 +77,17 @@ async function load(category: NewsCategory = active.value) {
     status.value = page.status
     items.value = page.items
     tips.value = page.tips
+    asOf.value = page.asOf ?? null
+    nextRefreshAt.value = page.nextRefreshAt ?? null
+    sourceStatuses.value = page.sourceStatuses ?? []
   } catch (e) {
     // 失败时清空列表：上一个分类的条目留着会被当成当前分类的资讯。
     status.value = ''
     items.value = []
     tips.value = []
+    asOf.value = null
+    nextRefreshAt.value = null
+    sourceStatuses.value = []
     error.value = getApiErrorMessage(e)
   } finally {
     loading.value = false
@@ -63,8 +98,9 @@ function start() {
   void router.push({ path: '/app/chat' })
 }
 
-function formatTime(value: string | null) {
-  return value ? new Date(value).toLocaleString('zh-CN') : '发布时间未核实'
+/** 时间一律走这里：解析不了就给兜底文案，绝不编造时间。 */
+function formatTime(value: string | null, fallback = '发布时间未核实') {
+  return formatMoment(value, fallback)
 }
 
 onMounted(() => void load())
@@ -121,6 +157,15 @@ onMounted(() => void load())
           <h2>{{ activeLabel }}</h2>
         </div>
 
+        <p v-if="statusNote" class="status-line" role="status">{{ statusNote }}</p>
+        <ul v-if="sourceStatuses.length" class="source-status" aria-label="来源状态">
+          <li v-for="entry in sourceStatuses" :key="entry.id">
+            <span class="dot" :class="`dot--${entry.status}`" aria-hidden="true"></span>
+            {{ entry.name }}：{{ sourceStatusText(entry.status) }}
+            <span v-if="entry.lastErrorCode" class="muted">（{{ entry.lastErrorCode }}）</span>
+          </li>
+        </ul>
+
         <p v-if="loading" class="state" role="status">正在读取资讯…</p>
         <p v-else-if="error" class="state state--error" role="status">
           {{ error }} <button class="retry" @click="load()">重试</button>
@@ -137,21 +182,42 @@ onMounted(() => void load())
           <strong>暂时取不到较新的资讯</strong>
           <p>已接入的来源暂时没有返回新内容，这里不展示旧条目冒充更新。</p>
         </div>
+        <div v-else-if="emptyReason === 'failed'" class="empty">
+          <strong>来源更新失败</strong>
+          <p>最近一次抓取没有成功，这里不展示未核实的旧内容冒充更新；来源恢复后会重新出现条目。</p>
+        </div>
         <div v-else-if="!items.length" class="empty">
           <strong>暂时没有更新</strong>
           <p>已接入的来源今天还没有新条目；没有条目时不会写成「今日已更新」。</p>
         </div>
         <ul v-else class="cards">
-          <li v-for="item in items" :key="item.id">
+          <li v-for="group in groups" :key="group.lead.id">
             <div class="card-head">
-              <strong>{{ item.title }}</strong>
-              <span v-if="!item.medicalReviewed" class="badge">未经医学审核</span>
+              <strong>{{ group.lead.title }}</strong>
+              <span v-if="!group.lead.medicalReviewed" class="badge">未经医学审核</span>
             </div>
-            <p v-if="item.summary" class="card-summary">{{ item.summary }}</p>
-            <p class="card-meta">
-              {{ item.sourceName }} · 发布 {{ formatTime(item.publishedAt) }} · 获取 {{ formatTime(item.retrievedAt) }}
+            <p v-if="group.lead.summary" class="card-summary">{{ group.lead.summary }}</p>
+            <p v-if="group.periods.length > 1" class="card-updates">
+              同题更新 {{ group.periods.length }} 期：{{ group.periods.join(' · ') }}
             </p>
-            <a :href="item.canonicalUrl" target="_blank" rel="noopener noreferrer nofollow">前往来源核对</a>
+            <p class="card-meta">
+              {{ group.lead.sourceName }} · 发布 {{ formatTime(group.lead.publishedAt) }} · 获取
+              {{ formatTime(group.lead.retrievedAt, '获取时间未记录') }}
+            </p>
+            <a :href="group.lead.canonicalUrl" target="_blank" rel="noopener noreferrer nofollow">
+              前往来源核对
+            </a>
+            <details v-if="group.updates.length" class="card-more">
+              <summary>另有 {{ group.updates.length }} 期较早更新</summary>
+              <ul>
+                <li v-for="update in group.updates" :key="update.id">
+                  <a :href="update.canonicalUrl" target="_blank" rel="noopener noreferrer nofollow">
+                    {{ periodLabel(update) ?? '原文' }}
+                  </a>
+                  <span class="muted">发布 {{ formatTime(update.publishedAt) }}</span>
+                </li>
+              </ul>
+            </details>
           </li>
         </ul>
       </section>
@@ -234,6 +300,20 @@ h1 { margin: 0; color: #24445f; font-size: clamp(24px, 3.4vw, 34px); font-weight
 .card-head strong { color: #3d566d; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
 .badge { padding: 1px 7px; border-radius: 999px; background: #fff3dc; color: #9a681c; font-size: 9px; line-height: 1.7; }
 .card-summary { margin: 7px 0 0; color: #7d8fa0; font-size: 12px; line-height: 1.8; }
+/* F2：状态说明、来源级状态、同题多期标注 */
+.status-line { margin: 12px 0 0; color: #5b748c; font-size: 12px; line-height: 1.7; }
+.source-status { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 8px 0 0; padding: 0; list-style: none; color: #71879b; font-size: 11px; }
+.source-status li { display: flex; align-items: center; gap: 6px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: #b6c4d1; }
+.dot--ready { background: #4fae7a; }
+.dot--empty { background: #c9b471; }
+.dot--stale { background: #d59b52; }
+.dot--failed { background: #d1726f; }
+.card-updates { margin: 7px 0 0; color: #4a7ba6; font-size: 12px; }
+.card-more { margin-top: 8px; color: #6b8195; font-size: 12px; }
+.card-more summary { cursor: pointer; }
+.card-more ul { display: flex; flex-direction: column; gap: 5px; margin: 8px 0 0; padding-left: 16px; }
+.card-more li { display: flex; gap: 8px; align-items: baseline; }
 .card-meta { margin: 7px 0 0; color: #98a7b4; font-size: 10px; }
 .cards a { display: inline-block; margin-top: 7px; color: #367fae; font-size: 11px; text-decoration: none; }
 .cards a:hover { text-decoration: underline; }

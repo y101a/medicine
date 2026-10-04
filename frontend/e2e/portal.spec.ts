@@ -147,3 +147,84 @@ test('交付前先确认：工作区 /app 仍是原概览，没被门户改动�
   // 门户的空态文案不该出现在工作区概览里。
   await expect(page.getByText('新闻源尚未接入')).toHaveCount(0)
 })
+
+/** F2 桩数据：真实形状——WHO 同一场疫情的多期更新（前两期标题逐字相同）+ 来源级状态。 */
+const WHO_BASE = 'https://www.who.int/emergencies/disease-outbreak-news/item'
+const WHO_TITLE = 'Ebola disease caused by Bundibugyo virus - Democratic Republic of the Congo'
+const NEWS_READY = {
+  category: 'disease',
+  status: 'ready',
+  asOf: '2026-10-04T16:04:47Z',
+  nextRefreshAt: '2026-10-04T20:00:00Z',
+  total: 3,
+  hasMore: false,
+  items: [
+    {
+      id: 'a',
+      category: 'disease',
+      title: WHO_TITLE,
+      summary: null,
+      sourceName: 'WHO 疾病暴发新闻',
+      canonicalUrl: `${WHO_BASE}/2026-DON618`,
+      publishedAt: '2026-09-25T15:16:26Z',
+      retrievedAt: '2026-10-04T16:04:47Z',
+      medicalReviewed: false,
+    },
+    {
+      id: 'b',
+      category: 'disease',
+      title: WHO_TITLE,
+      summary: null,
+      sourceName: 'WHO 疾病暴发新闻',
+      canonicalUrl: `${WHO_BASE}/2026-DON617`,
+      publishedAt: '2026-09-10T08:16:08Z',
+      retrievedAt: '2026-10-04T16:04:47Z',
+      medicalReviewed: false,
+    },
+    {
+      id: 'c',
+      category: 'disease',
+      title: 'Cholera - Haiti',
+      summary: null,
+      sourceName: 'WHO 疾病暴发新闻',
+      canonicalUrl: `${WHO_BASE}/2026-DON614`,
+      publishedAt: '2026-08-01T10:13:28Z',
+      retrievedAt: '2026-10-04T16:04:47Z',
+      medicalReviewed: false,
+    },
+  ],
+  tips: [],
+  sourceStatuses: [
+    {
+      id: 'who_disease_outbreak_news',
+      name: 'WHO 疾病暴发新闻',
+      status: 'ready',
+      lastSuccessAt: '2026-10-04T16:04:47Z',
+      lastErrorCode: null,
+    },
+  ],
+}
+
+for (const width of [1280, 375]) {
+  test(`F2 ${width}px：同题多期折成一组、标出期号与来源状态，且不横向溢出`, async ({ page }) => {
+    await installApiStubs(page, { authenticated: true, extra: { 'GET /news': { body: NEWS_READY } } })
+
+    await page.setViewportSize({ width, height: width === 375 ? 720 : 800 })
+    await page.goto('/portal')
+    await waitForRendered(page, '.portal')
+
+    // 3 条 → 2 张卡（同题两条折成一组），并标出期号与较早更新。
+    await expect(page.locator('.cards > li')).toHaveCount(2)
+    await expect(page.getByText('同题更新 2 期')).toBeVisible()
+    await expect(page.getByText('DON618（2026）')).toBeVisible()
+    await expect(page.getByText('另有 1 期较早更新')).toBeVisible()
+    await expect(page.getByText('WHO 疾病暴发新闻：正常')).toBeVisible()
+    await expect(page.getByText('未经医学审核').first()).toBeVisible()
+    await expect(page.getByText('新闻源尚未接入')).toHaveCount(0)
+    // 每条都必须指向来源原文，不能出现自造内容。
+    await expect(page.locator('.cards a').first()).toHaveAttribute('href', /who\.int/)
+
+    const report = await measureOverflow(page)
+    expect(report.overflow, describeOverflow(report, '/portal', width)).toBeLessThanOrEqual(1)
+  })
+}
