@@ -399,6 +399,14 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 - 验证：新闻专项 1 passed，完整后端 **556 passed、1 skipped**；`ruff check app tests migrations` 全绿。
 - 边界：未改 DSH 前端、未接新闻源、未联网或改注册表/数据库、未创建 Windows 安装包；浏览器页面仍待 DSH 实现和联调，不能宣称整个新闻首页已完成。
 
+### 2026-10-04 DSH 临时替 Codex 实现资讯数据层 N1 — 提交 `41ea3ac`
+
+- **前提**：用户 2026-10-04 明确要求「接入新闻功能目前已经规划好了，还未实现，你暂时替 codex 实现」，因此本轮动了 Codex 所有权内的后端文件。**（补记：开工前已在 §7.1 登记，收工按第 264 行的规则删除了该行，记录保留在本条。）**
+- 改动：按 `backend/docs/NEWS_UPDATE_PLAN.md` 只做 **N1 离线数据层**。新增独立三表与迁移 `20261004_0029`（`news_sources` / `news_refresh_runs` / `news_items`，**迁移不写入任何来源**，`enabled` 默认 false、`medical_reviewed` 默认 false）；新增 `backend/app/services/news/`：RSS/Atom 解析（标准库，纯离线、无外部实体）、URL 规范化（去追踪参数/fragment）与 SSRF 校验（仅公网 HTTPS，拒本机/内网/云元数据/非标准端口/带用户信息）、标题指纹去重（同 URL 与同文多 URL）、发布时间核实不到即 NULL、展示期过期隐藏、来源撤回即停用其条目；更新日按 `Asia/Shanghai` 04:00 换日，自动运行每日唯一（部分唯一索引 + SAVEPOINT 兜并发）、租约过期标 failed 且当天不自动补跑。`GET /api/v1/news` 改为读最近成功快照：`sources_not_connected`（无启用来源）/`empty`/`ready`/`partial`/`stale`/`failed` + `asOf` + `nextRefreshAt` + 来源级受控状态 + `limit`/`offset`/`total`/`hasMore`，**请求里不抓外网**。`app/core/config.py` 只新增 `news_*` 可配置项（全部默认关闭/保守值）。前端仅同步契约类型（`frontend/src/api/news.ts` 的 `summary` 可为 null、新增状态与分页字段）与卡片摘要可缺省。
+- 验证：`pytest tests/test_news.py` **20 passed**；后端全量 **575 passed, 1 skipped**（基线 556+1，增加的是本轮新测试）；`ruff check .` **All checks passed**。前端 `vitest src/views/portal.test.ts` 12 passed、`npm run build` 通过、`playwright e2e/portal.spec.ts` 7 passed。**已在开发库执行 `alembic upgrade head`（`20261002_0028 -> 20261004_0029`，只新增三张空表，未写数据）**——这是我第一次改开发库结构，Codex 如要回滚用 `alembic downgrade`。
+- 边界：**没有**联网、没有新增或启用任何真实来源、**没有翻转 `medical_source_registry.json` 的 `automated_collection_enabled`**、没有启用 `news_portal_enabled`、没有刷新器（N2）与领域适配器、没有前台运维 CLI、没有前端 F2（状态文案/分页/来源状态展示）。因此 `/portal` 现在仍显示「新闻源尚未接入」，**功能上没有新增任何新闻**。DNS 指向内网的 SSRF 绕过要等抓取层在连接时再判一次（已在 `is_public_https_url` 注释里写明未覆盖）。
+- 需要 Codex 复核：① 表结构与迁移命名是否符合你的既定风格（我按 `20261002_0028` 的写法冻结约束）；② `NewsRefreshRun` 用 `update_day + trigger` 的部分唯一索引，是否符合你对 N3 租约的设想；③ 若你已有 N1 方案，直接覆盖我的实现即可，我不会再动这些文件（§7.1 行已删除）。
+
 ### 2026-10-04 DSH 门户分区保留「全部」（五块平铺）— 提交 `3fc8e49`
 
 - 改动：`frontend/src/views/PortalView.vue` 把「全部」从列表右上角小按钮改回**第一块平铺卡片**（`Grid` 图标，说明「所有分区的资讯总览」），与养生/健身/疾病/药物同排共五块；那个小按钮随之撤掉（同一功能不留两个入口，`AGENTS.md` 入口纪律）。桌面一行五块铺满整行，≤1180px 三列、≤900px 两列、≤480px 单列。
