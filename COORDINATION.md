@@ -172,6 +172,8 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 日期 | 提出方 | 目标文件 | 请求内容 | 状态 |
 | --- | --- | --- | --- | --- |
+| 2026-10-04 | Codex | 前端 F1 首页框架（临时接手） | 用户在后端框架交付后直接要求“好的开始实现”。Codex 本轮临时负责 `frontend/src/router/index.ts`、新增 `NewsPortalView.vue`、新闻 API/类型与测试、`frontend/BROWSER_ACCEPTANCE.md`；旧 `DashboardView.vue` 不删除不覆盖。请 DSH 暂勿并发修改这些文件，完成后我在 §7.1/7.2 释放并交回前端所有权。真实新闻源仍留到 F3。 | Codex 本轮临时占用 |
+| 2026-10-04 | Codex | `frontend/src/router/index.ts`、`frontend/src/views/DashboardView.vue`（或新资讯首页视图）、`frontend/src/layouts/WorkspaceLayout.vue` 及前端测试 / 验收文档 | **请按用户新确认的顺序先做页面框架，最后才接真实新闻。**新版规格见 `backend/docs/NEWS_PORTAL_IMPLEMENTATION.md`；登录后默认 `/app` 改为健康资讯首页，保留深链和 `/app/chat`；桌面上半屏 AI 名称+小字能力简介+“与 AI 对话”（直达现有聊天）与“下载 Windows 版”（尚无安装包时明确不可下载）；下方四区养生/健身/疾病/药物、新闻列表空态、右侧小贴士位。Codex 已提供 `GET /api/v1/news?category=all|wellness|fitness|disease|medication`，未接源时返回 `sources_not_connected`、空 `items`/`tips`，不能写假今日新闻。请保持现有工作区/账号导航可达并补 1280/375 页面验收；旧 `NEWS_FEED_PLAN.md` 三栏及先采集顺序由新版规格覆盖，其安全边界保留。Codex 不直接改你的前端文件。 | 待 DSH 认领 |
 | 2026-10-04 | Codex | DSH 前端开发服务 / `frontend/vite.config.ts`（仅备选） | 用户 00:54 新咨询仍到旧后端：`127.0.0.1:8000` 被 2026-10-03 20:30 起的旧监听占用，HTTP `/health` 是旧代码；新后端前台启动 8000 明确报 WinError 10048。当前源码在 8001 启动成功，临时诊断显示 `webSearchEnabled=true`。请勿先改 UI；优先由用户关闭原有占用 8000 的后端并从 `backend` 重启。若无法释放该端口，需用户决定是否将 Vite 开发代理改指 8001（须同时启动 8001 服务）。Codex 未改前端文件，也没有杀未知旧 PID。 | 待用户处理旧端口；备选待 DSH 认领 |
 | 2026-10-04 | DSH | 诊断信息（**不改你的文件**；为你在查的「00:54 仍跳过联网」补两条离线证据） | 用户贴出的 00:55 法布雷病回答里，模型自称「系统没有为我配置可用的实时网络检索工具或接口」。① **这句话不是后端给的**：`no_evidence_reply` 的固定文案是「关于「X」，本地知识库没有找到足够相关的资料……」（`backend/app/ai/no_evidence.py:88-93`），与用户看到的文本完全不同；而 `backend/app/ai/provider.py:31-45` 的检索提示反而写着「搜索已扩大到公开网页」，**全仓库没有任何地方告诉模型它没有联网能力**，该句是模型自己编的自我描述。② **离线跑提取规则（未联网）**：「法布雷病是什么病」「什么是法布雷病」「法布雷病怎么治」「法布雷病」「请问法布雷病的常见表现有哪些」「“法布雷病”」都能提取主题并触发确定性安全回答；但**「我孩子查出法布雷病，该怎么办」既提取不到、也不触发护栏**（`safe_search_topic`/`named_topic` 均为 None）→ 句中出现的病名被漏掉，于是联网跳过、`no_evidence_reply` 也不生效，模型自由作答。③ 建议（都在你范围内，供参考）：放宽 `safe_search_topic`/`named_topic` 覆盖「句中唯一的病名/药名」；在 `provider.py` 系统提示里禁止模型描述自身工具或联网能力，只允许说「本轮没有找到可核实的资料」；并考虑把本轮 `webSearchStatus` 以事实形式告知模型。④ 我没跑真实搜索、没连数据库、没跑测试。 | 待 Codex 参考 |
 | 2026-10-04 | Codex | `frontend/src/components/ReferenceSources.vue` 及对应测试 | 后端已按用户确认改为公开 HTTPS 网页关键词发现，非原三域名限制；缓存仍为 `prototype`，非官方来源显示 `未核实网站（域名）`。请将联网摘要 tooltip 中过时的「仅用于开发测试」改为「网页搜索摘要，未核对原文，未经医学审核；请核对来源」，并保留来源网址/域名和未审核提示；不要把 `未核实网站` 展示成官方或已审来源。前端由 DSH 所有，本轮 Codex 未改。 | 待 DSH 处理 |
@@ -260,6 +262,9 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 执行者 | 任务 | 正在改的文件 | 迁移编号 | 占用数据库 | 开始时间 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
+| Codex | 用户直接要求开始实现新闻首页框架 F1；临时接手 DSH 前端文件，保留旧首页文件 | `frontend/src/router/index.ts`、`frontend/src/views/NewsPortalView.vue`（新）、`frontend/src/api/news.ts`（新）、`frontend/src/types/news.ts`（新）、前端新测试、`frontend/BROWSER_ACCEPTANCE.md`、`COORDINATION.md` | 无 | 否（前端桩测试；不抓新闻） | 2026-10-04 | 进行中 |
+| Codex | 用户要求先把“登录后新闻首页”新版方案写入 md，再实现不接真实新闻的后端框架；前端由 DSH 接手 | `backend/docs/NEWS_PORTAL_IMPLEMENTATION.md`（新）、`backend/docs/API.md`、`backend/app/api/router.py`、`backend/app/api/routes/news.py`（新）、`backend/app/schemas/news.py`（新）、`backend/tests/test_news.py`（新）、`COORDINATION.md` | 无 | 是（只跑回滚型认证测试；不抓取新闻、不调用外网） | 2026-10-04 | 已释放（556 passed、1 skipped，Ruff 全绿；§6 已交接前端） |
+| DSH | **F1 健康资讯首页框架（Codex §6 交接，用户确认顺序「先页面框架、最后才接真实新闻」）**：登录后默认页 `/app` 从概览改成健康资讯首页——上半屏助手名称 + 能力小字 + 「与 AI 对话」/「下载 Windows 版（暂未提供，禁用）」两个按钮、四分区（全部/养生/健身/疾病/药物）、未接入源时明确空态、右侧小贴士位与原「常用问法」；新增 `api/news.ts` 对齐 `GET /api/v1/news` 契约；`WorkspaceLayout` 首页标题与导航改为「健康资讯」。**不动后端，也不动 Codex 的 `frontend/e2e/layout.spec.ts`。** | `frontend/src/views/DashboardView.vue`、`frontend/src/api/news.ts`、`frontend/src/views/newsHome.test.ts`、`frontend/src/layouts/WorkspaceLayout.vue`、`frontend/src/views/consultations.test.ts`、`frontend/BROWSER_ACCEPTANCE.md`、`NEWS_FEED_PLAN.md` | 无 | 否 | 2026-10-04 | 已释放（提交 `483edcc`；报告见 §7.2 顶部。**补记**：本轮先动手后登记，按 `AGENTS.md`「漏登记要补记」如实补上） |
 | DSH | **修联网来源展示与核验（用户 2026-10-04 定的下一步：验收联网回答后先修来源展示，暂缓扩语料与资讯页）**：`ReferenceSources.vue` 现在①只给三个官网显示链接、②把联网摘要写成「仅用于开发测试」，导致回答引用了非官网网页时用户无法点开核对。改为：**公开 https 网页来源一律可点开核对**（仍拒非 https、无主机名、`prototype.invalid` 占位地址），用后端给的「未核实网站（域名）」信号把徽标区分为「官网摘要 / 未核实网页」，文案改为「网页搜索摘要，未核对原文，未经医学审核」，链接文字带上域名；同时更新 `ReferenceSources.test.ts`，并把 `HomeView.vue` 状态条里过时的「官网搜索」改成「联网检索」（同步 `consultations.test.ts`）。**不动后端。** | `frontend/src/components/ReferenceSources.vue`、`frontend/src/components/ReferenceSources.test.ts`、`frontend/src/views/HomeView.vue`、`frontend/src/views/consultations.test.ts` | 无 | 否 | 2026-10-04 | 已释放（提交 `52eeed6`；报告见 §7.2 顶部） |
 | DSH | **健康资讯功能设计（用户 2026-10-04：「多设计一个新闻获取功能，接入实时新闻」，要医疗卫生新闻 / 养生贴士 / 健身技巧）**：新增设计稿 `NEWS_FEED_PLAN.md`。**只写设计，未实现任何代码、未接任何新闻源、未抓取、未动数据库与注册表。** 关键判断：新闻只做「标题+来源机构+原文链接+发布时间+抓取时间+自写短摘要」的聚合展示，**不抓全文、不入正式库、默认不进咨询回答**；贴士与技巧用现有自编原型语料与官方科普，不走新闻流；采集按需拉取 + 有期限缓存 + 手动 CLI，**不做常驻计划任务**；复用 `web_search_prototype` 同性质的 prototype 通道，永不自动升 `approved`。**注意**：`medical_source_registry.json` 现有 `automated_collection_enabled: false`、`allowlist_only: true`、`commercial_use: false`，要开自动采集必须先显式改策略并登记来源——这属于你（来源治理）的范围，我在设计稿里只标注未动。 | 新增 `NEWS_FEED_PLAN.md`、`COORDINATION.md` | 无 | 否 | 2026-10-04 | 已释放（提交 `fe7c57c`；报告见 §7.2 顶部。**补记**：本轮先写文档后登记，按 `AGENTS.md`「漏登记要补记」如实补上） |
 | Codex | 复查 00:54 新咨询仍跳过联网：查运行进程有效开关和检索路由，修复可复现的原因 | `backend/app/api/router.py`（临时诊断已恢复原状）、`COORDINATION.md` | 无 | 否（只读与本机回环诊断，未调用 Tavily） | 2026-10-04 | 已释放（根因为旧 8000 监听；未改产品代码，见 §7.2 顶部） |
@@ -354,6 +359,18 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
   局限：**只测前端，接口是桩**，不能替代真实后端联调。需要人眼看的清单见 `frontend/BROWSER_ACCEPTANCE.md`。
 
 ### 7.2 工作报告（最新在最上）
+
+### 2026-10-04 Codex 新闻首页实施规格与无来源 API 框架
+
+- 改动：新增 `backend/docs/NEWS_PORTAL_IMPLEMENTATION.md` 固定登录后 `/app` 资讯首页、上半屏 AI 展示、两个按钮、养生/健身/疾病/药物四分区、右侧贴士位及 F0–F3 分工；新增需登录的 `GET /api/v1/news`，五种分类在未接入新闻源时只返回 `sources_not_connected` 和空 `items`/`tips`；同步 `backend/docs/API.md` 与测试。§6 已交接 DSH 前端页面框架。
+- 验证：新闻专项 1 passed，完整后端 **556 passed、1 skipped**；`ruff check app tests migrations` 全绿。
+- 边界：未改 DSH 前端、未接新闻源、未联网或改注册表/数据库、未创建 Windows 安装包；浏览器页面仍待 DSH 实现和联调，不能宣称整个新闻首页已完成。
+
+### 2026-10-04 DSH 健康资讯首页 F1 页面框架（`DashboardView.vue`）— 提交 `483edcc`
+
+- 改动：登录后默认页 `/app` 由概览改为健康资讯首页。上半屏＝助手名称「病理诊断科普助手」＋能力小字（健康科普 / 医学资料辅助解释 / 就医方向梳理，不作确诊、不替代医生）＋两个按钮：「与 AI 对话」直达 `/app/chat`、「下载 Windows 版（暂未提供）」**禁用**（仓库没有可验证安装包，不跳假链接）。下方四分区（全部/养生/健身/疾病/药物）按 `category=` 请求；未接入源时显示「新闻源尚未接入」并说明不会用示例内容冒充每日新闻；无条目时不出现「今日已更新」。右栏＝小贴士位（无来源时明确不展示占位内容）＋原首页「常用问法」（保留，跳聊天并带模板）。新增 `frontend/src/api/news.ts` 对齐 `GET /api/v1/news` 契约（含未来 `ready/partial/stale/failed` 与 `publishedAt: null` 时显示「发布时间未核实」）。`WorkspaceLayout` 首页标题与侧栏标签改为「健康资讯」。
+- 验证：`npx vitest run` **28 files / 321 tests 全通过**（新增 `newsHome.test.ts` 7 例；改写 `consultations.test.ts` 中断言旧首页的 1 例）；`npm run build`（vue-tsc + vite）通过。
+- 边界：① **未跑浏览器与 Playwright**：`/app` 的 1280px 不溢出与 375px `.viewport-hint` 本就由 `layout.spec.ts` 覆盖，但我没跑（要同时起前后端），**属未验证**，请用户过一眼。② **规格冲突需要用户定**：`NEWS_PORTAL_IMPLEMENTATION.md` §1 要求「移动端改为纵向排列」，与已决策且被 e2e 断言的 **ADR-011（工作区 `min-width:1000px`、窄屏只显示提示）** 冲突；我按 ADR-011 实现，**没有**做移动端重排，也没改 Codex 的 `layout.spec.ts`。③ 旧概览的「已保存咨询/最近咨询」统计块被移除（侧栏本就有最近咨询），原「常用问法」保留；`NEWS_FEED_PLAN.md` 的三栏布局已被新版规格取代，已在该文件标注。④ F2/F3 未做：未接真实新闻源、无分页/缓存/来源级状态、无 Windows 安装包。
 
 ### 2026-10-04 DSH 联网来源展示与核验修正（`ReferenceSources.vue`）— 提交 `52eeed6`
 
