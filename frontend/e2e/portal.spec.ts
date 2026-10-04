@@ -228,3 +228,24 @@ for (const width of [1280, 375]) {
     expect(report.overflow, describeOverflow(report, '/portal', width)).toBeLessThanOrEqual(1)
   })
 }
+
+test('F2：点卡片标题能打开来源原文（新标签），且标题链接指向来源域名', async ({ page, context }) => {
+  // 拦截真实外网：只验证「点得开、开的是来源地址」，不依赖 WHO 可达性。
+  await context.route('**://www.who.int/**', route => route.fulfill({ body: 'stub', contentType: 'text/html' }))
+  await installApiStubs(page, { authenticated: true, extra: { 'GET /news': { body: NEWS_READY } } })
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.goto('/portal')
+  await waitForRendered(page, '.portal')
+
+  const title = page.locator('.cards > li').first().locator('a.card-title')
+  await expect(title).toHaveAttribute('href', /who\.int/)
+
+  const href = await title.getAttribute('href')
+
+  const [popup] = await Promise.all([context.waitForEvent('page'), title.click()])
+  // 等导航真正落到来源地址：只等 domcontentloaded 时 url 可能还是 about:blank。
+  await popup.waitForURL(/who\.int/)
+  // 打开的就是卡片上写的来源地址，不多不少。
+  expect(popup.url(), `实际打开的地址是 ${popup.url()}`).toBe(href)
+  await popup.close()
+})

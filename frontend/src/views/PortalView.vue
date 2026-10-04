@@ -199,7 +199,14 @@ onMounted(() => void load())
         <ul v-else class="cards">
           <li v-for="group in groups" :key="group.lead.id">
             <div class="card-head">
-              <strong>{{ group.lead.title }}</strong>
+              <a
+                class="card-title"
+                :href="group.lead.canonicalUrl"
+                target="_blank"
+                rel="noopener noreferrer nofollow"
+              >
+                <strong>{{ group.lead.title }}</strong>
+              </a>
               <span v-if="!group.lead.medicalReviewed" class="badge">未经医学审核</span>
             </div>
             <p v-if="group.lead.summary" class="card-summary">{{ group.lead.summary }}</p>
@@ -305,6 +312,9 @@ h1 { margin: 0; color: #24445f; font-size: clamp(24px, 3.4vw, 34px); font-weight
 .card-head { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 8px; }
 .card-head strong { color: #3d566d; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
 .badge { padding: 1px 7px; border-radius: 999px; background: #fff3dc; color: #9a681c; font-size: 9px; line-height: 1.7; }
+/* 标题本身就是原文链接：用户第一反应是点标题，不能只有右下角小字可点。 */
+.card-title { color: inherit; text-decoration: none; }
+.card-title:hover strong, .card-title:focus-visible strong { color: #2f6f9f; text-decoration: underline; }
 .card-summary { margin: 7px 0 0; color: #7d8fa0; font-size: 12px; line-height: 1.8; }
 /* F2：状态说明、来源级状态、同题多期标注 */
 .status-line { margin: 12px 0 0; color: #5b748c; font-size: 12px; line-height: 1.7; }

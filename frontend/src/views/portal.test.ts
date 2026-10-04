@@ -122,6 +122,9 @@ describe('独立资讯门户（/portal，F1 页面框架）', () => {
     expect(wrapper.get('.source-status').text()).toContain('WHO 疾病暴发新闻：正常')
     expect(wrapper.get('.status-line').text()).toContain('最近更新')
     expect(wrapper.get('.cards .badge').text()).toBe('未经医学审核')
+    // 标题必须可点进原文，不能只有右下角小字能点。
+    expect(wrapper.get('.cards > li .card-title').attributes('href')).toBe(baseItem.canonicalUrl)
+    expect(wrapper.get('.cards > li .card-title').attributes('target')).toBe('_blank')
   })
 
   it('N3：正在更新来源时如实说明，不把「刚触发刷新」说成已是最新', async () => {
