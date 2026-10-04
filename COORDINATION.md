@@ -260,6 +260,7 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 执行者 | 任务 | 正在改的文件 | 迁移编号 | 占用数据库 | 开始时间 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
+| DSH | **修联网来源展示与核验（用户 2026-10-04 定的下一步：验收联网回答后先修来源展示，暂缓扩语料与资讯页）**：`ReferenceSources.vue` 现在①只给三个官网显示链接、②把联网摘要写成「仅用于开发测试」，导致回答引用了非官网网页时用户无法点开核对。改为：**公开 https 网页来源一律可点开核对**（仍拒非 https、无主机名、`prototype.invalid` 占位地址），用后端给的「未核实网站（域名）」信号把徽标区分为「官网摘要 / 未核实网页」，文案改为「网页搜索摘要，未核对原文，未经医学审核」，链接文字带上域名；同时更新 `ReferenceSources.test.ts`，并把 `HomeView.vue` 状态条里过时的「官网搜索」改成「联网检索」（同步 `consultations.test.ts`）。**不动后端。** | `frontend/src/components/ReferenceSources.vue`、`frontend/src/components/ReferenceSources.test.ts`、`frontend/src/views/HomeView.vue`、`frontend/src/views/consultations.test.ts` | 无 | 否 | 2026-10-04 | 已释放（提交 `52eeed6`；报告见 §7.2 顶部） |
 | DSH | **健康资讯功能设计（用户 2026-10-04：「多设计一个新闻获取功能，接入实时新闻」，要医疗卫生新闻 / 养生贴士 / 健身技巧）**：新增设计稿 `NEWS_FEED_PLAN.md`。**只写设计，未实现任何代码、未接任何新闻源、未抓取、未动数据库与注册表。** 关键判断：新闻只做「标题+来源机构+原文链接+发布时间+抓取时间+自写短摘要」的聚合展示，**不抓全文、不入正式库、默认不进咨询回答**；贴士与技巧用现有自编原型语料与官方科普，不走新闻流；采集按需拉取 + 有期限缓存 + 手动 CLI，**不做常驻计划任务**；复用 `web_search_prototype` 同性质的 prototype 通道，永不自动升 `approved`。**注意**：`medical_source_registry.json` 现有 `automated_collection_enabled: false`、`allowlist_only: true`、`commercial_use: false`，要开自动采集必须先显式改策略并登记来源——这属于你（来源治理）的范围，我在设计稿里只标注未动。 | 新增 `NEWS_FEED_PLAN.md`、`COORDINATION.md` | 无 | 否 | 2026-10-04 | 已释放（提交 `fe7c57c`；报告见 §7.2 顶部。**补记**：本轮先写文档后登记，按 `AGENTS.md`「漏登记要补记」如实补上） |
 | Codex | 复查 00:54 新咨询仍跳过联网：查运行进程有效开关和检索路由，修复可复现的原因 | `backend/app/api/router.py`（临时诊断已恢复原状）、`COORDINATION.md` | 无 | 否（只读与本机回环诊断，未调用 Tavily） | 2026-10-04 | 已释放（根因为旧 8000 监听；未改产品代码，见 §7.2 顶部） |
 | DSH | **语料补充清单（用户要求「安排一份语料清单，方便日后补充」）**：新增一份可勾选的待补语料清单文档（分波次 / 四层 / `topic_key` / 建议 slug / 覆盖问法 / 内容边界 / 来源线索 / 状态），与 Codex 的 `backend/docs/KNOWLEDGE_FOUR_LAYER_GAP_PLAN.md`（第一批 4 主题包）互相对照、不重复其已规划项。**只写文档，不写语料、不动数据库、不导入、不向量化、不改注册表。** | 新增 `backend/docs/CORPUS_BACKLOG.md` | 无 | 否 | 2026-10-03 | 已释放（提交 `bc09209`；报告见 §7.2 顶部） |
@@ -353,6 +354,12 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
   局限：**只测前端，接口是桩**，不能替代真实后端联调。需要人眼看的清单见 `frontend/BROWSER_ACCEPTANCE.md`。
 
 ### 7.2 工作报告（最新在最上）
+
+### 2026-10-04 DSH 联网来源展示与核验修正（`ReferenceSources.vue`）— 提交 `52eeed6`
+
+- 改动：`frontend/src/components/ReferenceSources.vue` 取消三域名白名单对链接的限制——**公开 https 网页来源一律可点开核对**（仍拒非 https、缺主机名、`prototype.invalid` 占位地址）；按后端 `organization` 的「未核实网站（域名）」信号把徽标分为「官网摘要 / 未核实网页」；新增「来源网址：域名」一行；链接文字带域名、`rel` 加 `nofollow`；联网文案改为「网页搜索摘要，未核对原文，未经医学审核」。`HomeView.vue` 状态条里过时的「官网搜索」改为「联网检索」。同步 `ReferenceSources.test.ts`、`consultations.test.ts` 与 `WEB_SEARCH_FALLBACK_PLAN.md` 的过时说明。
+- 验证：`npx vitest run` **27 files / 314 tests 全通过**；`npm run build`（vue-tsc + vite）通过。首轮满载时 `src/views/settings.test.ts` 有 2 例超时，单跑 13/13、复跑全绿，判定为负载抖动、与本改动无关（`ReferenceSources` 只被 `HomeView` 使用）。
+- 边界：① **未跑真实联网、未跑浏览器验收**；你给的四项验收（触发搜索、回答附真实来源、链接可打开、标注未经医学审核）需在真实 8000 服务上用「法布雷病」类问题人眼跑一次。② 两项契约仍缺：`sources[].retrievedAt`（获取时间）与搜索开始信号（「正在检索」）——本轮**没有虚构**这两项，来源区**仍不显示获取时间**。③ **有意保留**把非官网来源显示为可点链接：回答已引用它，藏链接会让用户无法核对，安全性靠「未核实网页」标注，而不是靠隐藏。
 
 ### 2026-10-04 DSH 健康资讯功能设计（`NEWS_FEED_PLAN.md`）— 提交 `fe7c57c`
 
