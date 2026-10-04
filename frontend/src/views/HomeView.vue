@@ -569,7 +569,7 @@ function explainRetrieval(progress: RetrievalProgress): string {
   if (progress.status === 'completed') {
     if (!progress.coverageLimited) return ''
     return progress.webSearchStatus === 'failed'
-      ? '现有资料只覆盖部分相关疾病，官网搜索未成功；下面的回答不能视为完整清单。'
+      ? '现有资料只覆盖部分相关疾病，联网检索未成功；下面的回答不能视为完整清单。'
       : '参考资料只覆盖部分相关疾病，下面的回答不能视为完整清单。'
   }
   if (progress.status === 'failed') {
@@ -578,14 +578,14 @@ function explainRetrieval(progress: RetrievalProgress): string {
   if (progress.status !== 'empty') return ''
   if (progress.webSearchStatus === 'failed') {
     const reason = progress.webSearchErrorCode === 'WEB_SEARCH_TIMEOUT'
-      ? '官网搜索超时'
-      : '官网搜索暂时不可用'
+      ? '联网检索超时'
+      : '联网检索暂时不可用'
     return `本地资料不足，且${reason}。本轮回答没有可核验的参考资料，请勿将其作为诊断依据。`
   }
   if (progress.webSearchStatus === 'empty') {
-    return '本地资料和官网搜索均未找到可引用的相关资料。本轮回答仅供一般科普，不能据此判断具体病情。'
+    return '本地资料和联网检索均未找到可引用的相关资料。本轮回答仅供一般科普，不能据此判断具体病情。'
   }
-  return '本地资料暂未找到相关证据，且未进行官网搜索。本轮回答没有可核验的参考资料。'
+  return '本地资料暂未找到相关证据，且未进行联网检索。本轮回答没有可核验的参考资料。'
 }
 async function loadModels() {
   modelsLoading.value = true

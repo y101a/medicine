@@ -184,7 +184,7 @@ describe('真实咨询界面', () => {
     await timeout.wrapper.get('textarea').setValue('甲状腺结节科普')
     await timeout.wrapper.get('form').trigger('submit')
     await flushPromises()
-    expect(timeout.wrapper.get('.retrieval-notice').text()).toContain('官网搜索超时')
+    expect(timeout.wrapper.get('.retrieval-notice').text()).toContain('联网检索超时')
     expect(timeout.wrapper.find('.reference-sources').exists()).toBe(false)
     timeout.wrapper.unmount()
 
