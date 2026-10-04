@@ -399,6 +399,15 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
 - 验证：新闻专项 1 passed，完整后端 **556 passed、1 skipped**；`ruff check app tests migrations` 全绿。
 - 边界：未改 DSH 前端、未接新闻源、未联网或改注册表/数据库、未创建 Windows 安装包；浏览器页面仍待 DSH 实现和联调，不能宣称整个新闻首页已完成。
 
+### 2026-10-04 DSH 资讯 N3：每日按需刷新（API 后台任务 + 轮内重试 + 前端「正在更新」）
+
+- **前提 / 补记**：用户 2026-10-04 明确「做N3」，并授权接口进程按需出网。**本轮又漏了先写 §7.1**（与前三轮同样的疏漏，如实记录）；收工时**没有留下任何占用行**，Codex 可随时接手这些文件。
+- 改动：新增 `backend/app/services/news/auto.py`（`daily_auto_refresh` 后台任务；`AUTO_REFRESH_ENABLED` 供测试关闭）；`app/api/routes/news.py` 在**当天首次访问**时 `background_tasks.add_task(...)`（**不等待**），响应新增 `refreshing`；`app/schemas/news.py` 加 `refreshing: bool = False`；`app/services/news/refresh.py` 加轮内重试（`MAX_FETCH_ATTEMPTS=2`，只对超时/连接失败/5xx 重试一次）并把 `fetcher` 默认值改成调用时解析（便于注入替身）；前端 `api/news.ts` 加 `refreshing`，`PortalView.vue` 在刷新进行中显示「正在更新来源，稍后刷新可见新条目」。
+- **修掉一个测试隔离缺陷（影响所有资讯测试）**：`tests/conftest.py` 新增 autouse 夹具 `_disable_news_auto_refresh`，默认关闭这条派发并把 `news_portal_enabled` 置 false。原因：开关放在开发者 `.env` 后，原有的「开关关闭时该跳过」测试会去**真联网**，我实测跑满 600 秒被超时杀掉；现在测试既不联网也不读本机 `.env`（与 conftest 里健康记录抽取的处理同一思路）。
+- **验证**（全部实跑）：`pytest tests/test_news.py tests/test_news_refresh.py tests/test_news_auto.py` **36 passed**（新增 `tests/test_news_auto.py` 5 项：开关关闭不出网、首次访问只跑一轮且同日不重复、瞬时失败重试一次后记受控错误码且响应仍 200、`refreshing` 在运行中为真、无来源不触发）；后端全量 **591 passed, 1 skipped**（上一轮 586+1，+5）；`ruff check .` **All checks passed**；前端 **334 passed / 29 files**（上一轮 333/29，+1）；`npm run build` 通过。
+- **真实链路**（开发后端 8000，`NEWS_PORTAL_ENABLED=true` 已在 `backend/.env`）：真实服务连打两次 `/api/v1/news` —— 触发那一次返回的 `asOf` 仍是上一次成功快照、`refreshing=false`；6 秒后再访问 `asOf` 推进到本轮成功时间、`total=20`、`status=ready`。CLI 的 auto 分支也实跑成功（`trigger=auto 结果=succeeded`，真实 WHO 请求 20 条）。期间产生的运行记录已用 `--purge-runs` 清掉，**条目保留**（门户现有 20 条）。
+- 边界：没有注册任何计划任务/服务/自启动（刷新只活在应用生命周期内，服务停止即停止，符合用户 2026-09-25 明令）；`automated_collection_enabled` 仍是 false，未翻转；`refreshing` 只在**自动**运行期间为真（CLI 手动跑不体现）；前端不做轮询，用户需自行刷新才能看到新一轮结果；WHO 再利用许可仍未核验；分页仍未做。**Codex 请注意**：`backend/.env` 现在多了一行 `NEWS_PORTAL_ENABLED=true`（本机配置，未提交），如果你希望默认关闭，把该行删掉即可。
+
 ### 2026-10-04 DSH 前端 F2：门户资讯展示（同题多期聚合 + 来源级状态）
 
 - 改动：新增 `frontend/src/views/portalNews.ts`（纯函数：同题聚合 `groupNewsItems`、期号提取 `periodLabel`、来源状态中文、时间兜底格式化）与 `portalNews.test.ts`；`frontend/src/views/PortalView.vue` 改为按组渲染（同题多期折成一张卡 + 「同题更新 N 期：DON618（2026） · …」+ 可展开的较早各期）、顶部状态说明（最近更新/下次更新/部分来源暂时不可用）、来源级状态圆点、失败与过期空态。**本轮没有新增任何用户可见入口**，因此不涉及 AGENTS.md 的入口位置纪律。
