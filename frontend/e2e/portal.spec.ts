@@ -63,6 +63,33 @@ test('1280px：AI 展示区约占首屏一半，装饰动画生效但不高过�
   expect(orbAnimation, '漂浮光斑动效应生效').toContain('floatY')
 })
 
+test('1280px：四个分区平铺在 AI 展示区下方并铺满整行', async ({ page }) => {
+  await installApiStubs(page, {
+    authenticated: true,
+    extra: { 'GET /news': { body: NEWS_EMPTY } },
+  })
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.goto('/portal')
+  await waitForRendered(page, '.portal')
+
+  const tiles = page.locator('.category-tile')
+  await expect(tiles).toHaveCount(4)
+
+  const heroBox = await page.locator('.hero').boundingBox()
+  const first = await tiles.nth(0).boundingBox()
+  const last = await tiles.nth(3).boundingBox()
+  expect(first, '没有找到分区卡片 .category-tile').not.toBeNull()
+
+  // 平铺在 AI 展示区下面
+  expect(first!.y, '分区应排在 AI 展示区下方').toBeGreaterThanOrEqual(heroBox!.y + heroBox!.height - 1)
+  // 同一行四块，每块都够大，并铺满内容区整行
+  expect(Math.abs(last!.y - first!.y), '四块应在同一行').toBeLessThan(2)
+  expect(first!.width, '分区卡片应放大到至少 200px 宽').toBeGreaterThanOrEqual(200)
+  const gridWidth = await page.locator('.categories').evaluate(el => el.getBoundingClientRect().width)
+  const rowWidth = last!.x + last!.width - first!.x
+  expect(rowWidth / gridWidth, '四块应铺满整行').toBeGreaterThan(0.98)
+})
+
 test('未登录访问 /portal 回到登录页并记住回跳地址', async ({ page }) => {
   await installApiStubs(page, { authenticated: false })
   await page.goto('/portal')

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowRight } from '@element-plus/icons-vue'
+import { ArrowRight, Basketball, FirstAidKit, Memo, Sunny } from '@element-plus/icons-vue'
 import { getApiErrorMessage } from '../api/http'
 import { newsApi, type NewsCategory, type NewsItem, type NewsStatus } from '../api/news'
 
@@ -13,15 +13,19 @@ import { newsApi, type NewsCategory, type NewsItem, type NewsStatus } from '../a
  */
 const router = useRouter()
 
-const categories: { value: NewsCategory; label: string }[] = [
-  { value: 'all', label: '全部' },
-  { value: 'wellness', label: '养生' },
-  { value: 'fitness', label: '健身' },
-  { value: 'disease', label: '疾病' },
-  { value: 'medication', label: '药物' },
+/** 四个分区做成平铺大卡片（用户 2026-10-04 要求放大平铺在 AI 展示区下面）。 */
+const categories: { value: NewsCategory; label: string; icon: unknown; text: string }[] = [
+  { value: 'wellness', label: '养生', icon: Sunny, text: '作息、饮食与日常调理' },
+  { value: 'fitness', label: '健身', icon: Basketball, text: '运动方式与安全注意' },
+  { value: 'disease', label: '疾病', icon: FirstAidKit, text: '常见疾病科普与就医方向' },
+  { value: 'medication', label: '药物', icon: Memo, text: '药品用途与注意事项' },
 ]
 
 const active = ref<NewsCategory>('all')
+/** 列表标题：当前分区名；选「全部」时不强调某个分区。 */
+const activeLabel = computed(
+  () => categories.find(item => item.value === active.value)?.label ?? '全部资讯',
+)
 const loading = ref(false)
 const error = ref('')
 const status = ref<NewsStatus | ''>('')
@@ -94,17 +98,32 @@ onMounted(() => void load())
       </div>
     </section>
 
+    <section class="categories" role="tablist" aria-label="资讯分类">
+      <button
+        v-for="item in categories"
+        :key="item.value"
+        class="category-tile"
+        role="tab"
+        :aria-selected="active === item.value"
+        :class="{ selected: active === item.value }"
+        @click="load(item.value)"
+      >
+        <span class="tile-icon" aria-hidden="true"><el-icon><component :is="item.icon" /></el-icon></span>
+        <strong>{{ item.label }}</strong>
+        <small>{{ item.text }}</small>
+      </button>
+    </section>
+
     <div class="columns">
       <section class="news">
-        <div class="tabs" role="tablist" aria-label="资讯分类">
+        <div class="panel-head">
+          <h2>{{ activeLabel }}</h2>
           <button
-            v-for="item in categories"
-            :key="item.value"
-            role="tab"
-            :aria-selected="active === item.value"
-            :class="{ selected: active === item.value }"
-            @click="load(item.value)"
-          >{{ item.label }}</button>
+            class="all-chip"
+            :class="{ selected: active === 'all' }"
+            :aria-pressed="active === 'all'"
+            @click="load('all')"
+          >全部</button>
         </div>
 
         <p v-if="loading" class="state" role="status">正在读取资讯…</p>
@@ -197,9 +216,18 @@ h1 { margin: 0; color: #24445f; font-size: clamp(24px, 3.4vw, 34px); font-weight
 .columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 340px); gap: 18px; flex: 1; min-height: 0; margin-top: 18px; }
 .news, .rail-card { border: 1px solid #e6edf3; border-radius: 16px; background: #fff; }
 .news { display: flex; flex-direction: column; padding: 22px 26px 26px; }
-.tabs { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 16px; border-bottom: 1px solid #eef2f5; }
-.tabs button { padding: 7px 15px; border: 1px solid #dde7f0; border-radius: 999px; background: #f8fafc; color: #5b748c; font-size: 12px; cursor: pointer; }
-.tabs button.selected { border-color: #9ec8e6; background: #eaf4fc; color: #1e6ba8; font-weight: 600; }
+/* 四分区：平铺在 AI 展示区下方，桌面一行铺满（窄屏 2 列 / 单列）。 */
+.categories { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
+.category-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 18px 18px 16px; border: 1px solid #e2eaf1; border-radius: 16px; background: #fff; color: inherit; text-align: left; cursor: pointer; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+.category-tile:hover { transform: translateY(-3px); border-color: #bcd8ee; box-shadow: 0 12px 24px rgb(52 116 168 / 12%); }
+.category-tile.selected { border-color: #7fb6de; background: linear-gradient(150deg, #f2f9ff, #e7f3fc); box-shadow: 0 10px 22px rgb(52 116 168 / 14%); }
+.tile-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 13px; background: #eaf4fc; color: #2f7cb4; font-size: 20px; }
+.category-tile strong { color: #35536c; font-size: 15px; }
+.category-tile small { color: #8b9aa8; font-size: 11px; line-height: 1.6; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid #eef2f5; }
+.panel-head h2 { margin: 0; color: #3d566d; font-size: 15px; }
+.all-chip { padding: 5px 13px; border: 1px solid #dde7f0; border-radius: 999px; background: #f8fafc; color: #5b748c; font-size: 12px; cursor: pointer; }
+.all-chip.selected { border-color: #9ec8e6; background: #eaf4fc; color: #1e6ba8; font-weight: 600; }
 .state { flex: 1; margin: 28px 0; color: #8798a8; font-size: 12px; }
 .state--error { color: #b0653c; }
 .retry { border: 0; background: none; color: #237ac2; font-size: 12px; cursor: pointer; }
@@ -233,13 +261,14 @@ button:focus-visible, a:focus-visible { outline: 2px solid #398ad0; outline-offs
 @media (max-width: 900px) {
   .hero { flex-direction: column; align-items: flex-start; min-height: 46vh; }
   .hero-art { display: none; }
+  .categories { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .columns { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 480px) {
   .hero { min-height: auto; }
   .hero-actions { flex-direction: column; align-items: stretch; }
   .primary, .ghost { justify-content: center; }
-  .tabs button { flex: 1 1 auto; }
+  .categories { grid-template-columns: minmax(0, 1fr); }
 }
 /* 用户可能有「降低动态效果」偏好：装饰动画全部静止，内容照常显示。 */
 @media (prefers-reduced-motion: reduce) {

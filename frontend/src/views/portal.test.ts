@@ -79,15 +79,32 @@ describe('独立资讯门户（/portal，F1 页面框架）', () => {
     expect(wrapper.find('.hero .ghost').exists()).toBe(true)
   })
 
-  it('四个分区可切换，并按分类请求资讯', async () => {
+  it('四个分区平铺可切换，并按分类请求资讯', async () => {
     const { wrapper } = await setup()
     expect(newsApi.page).toHaveBeenCalledWith('all')
 
-    const wellness = wrapper.findAll('.tabs button').find(item => item.text() === '养生')
-    await wellness?.trigger('click')
+    const tiles = wrapper.findAll('.category-tile')
+    expect(tiles).toHaveLength(4)
+    expect(tiles.map(item => item.text().replace(/\s+/g, ''))).toEqual([
+      '养生作息、饮食与日常调理',
+      '健身运动方式与安全注意',
+      '疾病常见疾病科普与就医方向',
+      '药物药品用途与注意事项',
+    ])
+    // 分区卡片排在 AI 展示区之后（用户要求「平铺在病理科普助手下面」）。
+    expect(wrapper.element.querySelector('.hero + .categories')).not.toBeNull()
+
+    const wellness = tiles[0]
+    await wellness.trigger('click')
     await flushPromises()
     expect(newsApi.page).toHaveBeenLastCalledWith('wellness')
-    expect(wellness?.attributes('aria-selected')).toBe('true')
+    expect(wellness.attributes('aria-selected')).toBe('true')
+    expect(wrapper.get('.panel-head h2').text()).toBe('养生')
+
+    await wrapper.get('.all-chip').trigger('click')
+    await flushPromises()
+    expect(newsApi.page).toHaveBeenLastCalledWith('all')
+    expect(wrapper.get('.all-chip').attributes('aria-pressed')).toBe('true')
   })
 
   it('没有安装包时下载入口保持不可用，也不跳外链', async () => {
