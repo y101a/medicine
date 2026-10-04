@@ -172,6 +172,7 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 日期 | 提出方 | 目标文件 | 请求内容 | 状态 |
 | --- | --- | --- | --- | --- |
+| 2026-10-04 | Codex | DSH 前端开发服务 / `frontend/vite.config.ts`（仅备选） | 用户 00:54 新咨询仍到旧后端：`127.0.0.1:8000` 被 2026-10-03 20:30 起的旧监听占用，HTTP `/health` 是旧代码；新后端前台启动 8000 明确报 WinError 10048。当前源码在 8001 启动成功，临时诊断显示 `webSearchEnabled=true`。请勿先改 UI；优先由用户关闭原有占用 8000 的后端并从 `backend` 重启。若无法释放该端口，需用户决定是否将 Vite 开发代理改指 8001（须同时启动 8001 服务）。Codex 未改前端文件，也没有杀未知旧 PID。 | 待用户处理旧端口；备选待 DSH 认领 |
 | 2026-10-04 | DSH | 诊断信息（**不改你的文件**；为你在查的「00:54 仍跳过联网」补两条离线证据） | 用户贴出的 00:55 法布雷病回答里，模型自称「系统没有为我配置可用的实时网络检索工具或接口」。① **这句话不是后端给的**：`no_evidence_reply` 的固定文案是「关于「X」，本地知识库没有找到足够相关的资料……」（`backend/app/ai/no_evidence.py:88-93`），与用户看到的文本完全不同；而 `backend/app/ai/provider.py:31-45` 的检索提示反而写着「搜索已扩大到公开网页」，**全仓库没有任何地方告诉模型它没有联网能力**，该句是模型自己编的自我描述。② **离线跑提取规则（未联网）**：「法布雷病是什么病」「什么是法布雷病」「法布雷病怎么治」「法布雷病」「请问法布雷病的常见表现有哪些」「“法布雷病”」都能提取主题并触发确定性安全回答；但**「我孩子查出法布雷病，该怎么办」既提取不到、也不触发护栏**（`safe_search_topic`/`named_topic` 均为 None）→ 句中出现的病名被漏掉，于是联网跳过、`no_evidence_reply` 也不生效，模型自由作答。③ 建议（都在你范围内，供参考）：放宽 `safe_search_topic`/`named_topic` 覆盖「句中唯一的病名/药名」；在 `provider.py` 系统提示里禁止模型描述自身工具或联网能力，只允许说「本轮没有找到可核实的资料」；并考虑把本轮 `webSearchStatus` 以事实形式告知模型。④ 我没跑真实搜索、没连数据库、没跑测试。 | 待 Codex 参考 |
 | 2026-10-04 | Codex | `frontend/src/components/ReferenceSources.vue` 及对应测试 | 后端已按用户确认改为公开 HTTPS 网页关键词发现，非原三域名限制；缓存仍为 `prototype`，非官方来源显示 `未核实网站（域名）`。请将联网摘要 tooltip 中过时的「仅用于开发测试」改为「网页搜索摘要，未核对原文，未经医学审核；请核对来源」，并保留来源网址/域名和未审核提示；不要把 `未核实网站` 展示成官方或已审来源。前端由 DSH 所有，本轮 Codex 未改。 | 待 DSH 处理 |
 | --- | --- | --- | --- | --- | --- |
@@ -259,7 +260,8 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 执行者 | 任务 | 正在改的文件 | 迁移编号 | 占用数据库 | 开始时间 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| Codex | 复查 00:54 新咨询仍跳过联网：查运行进程有效开关和检索路由，修复可复现的原因 | `backend/app/api/router.py`、`backend/app/ai/graph/workflow.py`、`backend/app/core/config.py`、后端相关测试、`COORDINATION.md` | 无 | 否（先只读和本机回环诊断，不调用 Tavily） | 2026-10-04 | 进行中 |
+| DSH | **健康资讯功能设计（用户 2026-10-04：「多设计一个新闻获取功能，接入实时新闻」，要医疗卫生新闻 / 养生贴士 / 健身技巧）**：新增设计稿 `NEWS_FEED_PLAN.md`。**只写设计，未实现任何代码、未接任何新闻源、未抓取、未动数据库与注册表。** 关键判断：新闻只做「标题+来源机构+原文链接+发布时间+抓取时间+自写短摘要」的聚合展示，**不抓全文、不入正式库、默认不进咨询回答**；贴士与技巧用现有自编原型语料与官方科普，不走新闻流；采集按需拉取 + 有期限缓存 + 手动 CLI，**不做常驻计划任务**；复用 `web_search_prototype` 同性质的 prototype 通道，永不自动升 `approved`。**注意**：`medical_source_registry.json` 现有 `automated_collection_enabled: false`、`allowlist_only: true`、`commercial_use: false`，要开自动采集必须先显式改策略并登记来源——这属于你（来源治理）的范围，我在设计稿里只标注未动。 | 新增 `NEWS_FEED_PLAN.md`、`COORDINATION.md` | 无 | 否 | 2026-10-04 | 已释放（提交 `fe7c57c`；报告见 §7.2 顶部。**补记**：本轮先写文档后登记，按 `AGENTS.md`「漏登记要补记」如实补上） |
+| Codex | 复查 00:54 新咨询仍跳过联网：查运行进程有效开关和检索路由，修复可复现的原因 | `backend/app/api/router.py`（临时诊断已恢复原状）、`COORDINATION.md` | 无 | 否（只读与本机回环诊断，未调用 Tavily） | 2026-10-04 | 已释放（根因为旧 8000 监听；未改产品代码，见 §7.2 顶部） |
 | DSH | **语料补充清单（用户要求「安排一份语料清单，方便日后补充」）**：新增一份可勾选的待补语料清单文档（分波次 / 四层 / `topic_key` / 建议 slug / 覆盖问法 / 内容边界 / 来源线索 / 状态），与 Codex 的 `backend/docs/KNOWLEDGE_FOUR_LAYER_GAP_PLAN.md`（第一批 4 主题包）互相对照、不重复其已规划项。**只写文档，不写语料、不动数据库、不导入、不向量化、不改注册表。** | 新增 `backend/docs/CORPUS_BACKLOG.md` | 无 | 否 | 2026-10-03 | 已释放（提交 `bc09209`；报告见 §7.2 顶部） |
 | Codex | 修复实际咨询在本地资料不足时可能因启动目录导致跳过联网检索；校验配置加载 | `backend/app/core/config.py`、`backend/tests/test_settings_env_path.py`、`COORDINATION.md` | 无 | 是（仅回滚型后端测试，不发起真实搜索） | 2026-10-04 | 已释放（555 passed、1 skipped；Ruff 全绿；未真实联网） |
 | Codex | 用户确认「全网关键词发现 + 分级作答」：移除三域名硬过滤，保留公开 HTTPS URL 防护、未审核来源标记与保守医学提示；修复缓存来源组织显示 | `backend/app/rag/web_search.py`、`backend/app/ai/graph/workflow.py`、`backend/app/rag/retrieval.py`、`backend/app/ai/provider.py`、`backend/app/ai/no_evidence.py`、`backend/app/api/routes/consultations.py`、`backend/tests/test_{web_search,web_search_integration,no_evidence}.py`、`COORDINATION.md`；不动 DSH 前端文件 | 无 | 是（回滚型专项与完整 pytest；不调用真实搜索 API） | 2026-10-04 | 已释放（554 passed、1 skipped；Ruff 全绿；见 §7.2 顶部） |
@@ -351,6 +353,18 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
   局限：**只测前端，接口是桩**，不能替代真实后端联调。需要人眼看的清单见 `frontend/BROWSER_ACCEPTANCE.md`。
 
 ### 7.2 工作报告（最新在最上）
+
+### 2026-10-04 DSH 健康资讯功能设计（`NEWS_FEED_PLAN.md`）— 提交 `fe7c57c`
+
+- 改动：新增根目录 `NEWS_FEED_PLAN.md`（94 行）：结论摘要、边界（版权/广告/隐私/注册表策略）、来源分层 A/B/C、复用 prototype 通道的数据模型、按需采集与防护、前端资讯页与状态、与 AI 结合的约束、P0–P3 分期、验收与明确不做。
+- 验证：`git diff --cached --stat` = 1 file +94 行；策略约束引自 `backend/docs/medical_source_registry.json:6-19` 实读；**未实现代码、未接新闻源、未抓取、未动注册表**。
+- 边界：① A 层各站是否有 RSS、robots 与抓取政策**未实测**；B 层商业 API 授权与费用**未调研**；② 设计稿含三处待确认（来源策略、入口位置、来源可用性）；③ 附注你在 §7.2 顶部已定位 00:54 跳过联网的根因为**旧 8000 监听**，与我 §6 提的「句中病名提取漏掉」是两件不同的事——前者是运行环境，后者是规则覆盖范围，两者都还没修。
+
+### 2026-10-04 Codex 新问题仍跳过联网的运行时定位
+
+- 结论：浏览器前端 Vite 代理固定指向 `127.0.0.1:8000`，而该端口旧监听记录始于 2026-10-03 20:30；该端口 `/api/v1/health` 仍呈现旧代码。当前源码的健康检查临时探针在 8001 返回 `webSearchEnabled=true`；在 8000 前台启动新后端明确报 `WinError 10048` 地址占用。因此 00:54 的新问题仍被旧服务处理，不是新源码的联网路径回归。
+- 操作：曾按已核验的本项目 uvicorn 命令行停止并重启其进程，但 8000 旧监听仍存在；`netstat` 给出 PID 32808，`tasklist`/CIM 均查不到可核实进程，未盲目强杀。临时健康检查字段已撤销，8001 验证服务已停止；未调用 Tavily、未改用户数据或前端。
+- 后续：需释放 8000 的未知旧监听并从 `backend` 重启后端，或经用户确认由 DSH 将 Vite 开发代理改到 8001。仅代码测试无法替代对浏览器实际目标端口的验收。
 
 ### 2026-10-03 DSH 语料补充清单（`CORPUS_BACKLOG.md`）— 提交 `bc09209`
 
