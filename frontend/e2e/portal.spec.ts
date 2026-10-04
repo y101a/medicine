@@ -41,6 +41,28 @@ for (const width of [1280, 375]) {
   })
 }
 
+test('1280px：AI 展示区约占首屏一半，装饰动画生效但不高过视口', async ({ page }) => {
+  await installApiStubs(page, {
+    authenticated: true,
+    extra: { 'GET /news': { body: NEWS_EMPTY } },
+  })
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.goto('/portal')
+  await waitForRendered(page, '.portal')
+
+  const box = await page.locator('.hero').boundingBox()
+  expect(box, '没有找到 AI 展示区 .hero').not.toBeNull()
+  // 用户要求「占据一半屏幕」：实测不少于首屏的 45%，也不超过整屏（否则会把下面分区挤出首屏）。
+  expect(box!.height).toBeGreaterThanOrEqual(800 * 0.45)
+  expect(box!.height).toBeLessThanOrEqual(800)
+
+  const heroAnimation = await page.locator('.hero').evaluate(el => getComputedStyle(el).animationName)
+  expect(heroAnimation, 'AI 展示区的渐变动效应生效').not.toBe('none')
+  const orbAnimation = await page.locator('.orb--1').evaluate(el => getComputedStyle(el).animationName)
+  // scoped 样式会给关键帧名加哈希后缀（floatY-xxxxxxxx），只断言前缀。
+  expect(orbAnimation, '漂浮光斑动效应生效').toContain('floatY')
+})
+
 test('未登录访问 /portal 回到登录页并记住回跳地址', async ({ page }) => {
   await installApiStubs(page, { authenticated: false })
   await page.goto('/portal')

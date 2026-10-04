@@ -68,19 +68,30 @@ onMounted(() => void load())
 <template>
   <main class="portal-home">
     <section class="hero">
+      <div class="hero-bg" aria-hidden="true">
+        <span class="orb orb--1"></span>
+        <span class="orb orb--2"></span>
+        <span class="grid"></span>
+      </div>
       <div class="hero-copy">
         <p class="eyebrow">健康资讯</p>
         <h1>病理诊断科普助手</h1>
-        <p class="capability">
-          健康科普、医学资料辅助解释与就医方向梳理。不作确诊、不开处方，也不能替代医生面诊。
-        </p>
+        <ul class="chips">
+          <li>健康科普</li>
+          <li>医学资料辅助解释</li>
+          <li>就医方向梳理</li>
+        </ul>
+        <p class="capability">不作确诊、不开处方，也不能替代医生面诊。</p>
         <div class="hero-actions">
           <button class="primary" @click="start()">与 AI 对话 <el-icon><ArrowRight /></el-icon></button>
           <!-- 仓库目前没有可验证的 Windows 安装包：宁可明确说没有，也不跳假链接。 -->
           <button class="ghost" disabled aria-disabled="true" title="暂未提供安装包">下载 Windows 版（暂未提供）</button>
         </div>
       </div>
-      <div class="hero-art" aria-hidden="true"><span>✦</span></div>
+      <div class="hero-art" aria-hidden="true">
+        <span class="ring"></span>
+        <span class="star">✦</span>
+      </div>
     </section>
 
     <div class="columns">
@@ -157,18 +168,32 @@ onMounted(() => void load())
 
 <style scoped>
 .portal-home { display: flex; flex: 1; flex-direction: column; width: 100%; padding: 18px clamp(14px, 2.5vw, 36px) 30px; }
-.hero { position: relative; display: flex; justify-content: space-between; gap: 24px; padding: clamp(24px, 4vw, 34px) clamp(20px, 4vw, 44px); overflow: hidden; border: 1px solid #dfeaf4; border-radius: 20px; background: linear-gradient(120deg, #f4f9fd 0%, #eaf4fc 62%, #e2f0fa 100%); }
-.hero::after { content: ''; position: absolute; width: 260px; height: 260px; right: -70px; top: -108px; border-radius: 50%; border: 38px solid rgb(255 255 255 / 35%); }
+/* AI 展示区：约占桌面首屏一半（min-height: 50vh），动效全部是纯 CSS 装饰，
+   放在 overflow: hidden 的容器里，不会制造横向溢出；降低动态效果偏好下会静止。 */
+.hero { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 50vh; padding: clamp(24px, 4vw, 40px) clamp(20px, 4vw, 44px); overflow: hidden; border: 1px solid #dfeaf4; border-radius: 20px; background: linear-gradient(120deg, #f4f9fd 0%, #eaf4fc 40%, #e6f2fb 60%, #f6fbff 100%); background-size: 220% 220%; animation: heroShift 24s ease-in-out infinite alternate; }
+.hero-bg { position: absolute; inset: 0; z-index: 0; }
+.orb { position: absolute; border-radius: 50%; filter: blur(2px); opacity: .55; }
+.orb--1 { width: clamp(180px, 24vw, 300px); height: clamp(180px, 24vw, 300px); right: -60px; top: -90px; background: radial-gradient(circle at 30% 30%, rgb(255 255 255 / 85%), rgb(180 214 240 / 35%)); animation: floatY 9s ease-in-out infinite; }
+.orb--2 { width: clamp(120px, 16vw, 200px); height: clamp(120px, 16vw, 200px); right: 22%; bottom: -80px; background: radial-gradient(circle at 40% 40%, rgb(214 236 250 / 75%), rgb(160 205 236 / 25%)); animation: floatY 12s ease-in-out infinite reverse; }
+.grid { position: absolute; inset: 0; background-image: linear-gradient(rgb(90 150 200 / 7%) 1px, transparent 1px), linear-gradient(90deg, rgb(90 150 200 / 7%) 1px, transparent 1px); background-size: 34px 34px; mask-image: radial-gradient(circle at 25% 40%, #000 0%, transparent 72%); }
 .eyebrow { margin: 0 0 10px; color: #367cb5; font-size: 12px; letter-spacing: 2px; }
-h1 { margin: 0; color: #24445f; font-size: clamp(22px, 3vw, 28px); font-weight: 650; }
+h1 { margin: 0; color: #24445f; font-size: clamp(24px, 3.4vw, 34px); font-weight: 650; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 0; padding: 0; list-style: none; }
+.chips li { padding: 5px 12px; border: 1px solid rgb(140 190 228 / 55%); border-radius: 999px; background: rgb(255 255 255 / 62%); color: #33729f; font-size: 12px; }
 .capability { max-width: 620px; margin: 14px 0 22px; color: #688095; font-size: 14px; line-height: 1.9; }
 .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 .primary, .ghost { display: inline-flex; align-items: center; gap: 9px; padding: 11px 19px; border-radius: 10px; font-size: 13px; cursor: pointer; }
 .primary { border: 0; background: #237ac2; color: #fff; box-shadow: 0 7px 18px rgb(35 122 194 / 18%); }
 .primary:hover { background: #176eaf; }
 .ghost { border: 1px dashed #b9cbdb; background: rgb(255 255 255 / 72%); color: #7d8fa0; cursor: not-allowed; }
-.hero-art { z-index: 1; display: grid; place-items: center; flex: 0 0 126px; }
-.hero-art span { display: grid; place-items: center; width: 88px; height: 88px; border-radius: 24px; background: rgb(255 255 255 / 65%); color: #2a7fc3; font-size: 42px; }
+.hero-copy { position: relative; z-index: 2; display: flex; flex-direction: column; justify-content: center; }
+.hero-art { position: relative; z-index: 2; display: grid; place-items: center; flex: 0 0 148px; height: 148px; }
+.ring { position: absolute; inset: 0; border-radius: 50%; border: 2px dashed rgb(120 180 224 / 65%); animation: spin 26s linear infinite; }
+.star { display: grid; place-items: center; width: 92px; height: 92px; border-radius: 26px; background: rgb(255 255 255 / 72%); color: #2a7fc3; font-size: 44px; box-shadow: 0 12px 30px rgb(58 128 186 / 16%); animation: pulse 5.5s ease-in-out infinite; }
+@keyframes heroShift { from { background-position: 0% 50%; } to { background-position: 100% 50%; } }
+@keyframes floatY { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-16px); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
 .columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 340px); gap: 18px; flex: 1; min-height: 0; margin-top: 18px; }
 .news, .rail-card { border: 1px solid #e6edf3; border-radius: 16px; background: #fff; }
 .news { display: flex; flex-direction: column; padding: 22px 26px 26px; }
@@ -206,13 +231,18 @@ button:focus-visible, a:focus-visible { outline: 2px solid #398ad0; outline-offs
 
 /* 独立门户不受 ADR-011 约束：窄屏改纵向排列，不留横向滚动。 */
 @media (max-width: 900px) {
-  .hero { flex-direction: column; }
+  .hero { flex-direction: column; align-items: flex-start; min-height: 46vh; }
   .hero-art { display: none; }
   .columns { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 480px) {
+  .hero { min-height: auto; }
   .hero-actions { flex-direction: column; align-items: stretch; }
   .primary, .ghost { justify-content: center; }
   .tabs button { flex: 1 1 auto; }
+}
+/* 用户可能有「降低动态效果」偏好：装饰动画全部静止，内容照常显示。 */
+@media (prefers-reduced-motion: reduce) {
+  .hero, .orb, .ring, .star { animation: none; }
 }
 </style>

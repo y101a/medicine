@@ -66,6 +66,19 @@ describe('独立资讯门户（/portal，F1 页面框架）', () => {
     expect(wrapper.text()).toContain('小贴士尚未接入来源')
   })
 
+  it('AI 展示区保留规格要求的能力说明与两个按钮', async () => {
+    const { wrapper } = await setup()
+
+    expect(wrapper.text()).toContain('病理诊断科普助手')
+    // 规格 §1：能力介绍只说现有能力，不宣传确诊、处方或替代医生。
+    for (const word of ['健康科普', '医学资料辅助解释', '就医方向梳理']) {
+      expect(wrapper.text()).toContain(word)
+    }
+    expect(wrapper.text()).toContain('不作确诊')
+    expect(wrapper.find('.hero .primary').exists()).toBe(true)
+    expect(wrapper.find('.hero .ghost').exists()).toBe(true)
+  })
+
   it('四个分区可切换，并按分类请求资讯', async () => {
     const { wrapper } = await setup()
     expect(newsApi.page).toHaveBeenCalledWith('all')
