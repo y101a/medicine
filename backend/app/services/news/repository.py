@@ -46,15 +46,27 @@ async def _find_by_url(db: AsyncSession, *, source_id: str, url: str) -> NewsIte
     return result.scalar_one_or_none()
 
 
-async def _find_by_fingerprint(
-    db: AsyncSession, *, source_id: str, fingerprint: str
+async def _find_syndicated_twin(
+    db: AsyncSession,
+    *,
+    source_id: str,
+    fingerprint: str,
+    published_at: datetime | None,
 ) -> NewsItem | None:
-    result = await db.execute(
-        select(NewsItem)
-        .where(NewsItem.source_id == source_id, NewsItem.fingerprint == fingerprint)
-        .order_by(NewsItem.first_seen_at)
-        .limit(1)
+    """判定「同文多 URL」：标题指纹相同**且发布时间一致（或都为空）**才算同一条。
+
+    实测依据（2026-10-04）：WHO 疾病暴发新闻对同一疫情的多期更新
+    （DON614–DON618）**共用完全相同的标题**，只有 URL 与发布时间不同。
+    只按标题指纹合并会把 5 期更新压成 1 条，所以必须再加「发布时间一致」这一条件。
+    """
+    query = select(NewsItem).where(
+        NewsItem.source_id == source_id, NewsItem.fingerprint == fingerprint
     )
+    if published_at is None:
+        query = query.where(NewsItem.published_at.is_(None))
+    else:
+        query = query.where(NewsItem.published_at == published_at)
+    result = await db.execute(query.order_by(NewsItem.first_seen_at).limit(1))
     return result.scalar_one_or_none()
 
 
@@ -111,8 +123,13 @@ async def upsert_entries(
             outcome.refreshed += 1
             continue
 
-        twin = await _find_by_fingerprint(
-            db, source_id=source.id, fingerprint=str(payload["fingerprint"])
+        twin = await _find_syndicated_twin(
+            db,
+            source_id=source.id,
+            fingerprint=str(payload["fingerprint"]),
+            published_at=payload["published_at"]
+            if isinstance(payload["published_at"], datetime)
+            else None,
         )
         if twin is not None:
             # 同文多 URL：只保留先到的那条，避免同一篇内容刷屏。

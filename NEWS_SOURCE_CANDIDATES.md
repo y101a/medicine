@@ -34,9 +34,20 @@
 | 目标 | 实测结果 | 时间 |
 | --- | --- | --- |
 | `https://www.who.int/rss-feeds` | HTTP **404**（该路径已不存在） | 2026-10-04 |
+| `https://www.who.int/api/news/diseaseoutbreaknews?$top=5&$orderby=PublicationDateAndTime desc` | HTTP **200** `application/json`，5 条；字段 `Title`、`UrlName`/`ItemDefaultUrl`、`PublicationDateAndTime` | 2026-10-04 |
+| `https://www.who.int/emergencies/disease-outbreak-news/item/2026-DON618` | HTTP **200**（条目 URL 模式确认） | 2026-10-04 |
+| `https://www.nmpa.gov.cn/robots.txt` | HTTP **403** | 2026-10-04 |
+| `https://www.nmpa.gov.cn/xxgk/ggtg/index.html` | HTTP **200** `text/html`（页面可读，但 robots 403 表示不希望被自动访问） | 2026-10-04 |
+| `https://www.chinacdc.cn/robots.txt` | HTTP **404** | 2026-10-04 |
+| `https://www.chinacdc.cn/jkzt/` | HTTP **404**（路径已变更） | 2026-10-04 |
 | `https://www.nhc.gov.cn/robots.txt` | HTTP **404**（nginx 直接 404） | 2026-10-04 |
 | nhc.gov.cn 栏目页 | 此前探测 HTTP 412（**需复测**） | 更早一轮 |
 | 中国疾控中心主站 / WHO 中文页 / sport.gov.cn | 此前探测：未开 / 未开 / 403（**需复测**） | 更早一轮 |
+
+**重要发现（2026-10-04 单源试跑）**：WHO 对**同一疫情的多期更新共用完全相同的标题**
+（实测 DON614–DON618 五条标题逐字相同，仅 URL 与发布时间不同）。因此
+「按标题指纹处理同文多 URL」的规则必须加上**发布时间一致**这一条件，否则 5 期更新会被压成 1 条。
+代码已按此修正（`repository._find_syndicated_twin`），并有回归测试。
 
 注意：**没有 robots.txt 不等于允许抓取**，HTTP 403/412 通常意味着站点不希望被自动访问。
 两者都不能代替许可判断。
@@ -78,3 +89,34 @@
 
 前端 `/portal` 已按契约实现 `sources_not_connected` / `empty` / `ready` / `partial` / `stale` / `failed` 的空态与标记；
 **没有来源时显示「新闻源尚未接入」是正确的交付状态**，不属于缺陷。真正的 F2/F3 展示（来源级状态、分页）等数据层接通后再做。
+
+## 7. 如何启用并试跑（运营命令，前台运行）
+
+```powershell
+cd backend
+$py = ".venv\Scripts\python.exe"
+& $py -m app.news_cli --catalog                        # 候选来源与「不可自动读取」的原因
+& $py -m app.news_cli --list                           # 库内来源与状态
+& $py -m app.news_cli --enable <source_id> --license-note "谁/何时/核对了什么"
+& $py -m app.news_cli --refresh --source <source_id> --limit 5   # 真实抓取（会访问外网）
+& $py -m app.news_cli --items disease                  # 看门户此刻会展示什么
+& $py -m app.news_cli --disable <source_id>            # 停用并移除其条目
+& $py -m app.news_cli --delete-source <source_id>      # 彻底删除来源行
+& $py -m app.news_cli --purge-runs                     # 清除刷新运行记录
+```
+
+CLI 是**前台进程**，跑完即退出：不注册计划任务、不装服务、不留自启动。
+
+**重要**：本仓库后端测试与开发库**共用同一个数据库**，而空态测试要求 `news_sources` 为空。
+一旦启用来源并写入条目，`tests/test_news*.py` 会有若干条断言失败（它们断言「未接入」）。
+要跑测试基线，先 `--disable` 或 `--delete-source`。这属于测试隔离问题（建议后续让资讯表在测试里隔离），
+不是功能缺陷。
+
+## 8. 当前实现状态（2026-10-04）
+
+- **N1 数据层**已完成：三表 + 迁移 `20261004_0029`、校验/SSRF/去重/过期/撤回、`GET /api/v1/news` 读最近成功快照。
+- **N2 单源链路**已完成：抓取层（连接时重做 SSRF 校验、逐跳校验重定向、限体积与类型）、WHO 适配器、
+  刷新器（受控错误码、失败不清空旧数据）、前台 CLI。**已对 WHO 单源真实试跑成功**（5 条，标题/链接/发布时间正确）；
+  试跑数据随后按清理命令撤回，开发库已回到「无来源」状态。
+- **未做**：N0 对 NMPA/中国疾控的许可争取与栏目地址复核、N3「每日首次访问触发」、前端 F2（状态文案/分页/来源级展示）、
+  来源摘要与中文呈现（当前只显示原题，WHO 内容为英文）。
