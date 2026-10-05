@@ -256,9 +256,13 @@ npm run e2e                                                  # 期望 39 passed�
 | 2026-09-27 | DSH | `backend/docs/DOCUMENT_GENERATION.md`、`backend/scripts/**`（**仅提醒，DSH 不动后端**） | ①**延续 2026-09-25 禁令**：文档生成 worker（`app/document_generation_cli.py`）**不得**在本机写任何自启动——不注册计划任务/服务/Run 键，`backend/scripts/**` 里也不要有注册命令；文档只写「由用户或项目显式启动」，生产环境交服务管理器托管。DSH 本轮已复查本机：**无任何指向本项目的计划任务或服务**（只有无关的 `XRiteColorAssistantStartup` 与系统内置项）。②请在后端落地时确认三处细节，前端已按此打桩：会话列表返回 `{items:[…]}`（**没有 `hasMore`**，与 `GET /consultations` 不同）、单任务查询**不推进** worker（前端 2→5 秒轮询只读状态）、下载响应的 `Content-Disposition` 文件名与前端固定名 `AI医学科普-YYYYMMDD.docx\|.pptx` **逐字一致**（前端自己就按这个格式命名，两边不一致会出现两个名字）。 | 待 Codex 确认 |
 | 2026-09-27 | DSH | `backend/app/{schemas,services,api/routes}`（`users`、`phone_verification` 相关）、`backend/tests/test_{profile,phone_verification}.py`（**协调通报：经用户明确指定，DSH 本轮临时接手这项后端改动**） | 用户要求「设置页能改用户名、能换绑手机号，换号仍走现在的模拟验证码」。改动面：`PATCH /users/me` 增 `username`/`currentPassword`（改登录名验密码，409 `USERNAME_EXISTS`）；新增 `POST /users/me/phone-verification/change-code` 与 `.../change`（复用 `phone_binding` 用途 + 指纹区分新旧号，**不新建迁移、不动表结构**）。**不碰你正在写的 `document_generation*` / `generated_document*` / `image_generation*` 与 `20260927_0024`、`20260927_0025`**；只跑后端专项 pytest（测试在事务内回滚，不改开发库数据）。若与你的改动冲突或你想自己接，请在 §6/7.2 说一声，我立刻让出。 | 待 Codex 知晓 |
 
+| 2026-10-05 | DSH | 请求新增 `backend/app/api/routes/news.py` 的 `POST /api/v1/news/refresh`（**前端「重试」缺它**） | 现状：只有「当天首次访问自动跑一轮」（`daily_auto_refresh` + `update_day` 租约），用户手工点重试时重复 GET **不会**强制新一轮，所以当天失败的来源用户无法重试。**契约草案（前端按此打桩，若有偏离请写明偏差点）**：`POST /api/v1/news/refresh`，`CurrentUser`，无请求体；响应 `202 {"accepted": bool, "reason": "started" / "already_ran_today" / "busy" / "disabled", "nextRefreshAt": "…Z" 或 null}`；同一更新日已跑过 → `accepted=false` + `already_ran_today`（**不伪造新一轮**）；沿用现有租约与后台任务，**不等待抓取完成**；服务端限流；复用受控错误码；**不加任何自启动**。前端在接口落地前**只保留禁用的按钮位**，文案「下次自动更新 {时间}」，不实现假重试。详见 `frontend/PORTAL_NEWS_FRONTEND_PLAN.md` §3。 | 待 Codex 确认 |
+
 ## 7. 看板
 
 ### 7.1 进行中（开工前先看这里；开工时在此登记，收工释放）
+
+2026-10-05 DSH：**门户新闻前端 F-P1/F-P2/F-P5 已完成并提交**（F-P3 经核已有「正在读取资讯…」加载态与失败重试，无需改动）——分页「加载更多」、来源明细「最后成功」时间、三个分页单测与一条分页 e2e、验收文档同步；涉及 `frontend/src/api/news.ts`、`frontend/src/views/PortalView.vue`、`frontend/src/views/portal.test.ts`、`frontend/e2e/portal.spec.ts`、`frontend/BROWSER_ACCEPTANCE.md`、`frontend/PORTAL_NEWS_FRONTEND_PLAN.md`、`COORDINATION.md`；**无迁移、不占用数据库、不联网、不动 `backend/**`**。入口位置已获用户确认：加载更多在列表下方随内容流，重试在来源状态行内（重试接口未落地前不给假按钮）。
 
 2026-10-05 DSH：接手 Codex 交还的门户前端改动（中文译题展示 + 分区来源过滤 + 竞态守卫），已亲自验收并提交；**前端已无在途占用**。**补记**：本轮先动手后登记，按 `AGENTS.md`「漏登记要补记」如实补上。
 
@@ -270,6 +274,11 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 执行者 | 任务 | 正在改的文件 | 迁移编号 | 占用数据库 | 开始时间 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
+| Codex | 后端专区新闻来源扩展、分类与刷新验收（用户已允许联网核验） | `backend/app/services/news/{catalog.py,adapters.py,refresh.py,repository.py}`、`backend/tests/test_news*.py`、`backend/docs/NEWS_SOURCE_EXPANSION.md`、`backend/docs/API.md`、`COORDINATION.md` | 无（如需迁移另行登记） | 是（回滚型测试） | 2026-10-05 | 进行中 |
+| Codex | 核对数据库状态并完成新闻专项及后端全量验收 | `COORDINATION.md`（仅协作记录）；测试读取 `backend/` | 无 | 是（回滚型测试） | 2026-10-05 | 已释放（容器原已健康；17 passed；全量 599 passed、1 skipped；补记：先核对后登记） |
+| Codex | 修复独立后端测试环境并验收新闻专区过滤 | `backend/pyproject.toml`、`backend/.gitignore`、`backend/tests/test_news_relevance.py`、`backend/.venv-codex/`（忽略）、`COORDINATION.md` | 无 | 否 | 2026-10-05 | 已释放（离线 2 passed；数据库不可达，集成测试待跑；补记：先创建环境后登记） |
+| Codex | 后端新闻专区相关性过滤：收紧 WHO 综合新闻稿归类并回归测试 | `backend/app/services/news/adapters.py`、`backend/app/services/news/catalog.py`、`backend/tests/test_news_refresh.py`、`backend/docs/NEWS_SOURCE_EXPANSION.md`、`COORDINATION.md` | 无 | 否 | 2026-10-05 | 已释放（Ruff 通过；Python 环境缺失，pytest 未运行） |
+| Codex | 只做后端：核验可读中文来源并实现营养与健康所新闻列表候选适配 | `backend/app/services/news/{catalog.py,adapters.py}`、`backend/tests/test_news_refresh.py`、`backend/docs/NEWS_SOURCE_EXPANSION.md`、`COORDINATION.md` | 无 | 否 | 2026-10-05 | 已释放（596 passed；候选源未启用） |
 | Codex（前端子 agent） | 中文新闻分区空态、来源状态及验收 | `frontend/src/api/news.ts`、`frontend/src/views/PortalView.vue`、`frontend/src/views/portal.test.ts`、`frontend/e2e/portal.spec.ts` | 无 | 否 | 2026-10-05 | 已释放（交还 DSH；测试通过） |
 | Codex（后端子 agent + 主代理验收） | 中文官方新闻来源核验、来源分类契约 | `backend/app/services/news/repository.py`、`backend/app/schemas/news.py`、`backend/app/api/routes/news.py`、`backend/tests/test_news.py`、`backend/docs/{API.md,NEWS_SOURCE_EXPANSION.md}` | 无 | 否 | 2026-10-05 | 已释放（测试通过；新来源仍待准入） |
 | Codex | 用户授权临时补前端新闻中文译题展示 | `frontend/src/api/news.ts`、`frontend/src/views/PortalView.vue`、`frontend/src/views/portal.test.ts`、`COORDINATION.md` | 无 | 否 | 2026-10-05 | 已释放（交还 DSH；测试通过） |
@@ -379,6 +388,36 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
   局限：**只测前端，接口是桩**，不能替代真实后端联调。需要人眼看的清单见 `frontend/BROWSER_ACCEPTANCE.md`。
 
 ### 7.2 工作报告（最新在最上）
+
+### 2026-10-05 DSH 门户新闻前端 F-P1/F-P2 与验收（用户确认入口位置后开工）
+
+- 改动：`frontend/src/api/news.ts` 的 `page()` 支持 `{limit, offset}`（默认仍是 20/0，与后端一致）；`frontend/src/views/PortalView.vue` 首屏固定一页 20 条，新增「加载更多」（按 `offset=已加载条数` 续取、按 `id` 去重、到底显示「已显示全部 N 条」、失败只提示且保留已加载条目、切分区回到第一页），来源状态行补「最后成功 {时间}」（无记录时明说「无成功记录」）；`portal.test.ts` +3 项、`e2e/portal.spec.ts` +1 项；`BROWSER_ACCEPTANCE.md` 第 19 行同步新入口与几何断言（标题行的「真实新闻未接入」也已按现状更正）。
+- 验证（本人实跑）：门户单测 **24 passed**；前端全量 **342 passed / 29 files**（上一轮 339，+3）；门户 Playwright **12 passed**（上一轮 11，+1）；`npm run build`（含 `vue-tsc`）**exit 0**。e2e 首跑失败一次是我把断言写成 `offset=20`，实测请求是 `offset=1`（offset 取已加载条数，首屏只有 1 条）——断言错、不是实现错，已改正。
+- 边界：**F-P3 不必做**（模板里已有排在空态之前的 `v-if="loading"` 加载态与失败重试按钮，本轮只确认、未改）；**F-P4「重试更新」未实现**——后端没有用户可触发的接口（契约草案在 §6），按用户确认的位置先不给假按钮，现在显示的是来源「最后成功」与整体「下次更新」时间；仍未做真实联调（等后端来源与译题）；养生/健身/药物三分区仍无来源；本轮未动 `backend/**` 与 Codex 在途文件。
+
+### 2026-10-05 Codex 数据库状态更正与后端全量验收
+
+- 改动：只读检查项目 Compose，确认 PostgreSQL 容器此前已 `healthy`，无需启动；未改业务代码、前端或数据库配置。
+- 验证：在可访问本机数据库的测试环境中，新闻刷新专项 17 passed；后端全量 599 passed、1 skipped。
+- 边界：上一条报告的 `127.0.0.1:5432` 不可达是受限环境的端口访问结果，不代表容器未运行；现已纠正。新专区来源尚未接入，需先核验稳定入口、使用条件和栏目相关性。未提交或推送。
+
+### 2026-10-05 Codex 后端测试环境与离线验收
+
+- 改动：用户授权重建并联网安装依赖。旧 `.venv` 清理因访问拒绝失败；保留原目录，另建并忽略 `backend/.venv-codex/`，用 Python 3.12 安装 `.[dev]`。Windows 项目依赖补 `tzdata`，使 `ZoneInfo("Asia/Shanghai")` 可用；增加无数据库的新闻专区筛选测试。未动前端。
+- 验证：离线新闻相关性测试 2 passed；Ruff 通过；时区加载通过。
+- 边界：原 `backend/.venv` 的清理失败后未继续使用，当前完整测试须使用 `.venv-codex`。`127.0.0.1:5432` 不可达，新闻刷新测试夹具依赖 PostgreSQL，集成及全量测试未通过；未擅自启动 Docker。未接入新的专区来源、未提交或推送。
+
+### 2026-10-05 Codex 后端新闻专区相关性过滤
+
+- 改动：WHO 综合新闻稿只保留原标题明显涉及疾病、传染病或免疫接种的条目；专用疾病暴发来源不变。增加“行政任命不入疾病专区”的离线回归测试及文档说明；未动前端。
+- 验证：`backend/.venv/Scripts/ruff.exe check` 通过。`pytest` 无法启动：现有虚拟环境指向已不存在的 `D:\developTools\miniConda\python.exe`，`py -0p` 显示无可用 Python；本轮没有安装或修改环境。
+- 边界：已入库的旧综合稿不在本轮删除，会按原展示期限自然过期。标题规则可能漏掉相关但未出现明确术语的稿件；中文候选来源仍未启用，栏目覆盖没有扩大。未提交或推送。
+
+### 2026-10-05 Codex 后端中文来源候选适配
+
+- 改动：仅在后端加入中国疾控中心营养与健康所健康科普列表的候选来源和受限 HTML 解析器；仅提取同域文章标题、日期与链接，按标题粗分养生/健身。来源仍在 `PENDING_SOURCES`，未进入正式 `CATALOG`，未写入新闻库。前端未改。
+- 验证：Ruff 全绿；新闻刷新专项 16 passed；后端全量 596 passed、1 skipped。
+- 边界：浏览器式请求可读该列表，但项目 `httpx` 请求返回 445，且内容复用授权不明确；所以不能作为每日自动更新源。当前正式新闻内容和栏目覆盖没有因此变化。未提交或推送。
 
 ### 2026-10-05 DSH 接手门户前端：中文译题展示 + 分区来源过滤（Codex 交还）
 

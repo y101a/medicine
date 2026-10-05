@@ -70,7 +70,18 @@ export interface NewsPage {
 }
 
 export const newsApi = {
-  async page(category: NewsCategory = 'all') {
-    return (await http.get<NewsPage>('/news', { params: { category } })).data
+  /**
+   * 分页读取：接口 `limit` 上限 50、`offset` 上限 10000，默认 20/0 与后端一致。
+   * 追加式加载由调用方传 `offset`，并按 `id` 去重（翻页期间若有新条目插入会错位）。
+   */
+  async page(
+    category: NewsCategory = 'all',
+    options: { limit?: number; offset?: number } = {},
+  ) {
+    return (
+      await http.get<NewsPage>('/news', {
+        params: { category, limit: options.limit, offset: options.offset },
+      })
+    ).data
   },
 }

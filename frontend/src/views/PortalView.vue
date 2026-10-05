@@ -46,6 +46,12 @@ const sourceStatuses = ref<NewsSourceStatusEntry[]>([])
 const sourceCoverageKnown = ref(false)
 /** N3：当天首次访问触发的一轮自动刷新是否正在进行。 */
 const refreshing = ref(false)
+/** F-P1 分页：首屏一页 20 条（与后端默认一致），「加载更多」按 offset 追加。 */
+const PAGE_SIZE = 20
+const total = ref(0)
+const hasMore = ref(false)
+const loadingMore = ref(false)
+const loadMoreError = ref('')
 let latestRequest = 0
 
 /** 同题多期折成一组：WHO 同一疫情的多期更新标题逐字相同，直接平铺会像重复条目。 */
@@ -90,8 +96,9 @@ async function load(category: NewsCategory = active.value) {
   active.value = category
   loading.value = true
   error.value = ''
+  loadMoreError.value = ''
   try {
-    const page = await newsApi.page(category)
+    const page = await newsApi.page(category, { limit: PAGE_SIZE, offset: 0 })
     if (request !== latestRequest) return
     status.value = page.status
     items.value = page.items
@@ -101,6 +108,8 @@ async function load(category: NewsCategory = active.value) {
     sourceStatuses.value = page.sourceStatuses ?? []
     sourceCoverageKnown.value = !!page.sourceStatuses?.length && page.sourceStatuses.every(entry => Array.isArray(entry.categories))
     refreshing.value = page.refreshing ?? false
+    total.value = page.total ?? page.items.length
+    hasMore.value = page.hasMore ?? (page.items.length < total.value)
   } catch (e) {
     if (request !== latestRequest) return
     // 失败时清空列表：上一个分类的条目留着会被当成当前分类的资讯。
@@ -112,9 +121,33 @@ async function load(category: NewsCategory = active.value) {
     sourceStatuses.value = []
     sourceCoverageKnown.value = false
     refreshing.value = false
+    total.value = 0
+    hasMore.value = false
     error.value = getApiErrorMessage(e)
   } finally {
     if (request === latestRequest) loading.value = false
+  }
+}
+
+/** F-P1：追加下一页。按 id 去重（翻页期间插入新条目会错位），失败保留已加载条目。 */
+async function loadMore() {
+  if (loadingMore.value || !hasMore.value) return
+  const request = latestRequest
+  loadingMore.value = true
+  loadMoreError.value = ''
+  try {
+    const page = await newsApi.page(active.value, { limit: PAGE_SIZE, offset: items.value.length })
+    if (request !== latestRequest) return
+    const seen = new Set(items.value.map(item => item.id))
+    items.value = [...items.value, ...page.items.filter(item => !seen.has(item.id))]
+    total.value = page.total ?? total.value
+    hasMore.value = page.hasMore ?? (items.value.length < total.value)
+  } catch (e) {
+    if (request !== latestRequest) return
+    // 加载更多失败只提示这一次没取到，已展示的条目不动。
+    loadMoreError.value = getApiErrorMessage(e)
+  } finally {
+    if (request === latestRequest) loadingMore.value = false
   }
 }
 
@@ -186,6 +219,7 @@ onMounted(() => void load())
           <li v-for="entry in visibleSourceStatuses" :key="entry.id">
             <span class="dot" :class="`dot--${entry.status}`" aria-hidden="true"></span>
             {{ entry.name }}：{{ sourceStatusText(entry.status) }}
+            <span class="muted">最后成功 {{ entry.lastSuccessAt ? formatTime(entry.lastSuccessAt, '时间未记录') : '无成功记录' }}</span>
             <span v-if="entry.lastErrorCode" class="muted">（{{ entry.lastErrorCode }}）</span>
           </li>
         </ul>
@@ -259,6 +293,16 @@ onMounted(() => void load())
             </details>
           </li>
         </ul>
+
+        <div v-if="items.length" class="load-more">
+          <button v-if="hasMore" type="button" :disabled="loadingMore" @click="loadMore()">
+            {{ loadingMore ? '正在加载…' : `加载更多（已显示 ${items.length} / ${total} 条）` }}
+          </button>
+          <p v-else class="muted">已显示全部 {{ total }} 条</p>
+          <p v-if="loadMoreError" class="state state--error" role="status">
+            {{ loadMoreError }} <button class="retry" @click="loadMore()">重试</button>
+          </p>
+        </div>
       </section>
 
       <aside class="rail">
@@ -361,6 +405,12 @@ h1 { margin: 0; color: #24445f; font-size: clamp(24px, 3.4vw, 34px); font-weight
 .card-meta { margin: 7px 0 0; color: #98a7b4; font-size: 10px; }
 .cards a { display: inline-block; margin-top: 7px; color: #367fae; font-size: 11px; text-decoration: none; }
 .cards a:hover { text-decoration: underline; }
+/* F-P1：加载更多按钮随内容流放在列表下方（入口位置经用户 2026-10-05 确认）。 */
+.load-more { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 0 2px; }
+.load-more button { padding: 8px 18px; border: 1px solid #bcd8ee; border-radius: 10px; background: #f4f9fd; color: #2f6f9f; font-size: 12px; cursor: pointer; }
+.load-more button:hover:enabled { background: #e7f3fc; }
+.load-more button:disabled { color: #9aa9b6; cursor: default; }
+.load-more .muted { margin: 0; }
 .rail { display: grid; gap: 16px; align-content: start; }
 .rail-card { padding: 18px 18px 20px; }
 .rail-card h2 { margin: 0 0 12px; color: #3d566d; font-size: 14px; font-weight: 650; }

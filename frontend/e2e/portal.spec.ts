@@ -272,3 +272,51 @@ test('切换到无来源分区时显示未接入，而非误称今天无新闻',
   const report = await measureOverflow(page)
   expect(report.overflow, describeOverflow(report, '/portal', 375)).toBeLessThanOrEqual(1)
 })
+
+test('F-P1：加载更多按 offset 追加第二页，375px 不溢出', async ({ page }) => {
+  await installApiStubs(page, { authenticated: true, extra: { 'GET /news': { body: NEWS_READY } } })
+  // installApiStubs 之后注册的 route 先生效：用计数器把第一页/第二页给成不同内容。
+  const requested: string[] = []
+  let calls = 0
+  await page.route('**/api/v1/news**', route => {
+    calls += 1
+    requested.push(route.request().url())
+    const make = (id: string, title: string, slug: string) => ({
+      id,
+      category: 'disease',
+      title,
+      summary: null,
+      sourceName: 'WHO',
+      canonicalUrl: `https://www.who.int/news/item/${slug}`,
+      publishedAt: null,
+      retrievedAt: '2026-10-04T16:04:47Z',
+      medicalReviewed: false,
+    })
+    return route.fulfill({
+      json: {
+        category: 'disease',
+        status: 'ready',
+        asOf: null,
+        items: calls === 1 ? [make('one', '第一条', 'one')] : [make('two', '第二条', 'two')],
+        tips: [],
+        total: 2,
+        hasMore: calls === 1,
+        sourceStatuses: [],
+      },
+    })
+  })
+  await page.setViewportSize({ width: 375, height: 720 })
+  await page.goto('/portal')
+  await waitForRendered(page, '.portal')
+
+  await expect(page.locator('.cards > li')).toHaveCount(1)
+  await page.locator('.load-more button').click()
+  await expect(page.locator('.cards > li')).toHaveCount(2)
+  await expect(page.locator('.load-more .muted')).toContainText('已显示全部 2 条')
+  // 第二次请求必须带 offset=已加载条数（这里首屏只有 1 条，所以是 1）、limit=20。
+  expect(requested[1]).toContain('offset=1')
+  expect(requested[1]).toContain('limit=20')
+  expect(requested[0]).toContain('offset=0')
+  const report = await measureOverflow(page)
+  expect(report.overflow, describeOverflow(report, '/portal', 375)).toBeLessThanOrEqual(1)
+})

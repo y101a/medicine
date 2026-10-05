@@ -120,11 +120,74 @@ describe('独立资讯门户（/portal，F1 页面框架）', () => {
     expect(wrapper.get('.card-more summary').text()).toContain('另有 1 期较早更新')
     expect(wrapper.get('.card-more a').attributes('href')).toContain('2026-DON617')
     expect(wrapper.get('.source-status').text()).toContain('WHO 疾病暴发新闻：正常')
+    // F-P2：来源明细给出「最后成功」时间，失败时给出受控错误码。
+    expect(wrapper.get('.source-status').text()).toContain('最后成功')
     expect(wrapper.get('.status-line').text()).toContain('最近更新')
     expect(wrapper.get('.cards .badge').text()).toBe('未经医学审核')
     // 标题必须可点进原文，不能只有右下角小字能点。
     expect(wrapper.get('.cards > li .card-title').attributes('href')).toBe(baseItem.canonicalUrl)
     expect(wrapper.get('.cards > li .card-title').attributes('target')).toBe('_blank')
+  })
+
+  it('F-P1：首屏一页 20 条，「加载更多」按 offset 追加并按 id 去重', async () => {
+    const firstPage = Array.from({ length: 20 }, (_, index) => ({
+      ...baseItem,
+      id: `p1-${index}`,
+      title: `第一页条目 ${index}`,
+    }))
+    const secondPage = [
+      { ...baseItem, id: 'p1-0', title: '第一页条目 0' },
+      { ...baseItem, id: 'p2-0', title: '第二页条目 0' },
+    ]
+    vi.mocked(newsApi.page)
+      .mockResolvedValueOnce({
+        category: 'all', status: 'ready', asOf: null, items: firstPage, tips: [], total: 21, hasMore: true,
+      })
+      .mockResolvedValueOnce({
+        category: 'all', status: 'ready', asOf: null, items: secondPage, tips: [], total: 21, hasMore: false,
+      })
+
+    const { wrapper } = await setup()
+    expect(newsApi.page).toHaveBeenNthCalledWith(1, 'all', { limit: 20, offset: 0 })
+    expect(wrapper.findAll('.cards > li')).toHaveLength(20)
+    expect(wrapper.get('.load-more button').text()).toContain('加载更多（已显示 20 / 21 条）')
+
+    await wrapper.get('.load-more button').trigger('click')
+    await flushPromises()
+
+    expect(newsApi.page).toHaveBeenNthCalledWith(2, 'all', { limit: 20, offset: 20 })
+    // 21 条：重复的 p1-0 被丢掉，只追加真正的新条目。
+    expect(wrapper.findAll('.cards > li')).toHaveLength(21)
+    expect(wrapper.get('.load-more .muted').text()).toContain('已显示全部 21 条')
+  })
+
+  it('F-P1：加载更多失败只提示，不清掉已加载的条目', async () => {
+    vi.mocked(newsApi.page)
+      .mockResolvedValueOnce({
+        category: 'all', status: 'ready', asOf: null,
+        items: [{ ...baseItem, id: 'a', title: '条目 A' }], tips: [], total: 2, hasMore: true,
+      })
+      .mockRejectedValueOnce(new Error('boom'))
+
+    const { wrapper } = await setup()
+    await wrapper.get('.load-more button').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findAll('.cards > li')).toHaveLength(1)
+    expect(wrapper.find('.load-more .state--error').exists()).toBe(true)
+    expect(wrapper.get('.load-more .state--error').text().length).toBeGreaterThan(0)
+  })
+
+  it('F-P1：切换分区回到第一页，不沿用上一次的 offset', async () => {
+    vi.mocked(newsApi.page).mockResolvedValue({
+      category: 'wellness', status: 'empty', asOf: null, items: [], tips: [], total: 0, hasMore: false,
+    })
+    const { wrapper } = await setup()
+    await wrapper.findAll('.category-tile')[1]!.trigger('click')
+    await flushPromises()
+
+    expect(newsApi.page).toHaveBeenLastCalledWith('wellness', { limit: 20, offset: 0 })
+    expect(wrapper.find('.cards').exists()).toBe(false)
   })
 
   it('有人工译题时显示中文、英文原题和核对标记', async () => {
@@ -294,7 +357,7 @@ describe('独立资讯门户（/portal，F1 页面框架）', () => {
 
   it('五个分区（含全部）平铺可切换，并按分类请求资讯', async () => {
     const { wrapper } = await setup()
-    expect(newsApi.page).toHaveBeenCalledWith('all')
+    expect(newsApi.page).toHaveBeenCalledWith('all', { limit: 20, offset: 0 })
 
     const tiles = wrapper.findAll('.category-tile')
     expect(tiles).toHaveLength(5)
@@ -313,14 +376,14 @@ describe('独立资讯门户（/portal，F1 页面框架）', () => {
     const wellness = tiles[1]
     await wellness.trigger('click')
     await flushPromises()
-    expect(newsApi.page).toHaveBeenLastCalledWith('wellness')
+    expect(newsApi.page).toHaveBeenLastCalledWith('wellness', { limit: 20, offset: 0 })
     expect(wellness.attributes('aria-selected')).toBe('true')
     expect(wrapper.get('.panel-head h2').text()).toBe('养生')
 
     const all = tiles[0]
     await all.trigger('click')
     await flushPromises()
-    expect(newsApi.page).toHaveBeenLastCalledWith('all')
+    expect(newsApi.page).toHaveBeenLastCalledWith('all', { limit: 20, offset: 0 })
     expect(all.attributes('aria-selected')).toBe('true')
     expect(wrapper.get('.panel-head h2').text()).toBe('全部')
   })
