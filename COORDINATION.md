@@ -172,6 +172,9 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 日期 | 提出方 | 目标文件 | 请求内容 | 状态 |
 | --- | --- | --- | --- | --- |
+| 2026-10-05 | Codex 更正交接 | `frontend/src/api/news.ts`、`frontend/src/views/PortalView.vue`、`frontend/src/views/portal.test.ts`、`frontend/e2e/portal.spec.ts` | 用户澄清原意是前端交给 DeepSeek、Codex 只负责后端。Codex 此前误解并已改上述前端文件：分区无来源空态、来源按分区显示和慢请求保护，测试通过。文件保留不回滚；此后 Codex 不再改前端，请 DeepSeek 在当前共享工作树接手并注意现有改动。后端 `sourceStatuses[].categories` 契约已完成。 | 待 DeepSeek 接手；Codex 前端占用已释放 |
+| 2026-10-05 | 用户授权 Codex 临时接手 | `frontend/src/api/news.ts`、`frontend/src/views/PortalView.vue`、`frontend/src/views/portal.test.ts` | 用户要求判断前端是否落后，若落后暂时由 Codex 实现；已核对 DSH 无活动占用。本轮仅补新闻中文译题契约和卡片显示，不调整布局或其他前端功能，完工后交还 DSH。 | 已完成并交还 DSH；验证见 §7.2 顶部 |
+| 2026-10-05 | Codex | `frontend/src/api/news.ts`、`frontend/src/views/PortalView.vue`、门户相关 Vitest/Playwright 与 `frontend/BROWSER_ACCEPTANCE.md` | 用户要求解决英文新闻：后端拟增加可空 `titleZh` 和 `titleZhSource=machine|manual`，`title` 始终是原题；请在 `titleZh` 非空时显示中文译题，旁边仍可见英文原题及原文链接，机器译题标“机器翻译·未经医学审核”，无译题时继续显示原题；不要把中文标题当医学审核，也不要自动生成摘要。后端迁移 `0030` 当前因 PostgreSQL 连接拒绝尚未应用，真实接口需等迁移。来源方面 ECDC 官方 RSS 已实测可读，但 `ecdc_news` 只在待启用目录，需门户补署名、CC BY 4.0 许可链接与译题改动标记后才可启用。Codex 不修改 DSH 前端。 | 待 DSH 认领；后端迁移待 DB 恢复 |
 | 2026-10-04 | Codex | `frontend/src/router/index.ts`、`frontend/src/views/LoginView.vue`、新独立资讯布局/视图及测试和 `BROWSER_ACCEPTANCE.md` | **用户已推翻原 `/app` 工作区首页方案并确认：同一 Vue 项目中的独立布局和路由。** 请按更新后的 `backend/docs/NEWS_PORTAL_IMPLEMENTATION.md` 实现顶层受保护 `/portal`，登录默认及已登录访问登录页均到 `/portal`，深链 `?redirect=` 优先；`/portal` 不挂 `WorkspaceLayout`、不显示 AI 工作区侧栏，桌面 AI 展示区约半屏，375px 纵向排列；“与 AI 对话”到 `/app/chat`。现有 `DashboardView.vue`（提交 `483edcc`）不得覆盖/删除，可保留为 `/app` 概览或安全迁移复用。现有 `GET /api/v1/news` 空状态契约不变；Windows 无安装包仍禁用，真实新闻最后接入。请补路由/登录/响应式 Vitest 与 Playwright，避免只用工作区 ADR-011 的窄屏提示代替门户适配。Codex 未改任何前端文件。 | 待 DSH 认领 |
 | 2026-10-04 | Codex | 前端 F1 首页框架（撤回临时接手） | 用户在后端框架交付后直接要求“好的开始实现”，我曾登记临时接手；随后发现 DSH 已于 16:57 开始写 `DashboardView.vue`、`src/api/news.ts`、`newsHome.test.ts`，故**未修改任何前端文件并立即让回 DSH 所有权**。当前聚焦测试 `newsHome.test.ts` 7 passed、`vue-tsc --noEmit` exit 0。请继续补前端构建 / e2e / `BROWSER_ACCEPTANCE.md`，并注意首屏 AI 展示区目前 `min-height:250px` 尚未达到“约半屏”；未来真实条目链接建议校验 HTTPS，分类请求需防止慢响应覆盖新分类。 | 已撤回；DSH 继续前端 |
 | 2026-10-04 | Codex | `frontend/src/router/index.ts`、`frontend/src/views/DashboardView.vue`（或新资讯首页视图）、`frontend/src/layouts/WorkspaceLayout.vue` 及前端测试 / 验收文档 | **请按用户新确认的顺序先做页面框架，最后才接真实新闻。**新版规格见 `backend/docs/NEWS_PORTAL_IMPLEMENTATION.md`；登录后默认 `/app` 改为健康资讯首页，保留深链和 `/app/chat`；桌面上半屏 AI 名称+小字能力简介+“与 AI 对话”（直达现有聊天）与“下载 Windows 版”（尚无安装包时明确不可下载）；下方四区养生/健身/疾病/药物、新闻列表空态、右侧小贴士位。Codex 已提供 `GET /api/v1/news?category=all|wellness|fitness|disease|medication`，未接源时返回 `sources_not_connected`、空 `items`/`tips`，不能写假今日新闻。请保持现有工作区/账号导航可达并补 1280/375 页面验收；旧 `NEWS_FEED_PLAN.md` 三栏及先采集顺序由新版规格覆盖，其安全边界保留。Codex 不直接改你的前端文件。 | 待 DSH 认领 |
@@ -257,6 +260,8 @@ npm run e2e                                                  # 期望 39 passed�
 
 ### 7.1 进行中（开工前先看这里；开工时在此登记，收工释放）
 
+2026-10-05 DSH：接手 Codex 交还的门户前端改动（中文译题展示 + 分区来源过滤 + 竞态守卫），已亲自验收并提交；**前端已无在途占用**。**补记**：本轮先动手后登记，按 `AGENTS.md`「漏登记要补记」如实补上。
+
 2026-10-04 Codex：新闻更新机制规划已完成，`backend/docs/NEWS_UPDATE_PLAN.md` 与协作记录占用已释放；无迁移、无数据库或外网操作。
 
 2026-10-01 Codex：本轮向量化与 hybrid 评测已完成，文件与数据库占用已释放；不改前端，无迁移。
@@ -265,6 +270,12 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 执行者 | 任务 | 正在改的文件 | 迁移编号 | 占用数据库 | 开始时间 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
+| Codex（前端子 agent） | 中文新闻分区空态、来源状态及验收 | `frontend/src/api/news.ts`、`frontend/src/views/PortalView.vue`、`frontend/src/views/portal.test.ts`、`frontend/e2e/portal.spec.ts` | 无 | 否 | 2026-10-05 | 已释放（交还 DSH；测试通过） |
+| Codex（后端子 agent + 主代理验收） | 中文官方新闻来源核验、来源分类契约 | `backend/app/services/news/repository.py`、`backend/app/schemas/news.py`、`backend/app/api/routes/news.py`、`backend/tests/test_news.py`、`backend/docs/{API.md,NEWS_SOURCE_EXPANSION.md}` | 无 | 否 | 2026-10-05 | 已释放（测试通过；新来源仍待准入） |
+| Codex | 用户授权临时补前端新闻中文译题展示 | `frontend/src/api/news.ts`、`frontend/src/views/PortalView.vue`、`frontend/src/views/portal.test.ts`、`COORDINATION.md` | 无 | 否 | 2026-10-05 | 已释放（交还 DSH；测试通过） |
+| Codex | 国内官方新闻来源分批接入：来源核验、受控 HTML 列表适配和回归测试 | `backend/app/services/news/{catalog.py,adapters.py,fetcher.py}`、`backend/tests/test_news_refresh.py`、`backend/docs/NEWS_SOURCE_EXPANSION.md`、`COORDINATION.md` | 无 | 否 | 2026-10-05 | 已释放（待启用候选；测试通过） |
+| Codex | 数据库已启动：应用新闻译题迁移并完成新闻专项、后端全量与静态测试 | `backend/migrations/versions/20261005_0030_news_titles.py`、`backend/tests/test_news*.py`、`COORDINATION.md` | `20261005_0030` | 否 | 2026-10-05 | 已释放（迁移、测试通过） |
+| Codex | 用户允许联网并要求解决英文新闻及来源过少：核验来源、增待启用 ECDC 候选、准备中文标题字段与接口；用户选择暂不付费翻译 | `backend/app/{models/news.py,schemas/news.py,api/routes/news.py,services/news/catalog.py,services/news/adapters.py,news_cli.py}`、`backend/migrations/versions/20261005_0030_news_titles.py`、`backend/tests/test_news*.py`、`backend/docs/NEWS_SOURCE_EXPANSION.md`、`COORDINATION.md` | `20261005_0030`（唯一 head） | 否（DB 连接拒绝，迁移未应用；无测试占用） | 2026-10-05 | 已释放（静态检查通过；DB 及前端接线待续） |
 | DSH | **门户分区保留「全部」（用户 2026-10-04：「把全部也保留」）**：全部改回第一块平铺卡片，与养生/健身/疾病/药物同排五块；撤掉列表右上角做同一件事的「全部」小按钮。**不动后端。** | `frontend/src/views/PortalView.vue`、`frontend/src/views/portal.test.ts`、`frontend/e2e/portal.spec.ts`、`frontend/BROWSER_ACCEPTANCE.md` | 无 | 否 | 2026-10-04 | 已释放（提交 `3fc8e49`；报告见 §7.2 顶部。**补记**：先动手后登记） |
 | DSH | **门户四分区改平铺大卡片（用户 2026-10-04 要求「放大平铺在病理科普助手下面」）**：分区从列表顶部小标签改成四块大卡片（养生/健身/疾病/药物，各带一句范围说明与图标），桌面一行铺满、窄屏 2 列/单列；「全部」移到列表右上角小按钮。**不动后端。** | `frontend/src/views/PortalView.vue`、`frontend/src/views/portal.test.ts`、`frontend/e2e/portal.spec.ts`、`frontend/BROWSER_ACCEPTANCE.md` | 无 | 否 | 2026-10-04 | 已释放（提交 `0a3815d`；报告见 §7.2 顶部。**补记**：先动手后登记） |
 | DSH | **门户 AI 展示区占首屏一半 + 轻量动效（用户 2026-10-04 要求「占据一半屏幕、加特效显得不单调」）**：`.hero` 改 `min-height:50vh`，能力说明改三个标签 + 一行边界说明，新增纯 CSS 装饰动效（渐变流动/光斑漂浮/圆环旋转/星标呼吸），`prefers-reduced-motion` 下静止；e2e 增加高度与动效实测断言。**不动后端。** | `frontend/src/views/PortalView.vue`、`frontend/src/views/portal.test.ts`、`frontend/e2e/portal.spec.ts`、`frontend/BROWSER_ACCEPTANCE.md` | 无 | 否 | 2026-10-04 | 已释放（提交 `feffc64`；报告见 §7.2 顶部。**补记**：先动手后登记） |
@@ -368,6 +379,47 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
   局限：**只测前端，接口是桩**，不能替代真实后端联调。需要人眼看的清单见 `frontend/BROWSER_ACCEPTANCE.md`。
 
 ### 7.2 工作报告（最新在最上）
+
+### 2026-10-05 DSH 接手门户前端：中文译题展示 + 分区来源过滤（Codex 交还）
+
+- 改动：**接手并验收 Codex 交还的 4 个前端文件**（`frontend/src/api/news.ts`、`frontend/src/views/PortalView.vue`、`frontend/src/views/portal.test.ts`、`frontend/e2e/portal.spec.ts`）：`titleZh`/`titleZhSource` 类型、优先显示中文译题且**同时保留英文原题与原文链接**、人工核对与机器翻译两种标签、`sourceStatuses[].categories` 按当前分区过滤来源状态、区分「该分区尚无来源」与「有来源但暂无条目」、慢请求竞态守卫（`latestRequest`，防止切分区时旧响应覆盖新分区）。代码主体是 Codex 写的，我**只做验收与接手，未改其业务逻辑**。
+- 验证（我亲自重跑，不是转述）：前端全量 `npm run test` **339 passed / 29 files**；`npm run build` 通过；门户 `npx playwright test e2e/portal.spec.ts` **11 passed**。只读核对后端契约：`alembic current` = `20261005_0030 (head)`（迁移已应用）、`news_items` 已含 `title_zh`/`title_zh_source` 两列、库里 **40 条 / 0 条有译题**、`news_cli --items disease` 读取正常（ORM 与新列一致）。
+- 边界：**我没有动任何 `backend/**`**——Codex 在途的后端改动原样留在工作树里，未暂存、未提交、未修改；本轮提交只含 4 个前端文件与 `COORDINATION.md`（后者会一并带上 Codex 未提交的 §7.1/§7.2 文字，仅登记内容、无代码）。**门户目前仍显示英文**：译题要靠后端往 `title_zh` 灌（现在 0/40），用户已选「暂不付费翻译」；「点标题进原文」上一轮已修好。前端分页/「加载更多」仍未做；养生、健身、药物三个分区仍无来源。
+
+### 2026-10-05 Codex 更正新闻前后端分工
+
+- 用户澄清前端交给 DeepSeek；Codex 上轮把“双 agent”误解成自己同时派前后端子 agent。此前前端分区空态改动已写入共享工作树并通过测试，现保留供 DeepSeek 接手，不再由 Codex 改前端。
+- 后续 Codex 仅负责 `backend/` 新闻来源与 API；接口契约为 `sourceStatuses[].categories` 必传，见 `backend/docs/API.md`。未做新的业务代码改动、未提交或推送。
+
+### 2026-10-05 Codex 双 agent 并行补新闻分区契约和前端空态
+
+- 改动：后端 `GET /news` 的 `sourceStatuses[]` 必传 `categories`（来源的分类范围），任一分区请求仍列全局已启用来源；前端按当前分区筛选来源状态，准确区分“该分区未接入来源”和“有来源但暂无条目”，并阻止慢请求覆盖新分区。前端文件按用户明确授权临时由 Codex 接手，现已交还 DSH。
+- 验证：后端新闻专项 40 passed、全量 595 passed + 1 skipped、Ruff 全绿；前端全量 Vitest 339 passed / 29 files、构建通过、门户 Playwright 11 passed（包括无来源分区）。前端子 agent 初次全量测试在沙箱遇临时缓存 ENOENT、浏览器测试启动挂起；主代理在当前环境复跑全部通过。
+- 边界：福建省卫健委官方 RSS 说明页在本机 HTTPS EOF，未实测 feed URL；国家药监局 UDI RSS 只是数据文件非新闻。未启用新中文来源、未写入新闻或自动翻译，养生/健身/药物分区仍无真实条目；未提交或推送。
+
+### 2026-10-05 Codex 按用户要求临时补齐门户中文译题展示
+
+- 改动：确认 DSH 无活动占用后，临时接手 `frontend/src/api/news.ts`、`frontend/src/views/PortalView.vue`、`frontend/src/views/portal.test.ts`；补 `titleZh/titleZhSource` 类型，优先显示非空中文译题，同时保留英文原题、原文链接，并区分人工核对与机器翻译标签。未改变同题分组和其他页面；现已交还 DSH。
+- 验证：新增译题 2 项通过；门户单测重跑 18 passed，前端全量 336 passed / 29 files；`npm run build` exit 0；门户 Playwright 10 passed。门户单测首跑有 1 项既有登录路由用例超时，随后单独重跑整份通过；未为超时修改产品代码。
+- 边界：当前数据库 40 条 WHO 新闻尚无中文译题，页面仍显示英文；未启用机器翻译或新国内来源；未提交或推送。
+
+### 2026-10-05 Codex 国内官方资讯来源第一批适配
+
+- 改动：`nmpaic_news` 登记为待启用候选；增加国家药监局信息中心要闻静态 HTML 列表适配器，只提取同域文章标题、原文链接与列表日期；抓取层允许受限大小的 `text/html` 响应，仍需登记来源专用解析器。扩源文档记录中国疾控中心、健康报网、体育总局、卫健委、药审中心的实际限制或待核验项。
+- 验证：药监信息中心实页只读解析 15 条；专项 15 passed；后端全量 595 passed、1 skipped、1 个依赖弃用警告；Ruff 全绿。
+- 边界：未启用任何新增来源、未向数据库写新闻；健康报网和中国疾控中心受版权声明约束，体育总局/北京/江苏卫健委在本机连接失败或栏目未稳定开放，不绕过拦截。前端未改；未提交或推送。
+
+### 2026-10-05 Codex 新闻译题迁移与数据库验收
+
+- 改动：按用户确认，已在运行中的开发库执行 `alembic upgrade head`，从 `20261004_0029` 升至 `20261005_0030`；本轮未改业务代码。
+- 验证：`alembic current` 为 `20261005_0030 (head)`；新闻专项 34 passed；后端全量 594 passed、1 skipped、1 个依赖弃用警告；Ruff 全绿；只读核对 WHO 两个新闻源各 20 条，原有 40 条记录仍在。
+- 边界：用户选择暂不付费翻译；现有英文标题不会自动变中文，ECDC 仍仅为待启用候选，前端展示接线仍由 DSH 负责；未运行外网抓取、未提交或推送。
+
+### 2026-10-05 Codex 新闻中文译题底座与来源核验
+
+- 改动：新增 `news_items.title_zh/title_zh_source` 与迁移 `20261005_0030`、`GET /news` 可选 `titleZh/titleZhSource`；前台 CLI 支持人工核对后写入中文译题，原题不改。ECDC 官方 RSS 实测 200 后仅列为 `PENDING_SOURCES`，离线适配器不转存摘要；新文档记录 FDA RSS 404、NIH RSS 403、CDC RSS 返回 HTML、MedlinePlus RSS 禁止网站使用等核验结果。§6 交接 DSH 前端展示与 ECDC 许可标注。
+- 验证：`ruff check app tests migrations` 全绿；`compileall` 退出 0；ECDC 离线解析和标题校验各通过；`alembic heads` 为唯一 `0030`。本机 PostgreSQL 连接拒绝，`alembic upgrade head` 未成功，数据库测试未跑。
+- 边界：用户选择暂不付费翻译；没有自动中文化、没有启用 ECDC 或任何新来源、没有抓取或改开发库数据。新迁移未应用前，含新字段的新闻接口不能作为已联调交付。
 
 ### 2026-10-04 Codex 每日一次新闻更新规则确认
 

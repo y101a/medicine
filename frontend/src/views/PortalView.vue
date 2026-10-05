@@ -43,13 +43,25 @@ const tips = ref<{ id: string; text: string; sourceName: string; canonicalUrl: s
 const asOf = ref<string | null>(null)
 const nextRefreshAt = ref<string | null>(null)
 const sourceStatuses = ref<NewsSourceStatusEntry[]>([])
+const sourceCoverageKnown = ref(false)
 /** N3：当天首次访问触发的一轮自动刷新是否正在进行。 */
 const refreshing = ref(false)
+let latestRequest = 0
 
 /** 同题多期折成一组：WHO 同一疫情的多期更新标题逐字相同，直接平铺会像重复条目。 */
 const groups = computed(() => groupNewsItems(items.value))
+const visibleSourceStatuses = computed(() => {
+  if (active.value === 'all') return sourceStatuses.value
+  return sourceStatuses.value.filter(entry =>
+    !entry.categories || entry.categories.includes(active.value as Exclude<NewsCategory, 'all'>),
+  )
+})
+const categoryHasSource = computed(() =>
+  active.value === 'all' || sourceStatuses.value.some(entry => entry.categories?.includes(active.value as Exclude<NewsCategory, 'all'>)),
+)
 
 const emptyReason = computed(() => {
+  if (!items.value.length && sourceCoverageKnown.value && !categoryHasSource.value) return 'category_without_source'
   if (status.value === 'sources_not_connected') return 'sources_not_connected'
   if (status.value === 'stale') return 'stale'
   if (status.value === 'failed') return 'failed'
@@ -58,6 +70,7 @@ const emptyReason = computed(() => {
 
 /** 顶部状态说明：把「部分来源失败」「内容可能较旧」这类事实说清楚，不夸大也不隐藏。 */
 const statusNote = computed(() => {
+  if (sourceCoverageKnown.value && !categoryHasSource.value) return ''
   // 正在更新就说正在更新：不把「刚触发刷新」说成「已是最新」。
   if (refreshing.value) return '正在更新来源，稍后刷新可见新条目'
   if (status.value === 'ready' || status.value === 'partial') {
@@ -73,19 +86,23 @@ const statusNote = computed(() => {
 })
 
 async function load(category: NewsCategory = active.value) {
+  const request = ++latestRequest
   active.value = category
   loading.value = true
   error.value = ''
   try {
     const page = await newsApi.page(category)
+    if (request !== latestRequest) return
     status.value = page.status
     items.value = page.items
     tips.value = page.tips
     asOf.value = page.asOf ?? null
     nextRefreshAt.value = page.nextRefreshAt ?? null
     sourceStatuses.value = page.sourceStatuses ?? []
+    sourceCoverageKnown.value = !!page.sourceStatuses?.length && page.sourceStatuses.every(entry => Array.isArray(entry.categories))
     refreshing.value = page.refreshing ?? false
   } catch (e) {
+    if (request !== latestRequest) return
     // 失败时清空列表：上一个分类的条目留着会被当成当前分类的资讯。
     status.value = ''
     items.value = []
@@ -93,10 +110,11 @@ async function load(category: NewsCategory = active.value) {
     asOf.value = null
     nextRefreshAt.value = null
     sourceStatuses.value = []
+    sourceCoverageKnown.value = false
     refreshing.value = false
     error.value = getApiErrorMessage(e)
   } finally {
-    loading.value = false
+    if (request === latestRequest) loading.value = false
   }
 }
 
@@ -164,8 +182,8 @@ onMounted(() => void load())
         </div>
 
         <p v-if="statusNote" class="status-line" role="status">{{ statusNote }}</p>
-        <ul v-if="sourceStatuses.length" class="source-status" aria-label="来源状态">
-          <li v-for="entry in sourceStatuses" :key="entry.id">
+        <ul v-if="!loading && visibleSourceStatuses.length" class="source-status" aria-label="来源状态">
+          <li v-for="entry in visibleSourceStatuses" :key="entry.id">
             <span class="dot" :class="`dot--${entry.status}`" aria-hidden="true"></span>
             {{ entry.name }}：{{ sourceStatusText(entry.status) }}
             <span v-if="entry.lastErrorCode" class="muted">（{{ entry.lastErrorCode }}）</span>
@@ -192,9 +210,14 @@ onMounted(() => void load())
           <strong>来源更新失败</strong>
           <p>最近一次抓取没有成功，这里不展示未核实的旧内容冒充更新；来源恢复后会重新出现条目。</p>
         </div>
+        <div v-else-if="emptyReason === 'category_without_source'" class="empty">
+          <strong>该分区尚无新闻来源</strong>
+          <p>目前没有已接入此分区的来源；这不代表今天没有相关新闻。接入来源后才会显示真实条目。</p>
+        </div>
         <div v-else-if="!items.length" class="empty">
           <strong>暂时没有更新</strong>
-          <p>已接入的来源今天还没有新条目；没有条目时不会写成「今日已更新」。</p>
+          <p v-if="sourceCoverageKnown">已接入的来源目前没有可显示条目；不代表今天没有相关新闻。</p>
+          <p v-else>当前没有可显示条目；来源覆盖情况尚未核实，不能判断是未接入还是暂无更新。</p>
         </div>
         <ul v-else class="cards">
           <li v-for="group in groups" :key="group.lead.id">
@@ -205,10 +228,13 @@ onMounted(() => void load())
                 target="_blank"
                 rel="noopener noreferrer nofollow"
               >
-                <strong>{{ group.lead.title }}</strong>
+                <strong>{{ group.lead.titleZh?.trim() || group.lead.title }}</strong>
               </a>
+              <span v-if="group.lead.titleZh?.trim() && group.lead.titleZhSource === 'manual'" class="badge badge--translation">人工核对译题</span>
+              <span v-else-if="group.lead.titleZh?.trim() && group.lead.titleZhSource === 'machine'" class="badge badge--translation">机器翻译·未经医学审核</span>
               <span v-if="!group.lead.medicalReviewed" class="badge">未经医学审核</span>
             </div>
+            <p v-if="group.lead.titleZh?.trim()" class="card-original">原题：{{ group.lead.title }}</p>
             <p v-if="group.lead.summary" class="card-summary">{{ group.lead.summary }}</p>
             <p v-if="group.periods.length > 1" class="card-updates">
               同题更新 {{ group.periods.length }} 期：{{ group.periods.join(' · ') }}
@@ -312,10 +338,12 @@ h1 { margin: 0; color: #24445f; font-size: clamp(24px, 3.4vw, 34px); font-weight
 .card-head { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 8px; }
 .card-head strong { color: #3d566d; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
 .badge { padding: 1px 7px; border-radius: 999px; background: #fff3dc; color: #9a681c; font-size: 9px; line-height: 1.7; }
+.badge--translation { background: #eaf4fc; color: #36749e; }
 /* 标题本身就是原文链接：用户第一反应是点标题，不能只有右下角小字可点。 */
 .card-title { color: inherit; text-decoration: none; }
 .card-title:hover strong, .card-title:focus-visible strong { color: #2f6f9f; text-decoration: underline; }
 .card-summary { margin: 7px 0 0; color: #7d8fa0; font-size: 12px; line-height: 1.8; }
+.card-original { margin: 7px 0 0; color: #71879b; font-size: 11px; line-height: 1.7; overflow-wrap: anywhere; }
 /* F2：状态说明、来源级状态、同题多期标注 */
 .status-line { margin: 12px 0 0; color: #5b748c; font-size: 12px; line-height: 1.7; }
 .source-status { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 8px 0 0; padding: 0; list-style: none; color: #71879b; font-size: 11px; }

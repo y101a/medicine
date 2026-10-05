@@ -249,3 +249,26 @@ test('F2：点卡片标题能打开来源原文（新标签），且标题链接
   expect(popup.url(), `实际打开的地址是 ${popup.url()}`).toBe(href)
   await popup.close()
 })
+
+test('切换到无来源分区时显示未接入，而非误称今天无新闻', async ({ page }) => {
+  await installApiStubs(page, {
+    authenticated: true,
+    extra: { 'GET /news': { body: {
+      category: 'wellness', status: 'stale', asOf: null, items: [], tips: [],
+      sourceStatuses: [{
+        id: 'who_news', name: 'WHO 新闻', categories: ['disease'], status: 'stale',
+        lastSuccessAt: null, lastErrorCode: null,
+      }],
+    } } },
+  })
+  await page.setViewportSize({ width: 375, height: 720 })
+  await page.goto('/portal')
+  await waitForRendered(page, '.portal')
+  await page.getByRole('tab', { name: /养生/ }).click()
+
+  await expect(page.getByText('该分区尚无新闻来源')).toBeVisible()
+  await expect(page.locator('.source-status')).toHaveCount(0)
+  await expect(page.getByText('今天还没有新条目')).toHaveCount(0)
+  const report = await measureOverflow(page)
+  expect(report.overflow, describeOverflow(report, '/portal', 375)).toBeLessThanOrEqual(1)
+})

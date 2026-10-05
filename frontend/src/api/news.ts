@@ -22,6 +22,9 @@ export interface NewsItem {
   id: string
   category: NewsItemCategory
   title: string
+  /** 可选译题；原题始终保留在 title。 */
+  titleZh?: string | null
+  titleZhSource?: 'manual' | 'machine' | null
   /** 写不出可靠摘要时为 null：只显示标题、来源与链接，不编造内容。 */
   summary: string | null
   sourceName: string
@@ -43,6 +46,8 @@ export interface NewsTip {
 export interface NewsSourceStatusEntry {
   id: string
   name: string
+  /** 新版接口返回来源覆盖的分区；可选以兼容旧接口桩。 */
+  categories?: NewsItemCategory[]
   status: NewsSourceStatus
   lastSuccessAt: string | null
   lastErrorCode: string | null

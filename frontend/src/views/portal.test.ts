@@ -127,6 +127,46 @@ describe('独立资讯门户（/portal，F1 页面框架）', () => {
     expect(wrapper.get('.cards > li .card-title').attributes('target')).toBe('_blank')
   })
 
+  it('有人工译题时显示中文、英文原题和核对标记', async () => {
+    vi.mocked(newsApi.page).mockResolvedValue({
+      category: 'disease',
+      status: 'ready',
+      asOf: '2026-10-04T16:04:47Z',
+      items: [{ ...baseItem, id: 'translated', titleZh: '埃博拉病疫情更新', titleZhSource: 'manual' }],
+      tips: [],
+    })
+    const { wrapper } = await setup()
+    expect(wrapper.get('.card-title').text()).toBe('埃博拉病疫情更新')
+    expect(wrapper.get('.card-original').text()).toContain(baseItem.title)
+    expect(wrapper.text()).toContain('人工核对译题')
+    expect(wrapper.text()).toContain('未经医学审核')
+    expect(wrapper.get('.card-title').attributes('href')).toBe(baseItem.canonicalUrl)
+  })
+
+  it('机器译题明确标未审核；没有译题时继续显示英文原题', async () => {
+    vi.mocked(newsApi.page).mockResolvedValue({
+      category: 'disease',
+      status: 'ready',
+      asOf: '2026-10-04T16:04:47Z',
+      items: [{ ...baseItem, id: 'machine', titleZh: '刚果埃博拉疫情', titleZhSource: 'machine' }],
+      tips: [],
+    })
+    const machine = await setup()
+    expect(machine.wrapper.get('.card-title').text()).toBe('刚果埃博拉疫情')
+    expect(machine.wrapper.text()).toContain('机器翻译·未经医学审核')
+
+    vi.mocked(newsApi.page).mockResolvedValue({
+      category: 'disease',
+      status: 'ready',
+      asOf: '2026-10-04T16:04:47Z',
+      items: [{ ...baseItem, id: 'original', titleZh: null, titleZhSource: null }],
+      tips: [],
+    })
+    const original = await setup()
+    expect(original.wrapper.get('.card-title').text()).toBe(baseItem.title)
+    expect(original.wrapper.find('.card-original').exists()).toBe(false)
+  })
+
   it('N3：正在更新来源时如实说明，不把「刚触发刷新」说成已是最新', async () => {
     vi.mocked(newsApi.page).mockResolvedValue({
       category: 'disease',
@@ -185,6 +225,58 @@ describe('独立资讯门户（/portal，F1 页面框架）', () => {
 
     expect(wrapper.text()).toContain('来源更新失败')
     expect(wrapper.find('.cards').exists()).toBe(false)
+  })
+
+  it('切到无来源分区时说明未接入，不把其他分区的旧快照说成今天无新闻', async () => {
+    vi.mocked(newsApi.page).mockResolvedValue({
+      category: 'all',
+      status: 'stale',
+      asOf: '2026-10-04T16:04:47Z',
+      items: [],
+      tips: [],
+      sourceStatuses: [{
+        id: 'who_news', name: 'WHO 新闻', categories: ['disease'], status: 'stale',
+        lastSuccessAt: '2026-10-04T16:04:47Z', lastErrorCode: null,
+      }],
+    })
+    const { wrapper } = await setup()
+    await wrapper.findAll('.category-tile')[1]!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('该分区尚无新闻来源')
+    expect(wrapper.text()).not.toContain('今天还没有新条目')
+    expect(wrapper.find('.source-status').exists()).toBe(false)
+    expect(wrapper.find('.cards').exists()).toBe(false)
+  })
+
+  it('有分区来源但无条目时只说目前没有条目，来源状态只显示当前分区', async () => {
+    vi.mocked(newsApi.page).mockResolvedValue({
+      category: 'wellness', status: 'empty', asOf: null, items: [], tips: [],
+      sourceStatuses: [
+        { id: 'wellness', name: '养生来源', categories: ['wellness'], status: 'empty', lastSuccessAt: null, lastErrorCode: null },
+        { id: 'disease', name: '疾病来源', categories: ['disease'], status: 'ready', lastSuccessAt: null, lastErrorCode: null },
+      ],
+    })
+    const { wrapper } = await setup()
+    await wrapper.findAll('.category-tile')[1]!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('已接入的来源目前没有可显示条目')
+    expect(wrapper.get('.source-status').text()).toContain('养生来源')
+    expect(wrapper.get('.source-status').text()).not.toContain('疾病来源')
+  })
+
+  it('旧接口桩缺来源分区时保持保守文案，不推断来源是否接入', async () => {
+    vi.mocked(newsApi.page).mockResolvedValue({
+      category: 'wellness', status: 'empty', asOf: null, items: [], tips: [],
+      sourceStatuses: [{ id: 'old', name: '旧来源', status: 'empty', lastSuccessAt: null, lastErrorCode: null }],
+    })
+    const { wrapper } = await setup()
+    await wrapper.findAll('.category-tile')[1]!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('来源覆盖情况尚未核实')
+    expect(wrapper.text()).not.toContain('该分区尚无新闻来源')
   })
 
   it('AI 展示区保留规格要求的能力说明与两个按钮', async () => {
