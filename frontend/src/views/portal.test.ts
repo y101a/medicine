@@ -6,7 +6,7 @@ import PortalView from './PortalView.vue'
 import { newsApi } from '../api/news'
 import { ApiError } from '../api/http'
 
-vi.mock('../api/news', () => ({ newsApi: { page: vi.fn() } }))
+vi.mock('../api/news', () => ({ newsApi: { page: vi.fn(), requestRefresh: vi.fn() } }))
 
 /** 守卫会读登录态；这里给出可控的替身，避免依赖真实登录流程。 */
 const authState = vi.hoisted(() => ({ isAuthenticated: true }))
@@ -64,6 +64,12 @@ beforeEach(() => {
   vi.resetAllMocks()
   authState.isAuthenticated = true
   vi.mocked(newsApi.page).mockResolvedValue({ ...emptyPage })
+  // F-P4 默认桩：不点重试就不会调用它，给默认值避免用例之间互相影响。
+  vi.mocked(newsApi.requestRefresh).mockResolvedValue({
+    accepted: false,
+    reason: 'disabled',
+    nextRefreshAt: null,
+  })
 })
 
 describe('独立资讯门户（/portal，F1 页面框架）', () => {
@@ -188,6 +194,135 @@ describe('独立资讯门户（/portal，F1 页面框架）', () => {
 
     expect(newsApi.page).toHaveBeenLastCalledWith('wellness', { limit: 20, offset: 0 })
     expect(wrapper.find('.cards').exists()).toBe(false)
+  })
+
+  it('F-P4：来源失败时才出现「重试更新」，正常时不出现', async () => {
+    vi.mocked(newsApi.page).mockResolvedValue({
+      category: 'all', status: 'failed', asOf: null, items: [], tips: [],
+      sourceStatuses: [{
+        id: 'who', name: 'WHO 新闻', categories: ['disease'], status: 'failed',
+        lastSuccessAt: null, lastErrorCode: 'FETCH_TIMEOUT',
+      }],
+    })
+    const failed = await setup()
+    expect(failed.wrapper.get('.retry-line').text()).toContain('重试更新')
+
+    vi.mocked(newsApi.page).mockResolvedValue({
+      category: 'all', status: 'ready', asOf: '2026-10-04T16:04:47Z',
+      items: [{ ...baseItem, id: 'a', title: '条目 A' }], tips: [],
+      sourceStatuses: [{
+        id: 'who', name: 'WHO 新闻', categories: ['disease'], status: 'ready',
+        lastSuccessAt: '2026-10-04T16:04:47Z', lastErrorCode: null,
+      }],
+    })
+    const ok = await setup()
+    expect(ok.wrapper.find('.retry-line').exists()).toBe(false)
+  })
+
+  it('F-P4：同一更新日已更新过时如实说明，不假装又跑了一轮', async () => {
+    vi.mocked(newsApi.page).mockResolvedValue({
+      category: 'all', status: 'failed', asOf: null, items: [], tips: [],
+      sourceStatuses: [{
+        id: 'who', name: 'WHO 新闻', categories: ['disease'], status: 'failed',
+        lastSuccessAt: null, lastErrorCode: 'FETCH_TIMEOUT',
+      }],
+    })
+    vi.mocked(newsApi.requestRefresh).mockResolvedValue({
+      accepted: false, reason: 'already_ran_today', nextRefreshAt: '2026-10-05T20:00:00Z',
+    })
+
+    const { wrapper } = await setup()
+    await wrapper.get('.retry-line .retry').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('.retry-line').text()).toContain('今天这一轮已经更新过')
+    // 没有真的开始更新，就不该进轮询。
+    expect(newsApi.page).toHaveBeenCalledTimes(1)
+  })
+
+  it('F-P4：接受后轮询到快照时间前进就报完成', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.mocked(newsApi.page)
+        .mockResolvedValueOnce({
+          category: 'all', status: 'failed', asOf: '2026-10-04T00:00:00Z', items: [], tips: [],
+          sourceStatuses: [{
+            id: 'who', name: 'WHO 新闻', categories: ['disease'], status: 'failed',
+            lastSuccessAt: null, lastErrorCode: 'FETCH_TIMEOUT',
+          }],
+        })
+        .mockResolvedValue({
+          category: 'all', status: 'ready', asOf: '2026-10-05T00:00:00Z',
+          items: [{ ...baseItem, id: 'a', title: '条目 A' }], tips: [],
+          sourceStatuses: [{
+            id: 'who', name: 'WHO 新闻', categories: ['disease'], status: 'ready',
+            lastSuccessAt: '2026-10-05T00:00:00Z', lastErrorCode: null,
+          }],
+        })
+      vi.mocked(newsApi.requestRefresh).mockResolvedValue({
+        accepted: true, reason: 'started', nextRefreshAt: null,
+      })
+
+      const { wrapper } = await setup()
+      await wrapper.get('.retry-line .retry').trigger('click')
+      await flushPromises()
+      await vi.advanceTimersByTimeAsync(2000)
+      await flushPromises()
+
+      expect(wrapper.get('.retry-line').text()).toContain('更新完成')
+      expect(wrapper.findAll('.cards > li')).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('F-P4：轮询超时如实说没等到，已有条目不受影响', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.mocked(newsApi.page).mockResolvedValue({
+        // 有内容时整体状态不会是 failed（后端 failed 只在 total=0 时给），用 partial 更真实。
+        category: 'all', status: 'partial', asOf: '2026-10-04T00:00:00Z',
+        items: [{ ...baseItem, id: 'a', title: '条目 A' }], tips: [],
+        sourceStatuses: [{
+          id: 'who', name: 'WHO 新闻', categories: ['disease'], status: 'failed',
+          lastSuccessAt: null, lastErrorCode: 'FETCH_TIMEOUT',
+        }],
+      })
+      vi.mocked(newsApi.requestRefresh).mockResolvedValue({
+        accepted: true, reason: 'started', nextRefreshAt: null,
+      })
+
+      const { wrapper } = await setup()
+      await wrapper.get('.retry-line .retry').trigger('click')
+      await flushPromises()
+      await vi.advanceTimersByTimeAsync(20_000)
+      await flushPromises()
+
+      expect(wrapper.get('.retry-line').text()).toContain('没等到新结果')
+      expect(wrapper.findAll('.cards > li')).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('F-P4：后端还没有这个接口时收起按钮，不留死按钮', async () => {
+    vi.mocked(newsApi.page).mockResolvedValue({
+      category: 'all', status: 'failed', asOf: null, items: [], tips: [],
+      sourceStatuses: [{
+        id: 'who', name: 'WHO 新闻', categories: ['disease'], status: 'failed',
+        lastSuccessAt: null, lastErrorCode: 'FETCH_TIMEOUT',
+      }],
+    })
+    vi.mocked(newsApi.requestRefresh).mockRejectedValue(
+      new ApiError('请求的内容不存在', 'HTTP_404', 404),
+    )
+
+    const { wrapper } = await setup()
+    await wrapper.get('.retry-line .retry').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.retry-line .retry').exists()).toBe(false)
+    expect(wrapper.get('.retry-line').text()).toContain('服务端暂未开放手动重试')
   })
 
   it('有人工译题时显示中文、英文原题和核对标记', async () => {

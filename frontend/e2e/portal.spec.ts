@@ -320,3 +320,47 @@ test('F-P1：加载更多按 offset 追加第二页，375px 不溢出', async ({
   const report = await measureOverflow(page)
   expect(report.overflow, describeOverflow(report, '/portal', 375)).toBeLessThanOrEqual(1)
 })
+
+test('F-P4：来源失败时可点「重试更新」，轮询到新快照后如实报告', async ({ page }) => {
+  await installApiStubs(page, { authenticated: true, extra: { 'GET /news': { body: NEWS_READY } } })
+  // 同样用计数器：第一次 GET 给「失败且无内容」，POST 之后给「有新快照」。
+  let newsCalls = 0
+  await page.route('**/api/v1/news**', route => {
+    if (route.request().method() === 'POST') {
+      return route.fulfill({
+        status: 202,
+        json: { accepted: true, reason: 'started', nextRefreshAt: null },
+      })
+    }
+    newsCalls += 1
+    const first = newsCalls === 1
+    return route.fulfill({
+      json: {
+        category: 'all',
+        status: first ? 'failed' : 'ready',
+        asOf: first ? '2026-10-04T00:00:00Z' : '2026-10-05T00:00:00Z',
+        items: [],
+        tips: [],
+        sourceStatuses: [
+          {
+            id: 'who',
+            name: 'WHO 新闻',
+            categories: ['disease'],
+            status: first ? 'failed' : 'ready',
+            lastSuccessAt: first ? null : '2026-10-05T00:00:00Z',
+            lastErrorCode: first ? 'FETCH_TIMEOUT' : null,
+          },
+        ],
+      },
+    })
+  })
+  await page.setViewportSize({ width: 375, height: 720 })
+  await page.goto('/portal')
+  await waitForRendered(page, '.portal')
+
+  await expect(page.locator('.retry-line .retry')).toBeVisible()
+  await page.locator('.retry-line .retry').click()
+  await expect(page.locator('.retry-line')).toContainText('更新完成', { timeout: 20_000 })
+  const report = await measureOverflow(page)
+  expect(report.overflow, describeOverflow(report, '/portal', 375)).toBeLessThanOrEqual(1)
+})

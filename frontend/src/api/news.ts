@@ -69,6 +69,16 @@ export interface NewsPage {
   refreshing?: boolean
 }
 
+/** F-P4：手动重试的结果（契约草案见 `COORDINATION.md` §6）。 */
+export type NewsRefreshReason = 'started' | 'already_ran_today' | 'busy' | 'disabled'
+
+export interface NewsRefreshResult {
+  /** false 表示这一轮并没有真的开始（例如今天已经跑过、或功能未开启）。 */
+  accepted: boolean
+  reason: NewsRefreshReason
+  nextRefreshAt: string | null
+}
+
 export const newsApi = {
   /**
    * 分页读取：接口 `limit` 上限 50、`offset` 上限 10000，默认 20/0 与后端一致。
@@ -83,5 +93,12 @@ export const newsApi = {
         params: { category, limit: options.limit, offset: options.offset },
       })
     ).data
+  },
+  /**
+   * 手动触发一轮抓取（F-P4）。后端契约（`COORDINATION.md` §6）：**不等待抓取完成**，立即返回；
+   * 同一更新日已跑过时 `accepted=false` + `reason=already_ran_today`，不伪造新一轮。
+   */
+  async requestRefresh() {
+    return (await http.post<NewsRefreshResult>('/news/refresh')).data
   },
 }

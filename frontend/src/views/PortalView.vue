@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowRight, Basketball, FirstAidKit, Grid, Memo, Sunny } from '@element-plus/icons-vue'
-import { getApiErrorMessage } from '../api/http'
+import { ApiError, getApiErrorMessage } from '../api/http'
 import {
   newsApi,
   type NewsCategory,
@@ -52,6 +52,12 @@ const total = ref(0)
 const hasMore = ref(false)
 const loadingMore = ref(false)
 const loadMoreError = ref('')
+/** F-P4：手动重试。后端还没提供这个接口时自动退让，不留点了没用的按钮。 */
+const retrying = ref(false)
+const retryNote = ref('')
+const retryUnsupported = ref(false)
+/** 触发后按退避轮询等结果：4 次共约 15 秒，超时如实说没等到，不动已有内容。 */
+const RETRY_POLL_DELAYS = [2000, 3000, 5000, 5000]
 let latestRequest = 0
 
 /** 同题多期折成一组：WHO 同一疫情的多期更新标题逐字相同，直接平铺会像重复条目。 */
@@ -64,6 +70,13 @@ const visibleSourceStatuses = computed(() => {
 })
 const categoryHasSource = computed(() =>
   active.value === 'all' || sourceStatuses.value.some(entry => entry.categories?.includes(active.value as Exclude<NewsCategory, 'all'>)),
+)
+/** 只有「来源失败」或「整体过期」时才给重试；服务端没有这个接口时整块不显示。 */
+const retryable = computed(() =>
+  !retryUnsupported.value
+  && (status.value === 'failed'
+    || status.value === 'stale'
+    || visibleSourceStatuses.value.some(entry => entry.status === 'failed' || entry.status === 'stale')),
 )
 
 const emptyReason = computed(() => {
@@ -91,10 +104,12 @@ const statusNote = computed(() => {
   return ''
 })
 
-async function load(category: NewsCategory = active.value) {
+async function load(category: NewsCategory = active.value, options: { silent?: boolean } = {}) {
   const request = ++latestRequest
+  const silent = options.silent ?? false
   active.value = category
-  loading.value = true
+  // silent：重试后轮询时静默刷新，不把列表切成「正在读取资讯…」。
+  if (!silent) loading.value = true
   error.value = ''
   loadMoreError.value = ''
   try {
@@ -125,7 +140,7 @@ async function load(category: NewsCategory = active.value) {
     hasMore.value = false
     error.value = getApiErrorMessage(e)
   } finally {
-    if (request === latestRequest) loading.value = false
+    if (request === latestRequest && !silent) loading.value = false
   }
 }
 
@@ -148,6 +163,52 @@ async function loadMore() {
     loadMoreError.value = getApiErrorMessage(e)
   } finally {
     if (request === latestRequest) loadingMore.value = false
+  }
+}
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+/**
+ * F-P4：手动重试一轮抓取。接口不等待抓取完成：POST 立即返回，
+ * 再由前端按退避轮询到「最近成功快照时间前进」为止；超时就如实说没等到。
+ */
+async function retryRefresh() {
+  if (retrying.value) return
+  const before = asOf.value
+  retrying.value = true
+  retryNote.value = ''
+  try {
+    const result = await newsApi.requestRefresh()
+    if (!result.accepted) {
+      retryNote.value = result.reason === 'already_ran_today'
+        ? '今天这一轮已经更新过，等下次自动更新即可'
+        : result.reason === 'busy'
+          ? '更新正在进行，稍后刷新可见新条目'
+          : '服务端当前没有开启在线更新'
+      return
+    }
+    retryNote.value = '已开始更新，正在等结果…'
+    for (const delay of RETRY_POLL_DELAYS) {
+      await sleep(delay)
+      await load(active.value, { silent: true })
+      if (asOf.value && asOf.value !== before) {
+        retryNote.value = '更新完成，下面是本轮的最近成功内容'
+        return
+      }
+    }
+    retryNote.value = '这次没等到新结果，可以稍后再试；已有内容不受影响'
+  } catch (e) {
+    // 后端还没提供这个接口时不要留死按钮：收起按钮，改说明「下次自动更新」。
+    if (e instanceof ApiError && (e.status === 404 || e.status === 405)) {
+      retryUnsupported.value = true
+      retryNote.value = '服务端暂未开放手动重试，将在下次自动更新时重试'
+    } else {
+      retryNote.value = getApiErrorMessage(e)
+    }
+  } finally {
+    retrying.value = false
   }
 }
 
@@ -223,6 +284,19 @@ onMounted(() => void load())
             <span v-if="entry.lastErrorCode" class="muted">（{{ entry.lastErrorCode }}）</span>
           </li>
         </ul>
+
+        <p v-if="retryable || retrying || retryNote" class="retry-line" role="status">
+          <button
+            v-if="retryable && !retrying"
+            type="button"
+            class="retry"
+            @click="retryRefresh()"
+          >
+            重试更新
+          </button>
+          <span v-if="retrying">正在等待更新结果…</span>
+          <span v-if="retryNote" class="muted">{{ retryNote }}</span>
+        </p>
 
         <p v-if="loading" class="state" role="status">正在读取资讯…</p>
         <p v-else-if="error" class="state state--error" role="status">
@@ -411,6 +485,10 @@ h1 { margin: 0; color: #24445f; font-size: clamp(24px, 3.4vw, 34px); font-weight
 .load-more button:hover:enabled { background: #e7f3fc; }
 .load-more button:disabled { color: #9aa9b6; cursor: default; }
 .load-more .muted { margin: 0; }
+/* F-P4：重试入口紧跟来源状态（入口位置经用户 2026-10-05 确认）。 */
+.retry-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 0; font-size: 11px; }
+.retry-line .retry { padding: 4px 12px; border: 1px solid #bcd8ee; border-radius: 999px; background: #f4f9fd; }
+.retry-line .muted { margin: 0; }
 .rail { display: grid; gap: 16px; align-content: start; }
 .rail-card { padding: 18px 18px 20px; }
 .rail-card h2 { margin: 0 0 12px; color: #3d566d; font-size: 14px; font-weight: 650; }

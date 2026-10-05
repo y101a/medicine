@@ -262,6 +262,8 @@ npm run e2e                                                  # 期望 39 passed�
 
 ### 7.1 进行中（开工前先看这里；开工时在此登记，收工释放）
 
+2026-10-05 DSH：**门户「重试更新」（F-P4）前端已按 §6 契约按桩实现并提交**——`requestRefresh()` + 来源状态下方入口 + 退避轮询 + 接口未落地自动收起；无迁移、未占数据库、未联网、未动 `backend/**`。**前端已无在途占用**（本轮未先登记，按 `AGENTS.md` 如实补记）。详见 §7.2 顶部。
+
 2026-10-05 DSH：**门户新闻前端 F-P1/F-P2/F-P5 已完成并提交**（F-P3 经核已有「正在读取资讯…」加载态与失败重试，无需改动）——分页「加载更多」、来源明细「最后成功」时间、三个分页单测与一条分页 e2e、验收文档同步；涉及 `frontend/src/api/news.ts`、`frontend/src/views/PortalView.vue`、`frontend/src/views/portal.test.ts`、`frontend/e2e/portal.spec.ts`、`frontend/BROWSER_ACCEPTANCE.md`、`frontend/PORTAL_NEWS_FRONTEND_PLAN.md`、`COORDINATION.md`；**无迁移、不占用数据库、不联网、不动 `backend/**`**。入口位置已获用户确认：加载更多在列表下方随内容流，重试在来源状态行内（重试接口未落地前不给假按钮）。
 
 2026-10-05 DSH：接手 Codex 交还的门户前端改动（中文译题展示 + 分区来源过滤 + 竞态守卫），已亲自验收并提交；**前端已无在途占用**。**补记**：本轮先动手后登记，按 `AGENTS.md`「漏登记要补记」如实补上。
@@ -388,6 +390,13 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
   局限：**只测前端，接口是桩**，不能替代真实后端联调。需要人眼看的清单见 `frontend/BROWSER_ACCEPTANCE.md`。
 
 ### 7.2 工作报告（最新在最上）
+
+### 2026-10-05 DSH 门户「重试更新」前端按契约实现（桩验证，后端一落地即可用）
+
+- 改动：`frontend/src/api/news.ts` 新增 `requestRefresh()` 与 `NewsRefreshResult`（按 `COORDINATION.md` §6 契约：202 + `accepted`/`reason`/`nextRefreshAt`）；`frontend/src/views/PortalView.vue` 在「来源状态」下方加「重试更新」（只在来源失败或内容过期时出现；入口位置经用户 2026-10-05 确认），点击后「POST 立即返回 → 按 2/3/5/5 秒退避轮询 `GET /news` 到快照时间前进」，`load()` 增加 `silent` 选项使轮询不把列表切成加载态；结果全部用受控中文（已开始更新 / 今天已更新过 / 正在更新 / 功能未开启 / 没等到新结果）；**后端返回 404/405 时自动收起按钮**并说明「服务端暂未开放手动重试，将在下次自动更新时重试」，不留死按钮、后端上线后无需再改前端。`portal.test.ts` +5 项（出现条件、已跑过不轮询、轮询成功、轮询超时、接口缺失），`e2e/portal.spec.ts` +1 项（真实点击 + 轮询到新快照 + 375px 不溢出）。
+- 验证（本人实跑）：门户单测 **29 passed**（上轮 24，+5）；前端全量 **347 passed / 29 files**（上轮 342，+5）；门户 Playwright **13 passed**（上轮 12，+1）；`npm run build`（含 `vue-tsc`）**exit 0**。轮询用 `vi.useFakeTimers()` + `advanceTimersByTimeAsync` 验证，不靠真实等待；e2e 那条是真实点击、真实 2 秒轮询。
+- **与规划文档的一处偏离（文档已同步改）**：原计划写「接口未落地前保留禁用按钮」，实现改为**接口不存在时自动收起**——禁用按钮是假入口，且后端上线后还要再改前端；现在后端一落地就自动可用。中途还改了一处自己的测试错判：有内容时整体状态不会是 `failed`（后端 `failed` 只在 `total=0` 时给），该用例改用 `partial`。
+- 边界：接口仍是**前端桩**——真实抓取是否开始与成功取决于后端实现；`accepted=true` 只代表「已开始一轮」，前端不谎报完成（必须等 `asOf` 前进，超时就如实说没等到）；未动 `backend/**`；养生/健身/药物三分区仍无来源。
 
 ### 2026-10-05 DSH 门户新闻前端 F-P1/F-P2 与验收（用户确认入口位置后开工）
 
