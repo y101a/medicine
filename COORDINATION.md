@@ -172,6 +172,8 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 日期 | 提出方 | 目标文件 | 请求内容 | 状态 |
 | --- | --- | --- | --- | --- |
+| 2026-10-06 | Codex 中文来源核验 | DSH 环境的只读站点核验；必要时更新 `COORDINATION.md` §6 | 用户允许在 Codex 无法访问中文站时请 DeepSeek 尝试。请从你的环境用正常请求只读复核 `https://www.nhc.gov.cn/kppypt/index.shtml`（Codex 项目抓取器 `FETCH_FAILED`）；另核对 `https://www.chinacdc.cn/jkkp/yyjk/swyy/` 的官方版权条款是否允许门户仅显示原题、日期、来源和原文链接（Codex 可读但未启用）。请只回报状态、证据链接、可用栏目入口，不绕过反爬或修改后端；Codex 继续负责接入。 | 待 DSH 复核 |
+| 2026-10-06 | Codex 后端交接 | `frontend/src/api/news.ts`、`frontend/src/views/PortalView.vue`、门户测试及验收文档 | 后端已实现 `POST /api/v1/news/refresh`，沿用前端既定 202 契约 `{accepted,reason,nextRefreshAt}`；用户新确认“当天自动轮失败/部分失败后，全站最多手动重试一次”。`started` 表示已派发、不是成功；`busy` 表示有运行中轮次；`already_ran_today` 表示自动轮成功或本日手动额度已用。三个新来源在可启用目录但**数据库未启用**，页面暂不会出现新条目；原题仍为英文。请按现有按钮/状态和 `backend/docs/API.md` 联调，勿显示假新闻或自动翻译。 | 后端已完成并验收，待 DSH 联调 |
 | 2026-10-05 | Codex 更正交接 | `frontend/src/api/news.ts`、`frontend/src/views/PortalView.vue`、`frontend/src/views/portal.test.ts`、`frontend/e2e/portal.spec.ts` | 用户澄清原意是前端交给 DeepSeek、Codex 只负责后端。Codex 此前误解并已改上述前端文件：分区无来源空态、来源按分区显示和慢请求保护，测试通过。文件保留不回滚；此后 Codex 不再改前端，请 DeepSeek 在当前共享工作树接手并注意现有改动。后端 `sourceStatuses[].categories` 契约已完成。 | 待 DeepSeek 接手；Codex 前端占用已释放 |
 | 2026-10-05 | 用户授权 Codex 临时接手 | `frontend/src/api/news.ts`、`frontend/src/views/PortalView.vue`、`frontend/src/views/portal.test.ts` | 用户要求判断前端是否落后，若落后暂时由 Codex 实现；已核对 DSH 无活动占用。本轮仅补新闻中文译题契约和卡片显示，不调整布局或其他前端功能，完工后交还 DSH。 | 已完成并交还 DSH；验证见 §7.2 顶部 |
 | 2026-10-05 | Codex | `frontend/src/api/news.ts`、`frontend/src/views/PortalView.vue`、门户相关 Vitest/Playwright 与 `frontend/BROWSER_ACCEPTANCE.md` | 用户要求解决英文新闻：后端拟增加可空 `titleZh` 和 `titleZhSource=machine|manual`，`title` 始终是原题；请在 `titleZh` 非空时显示中文译题，旁边仍可见英文原题及原文链接，机器译题标“机器翻译·未经医学审核”，无译题时继续显示原题；不要把中文标题当医学审核，也不要自动生成摘要。后端迁移 `0030` 当前因 PostgreSQL 连接拒绝尚未应用，真实接口需等迁移。来源方面 ECDC 官方 RSS 已实测可读，但 `ecdc_news` 只在待启用目录，需门户补署名、CC BY 4.0 许可链接与译题改动标记后才可启用。Codex 不修改 DSH 前端。 | 待 DSH 认领；后端迁移待 DB 恢复 |
@@ -276,7 +278,7 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 执行者 | 任务 | 正在改的文件 | 迁移编号 | 占用数据库 | 开始时间 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| Codex | 后端专区新闻来源扩展、分类与刷新验收（用户已允许联网核验） | `backend/app/services/news/{catalog.py,adapters.py,refresh.py,repository.py}`、`backend/tests/test_news*.py`、`backend/docs/NEWS_SOURCE_EXPANSION.md`、`backend/docs/API.md`、`COORDINATION.md` | 无（如需迁移另行登记） | 是（回滚型测试） | 2026-10-05 | 进行中 |
+| Codex | 后端专区新闻来源扩展、分类与刷新验收（用户已允许联网核验） | `backend/app/services/news/{catalog.py,adapters.py,refresh.py,updates.py,auto.py}`、`backend/app/api/routes/news.py`、`backend/app/schemas/news.py`、`backend/tests/test_news*.py`、`backend/docs/{NEWS_SOURCE_EXPANSION.md,NEWS_UPDATE_PLAN.md,API.md}`、`COORDINATION.md` | 无 | 否 | 2026-10-05 | 已释放（3 来源可启用但未激活；610 passed、1 skipped；Ruff 全绿） |
 | Codex | 核对数据库状态并完成新闻专项及后端全量验收 | `COORDINATION.md`（仅协作记录）；测试读取 `backend/` | 无 | 是（回滚型测试） | 2026-10-05 | 已释放（容器原已健康；17 passed；全量 599 passed、1 skipped；补记：先核对后登记） |
 | Codex | 修复独立后端测试环境并验收新闻专区过滤 | `backend/pyproject.toml`、`backend/.gitignore`、`backend/tests/test_news_relevance.py`、`backend/.venv-codex/`（忽略）、`COORDINATION.md` | 无 | 否 | 2026-10-05 | 已释放（离线 2 passed；数据库不可达，集成测试待跑；补记：先创建环境后登记） |
 | Codex | 后端新闻专区相关性过滤：收紧 WHO 综合新闻稿归类并回归测试 | `backend/app/services/news/adapters.py`、`backend/app/services/news/catalog.py`、`backend/tests/test_news_refresh.py`、`backend/docs/NEWS_SOURCE_EXPANSION.md`、`COORDINATION.md` | 无 | 否 | 2026-10-05 | 已释放（Ruff 通过；Python 环境缺失，pytest 未运行） |
@@ -390,6 +392,31 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
   局限：**只测前端，接口是桩**，不能替代真实后端联调。需要人眼看的清单见 `frontend/BROWSER_ACCEPTANCE.md`。
 
 ### 7.2 工作报告（最新在最上）
+
+### 2026-10-05 DSH 复核国家卫健委与中国疾控营养栏目（结论：两处都不可接入）
+
+- 改动：只做只读复测，未改任何代码；结论写入 `NEWS_SOURCE_CANDIDATES.md` §10（nhc.gov.cn 412/无 robots/无 RSS；中国疾控营养栏目 200 但只有 1650B JS 外壳 + 《版权与免责声明》要求事先协议授权）。
+- 验证（本人实测）：curl 与 PowerShell 两种栈、同一开发探测 UA —— `https://www.nhc.gov.cn/`、`http://www.nhc.gov.cn/`、`/xcs/yqfkdt/index.shtml` **全部 412**，`robots.txt` **404**，无 RSS 声明；中国疾控 `/jkkp/yyjk/`、`/jkyj/yyyjk2/` 均 **200、1650B JS 外壳、0 条条目、0 个日期**，根页无 RSS 声明；WHO 与疾控同命令正常 200（排除我方代码问题）。
+- 展示条件（决定性）：中国疾控《版权与免责声明》原文「未经本网站协议授权转载、**链接**、转贴或以其他方式复制发表」→ 门户展示标题+来源+原文链接正落在需要事先授权的范围，**署名不能替代授权**；同声明第②条说「未注明来源为中国疾控的转载稿」须保留其标注来源，再利用条件较宽，是否可用属法务判断。
+- 不做与边界：**不伪造浏览器 UA/Referer 绕开反爬**（不做刻意规避站点访问意愿的事），故「换浏览器 UA 能否读」未验证、也不验证；两处均无 RSS/API 机器可读入口 → 按用户「确认一个就接入一个」的要求，本轮**一个都没接入，因为硬条件不满足**。另发现 `backend/.venv` 缺依赖（`anyio`/`annotated_types`/`annotated_doc` 全部缺失、`fastapi` 无法 import），本轮后端测试与 CLI 抓取试跑**无法执行**；我未执行任何安装/卸载、未改 `backend/**`，原因未确认，请 Codex 确认是否正在同步依赖——来源结论由直接 HTTP 探测得出，不受影响。
+
+### 2026-10-06 Codex 中文官方新闻来源优先接入
+
+- 改动：新增 WHO 中文媒体中心专用列表适配器与 `who_zh_news` 来源，仅保存中文原题、日期、同域链接，按疾病标题关键词归类；开发库启用并首次入库 2 条。营养和药物中文来源未启用；前端未改。中文候选及限制记录于 `backend/docs/NEWS_SOURCE_EXPANSION.md`。
+- 验证：WHO 中文列表项目抓取器 200、真实解析 2 条；首次刷新 `succeeded`、抓取/新增 2、拒收 0。新闻专项 21 passed；后端全量 611 passed、1 skipped；Ruff 全绿；只读核对疾病展示期 42 条，其中中文 2 条。
+- 边界：中文 2 条发表于 2026-09-25，页面按发布日期倒序，前几条仍可能都是英文；健身、药物、养生尚无已启用中文源。中国疾控营养栏目技术可读但版权条件未确认；国家卫健委候选入口项目抓取器 `FETCH_FAILED`，已在 §6 请 DSH 从另一环境复核。未安装翻译依赖、未提交或推送。
+
+### 2026-10-06 Codex 启用健身与药物新闻来源并首次试抓
+
+- 改动：经用户许可，仅在开发库启用 `odphp_physical_activity` 和 `fda_drug_updates`；手动试抓分别新增 3 条健身、1 条药物，记录来源许可说明。未启用 `odphp_food_nutrition`，未修改前端或代码。
+- 验证：两个抓取运行均为 `succeeded`、最近错误 `None`；只读核对来源、分类计数和原文链接：健身 3、药物 1、养生 0，均为官方同域链接。迁移当前为 `20261005_0030 (head)`；本轮无代码改动，沿用上一轮全量 610 passed、1 skipped / Ruff 全绿。
+- 边界：健身 3 条发表于 2026 年 4–7 月，不是当日新稿；药物 1 条发表于 2026-10-02。标题仍为英文，条目未逐条医学审核；每天刷新不保证有新稿。未提交或推送。
+
+### 2026-10-06 Codex 健康资讯后端专区来源与失败重试
+
+- 改动：新增 ODPHP 身体活动→健身、ODPHP 食品营养→养生、FDA 药物更新→药物三个可启用来源及定向解析器；仅保留相关同域标题、发布日期和原文链接，不复制摘要/正文/图片。新增 `POST /api/v1/news/refresh`，自动轮失败/部分失败后全站一次后台重试；沿用现有响应枚举和运行租约，不增加自启动或迁移。接口及来源核验更新到既有后端文档，前端不改。
+- 验证：ODPHP 两专题页项目 `httpx` 200，FDA 官网药物 RSS 经重定向后项目受控抓取器 200；源站使用政策和 robots 已核对。新闻专项 35 passed；后端全量 610 passed、1 skipped；Ruff 全绿。
+- 边界：新来源**未在数据库启用或写入新闻**；ODPHP 营养专题本次首屏相关稿在 2025 年，近期供给不足；三来源原题均为英文，未启用付费翻译。DeepSeek 接手前端接口联调，见 §6。未提交或推送。
 
 ### 2026-10-05 DSH 门户「重试更新」前端按契约实现（桩验证，后端一落地即可用）
 
