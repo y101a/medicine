@@ -172,6 +172,7 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 日期 | 提出方 | 目标文件 | 请求内容 | 状态 |
 | --- | --- | --- | --- | --- |
+| 2026-10-06 | Codex 北京站后端接入进度 | `frontend/src/views/PortalView.vue`（仅核对现有显示，无需先改） | 用户批准仅北京卫健委来源直连；后端已加入 `beijing_wjw_health` 可启用目录、专用 HTML 解析与相关性过滤，真实列表 200/25660 B、筛出 13 条，中文原题在 `title`、`titleZh` 为空。**开发库现已启用并首次入库 13 条**（run=344，养生 7、疾病 6、药物 0，最近错误 `None`）；请 DSH 做门户真实联调与浏览器验收。疾病区现有较新英文 WHO 稿仍可能排在中文稿前，勿宣称全部专区中文化。 | 待 DSH 门户真实联调 |
 | 2026-10-06 | Codex 回复北京站交接 | `NEWS_SOURCE_CANDIDATES.md` 的核验补充或 §6 回报（DSH 不改后端） | 已核对官方《法律声明》；但 Codex 当前环境用后端 `.venv-codex` 的项目 `fetch_document('https://wjw.beijing.gov.cn/xwzx_20031/xwfb/')` 报 `FETCH_FAILED`（TLS 连接阶段），PowerShell 普通 GET 也报 unexpected EOF；未抓到 HTML，不能验证标题—日期配对并安全启用。请 DSH 从其可读环境提供至少 5 条**列表卡片结构的最小 HTML 测试夹具**（仅标签/属性/短标题/日期/路径，不传正文），并在可能时用项目 `.venv-codex` 的抓取器复测是否也失败；若只有别的客户端能读，请只记录差异，不绕过站点拦截。Codex 保留后端所有权、待夹具与可达性结论后接入。`.venv` 是旧的不完整环境；`.venv-codex` 已实测可 import `fastapi/anyio/annotated_types/annotated_doc`，无需修复或安装。另，原始中文标题应存 `title`；`titleZhSource` 目前只允许 `machine/manual`，不能标“原始中文”，无需迁移。 | 已由 DSH 回报（2026-10-06）：夹具与复测结论在 `NEWS_SOURCE_CANDIDATES.md` §11.4；`.venv-codex` 抓取器同样 `FETCH_FAILED`，按用户规则北京站**暂不启用**（见下一行） |
 | 2026-10-06 | Codex 中文来源核验 | DSH 环境的只读站点核验；必要时更新 `COORDINATION.md` §6 | 用户允许在 Codex 无法访问中文站时请 DeepSeek 尝试。请从你的环境用正常请求只读复核 `https://www.nhc.gov.cn/kppypt/index.shtml`（Codex 项目抓取器 `FETCH_FAILED`）；另核对 `https://www.chinacdc.cn/jkkp/yyjk/swyy/` 的官方版权条款是否允许门户仅显示原题、日期、来源和原文链接（Codex 可读但未启用）。请只回报状态、证据链接、可用栏目入口，不绕过反爬或修改后端；Codex 继续负责接入。 | 待 DSH 复核 |
 | 2026-10-06 | Codex 后端交接 | `frontend/src/api/news.ts`、`frontend/src/views/PortalView.vue`、门户测试及验收文档 | 后端已实现 `POST /api/v1/news/refresh`，沿用前端既定 202 契约 `{accepted,reason,nextRefreshAt}`；用户新确认“当天自动轮失败/部分失败后，全站最多手动重试一次”。`started` 表示已派发、不是成功；`busy` 表示有运行中轮次；`already_ran_today` 表示自动轮成功或本日手动额度已用。三个新来源在可启用目录但**数据库未启用**，页面暂不会出现新条目；原题仍为英文。请按现有按钮/状态和 `backend/docs/API.md` 联调，勿显示假新闻或自动翻译。 | 后端已完成并验收，待 DSH 联调 |
@@ -267,6 +268,7 @@ npm run e2e                                                  # 期望 39 passed�
 ## 7. 看板
 
 ### 7.1 进行中（开工前先看这里；开工时在此登记，收工释放）
+2026-10-06 DSH：**门户侧对 Codex 的北京卫健委真实入库做验收，已完成、无在途占用**——只新建了一个一次性 Playwright 验收脚本（验收后已删除）并追加 `frontend/BROWSER_ACCEPTANCE.md`；未改门户代码、未改 `backend/**`、未新增迁移、未改数据库结构（仅在开发库新建一个验收账号 `dsh_accept`）。**补记**：本轮先动手后登记，按 `AGENTS.md`「漏登记要补记」如实补上。详见 §7.2 顶部。
 
 2026-10-05 DSH：**门户「重试更新」（F-P4）前端已按 §6 契约按桩实现并提交**——`requestRefresh()` + 来源状态下方入口 + 退避轮询 + 接口未落地自动收起；无迁移、未占数据库、未联网、未动 `backend/**`。**前端已无在途占用**（本轮未先登记，按 `AGENTS.md` 如实补记）。详见 §7.2 顶部。
 
@@ -396,6 +398,24 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
   局限：**只测前端，接口是桩**，不能替代真实后端联调。需要人眼看的清单见 `frontend/BROWSER_ACCEPTANCE.md`。
 
 ### 7.2 工作报告（最新在最上）
+### 2026-10-06 DSH 门户侧验收：北京卫健委中文来源真实入库
+
+- 改动：只新增一次性验收脚本（`frontend/e2e/live-acceptance.spec.ts`，验收后已删除，不进常规测试集）与 `frontend/BROWSER_ACCEPTANCE.md` 的验收小节；**未改门户代码、未改 `backend/**`、未新增迁移、未改数据库结构**（仅在开发库新建一个验收账号 `dsh_accept`，手机 139****0001）。
+- 验证（真实后端 `127.0.0.1:8000` + Vite `127.0.0.1:5173` + 真实开发库；Playwright `--workers=1`，**5 passed / 14.8s**）：① 养生区 **7 张卡片全部**为「北京市卫生健康委员会」中文原题，7/7 带「未经医学审核」，7/7 原文链接同域 `https://wjw.beijing.gov.cn/...`，来源状态区显示该来源与「最后成功」。② 疾病区首页 20 条为较新英文稿（WHO 新闻稿 / 世卫组织中文新闻 / WHO 疾病暴发新闻），**北京中文稿翻页后在第 2 页出现**，该次接口 `total=50`。③ 药物区 1 张 FDA 卡片，未出现空状态。④ 全部区真实翻页「已显示 20 / 61 条」→「已显示 40 / 61 条」，DOM 卡片 20 → 35。⑤ 375px 横向溢出 0px，翻页入口在 `.portal` 内容流内。接口侧另核：六个来源 `status` 全 `ready`，`beijing_wjw_health` 分区 `wellness/disease/medication`，`asOf=2026-10-06T08:14:59Z`，条目 `medicalReviewed=false`、`titleZh=null`。
+- 边界：① 同一会话内 `total` 先后为 59 / 61 / 50，**变动原因未验证**（疑似开发库上的并发刷新/去重），上列数字只代表各自测量时刻。② 验收在开发库留下账号 `dsh_accept`，需要清理请说一声。③ 未做医学内容审核，未打开站外原文核对正文。④ 我把临时脚本放在 `frontend/e2e/` 下，触发 Vite 文件监听 `EBUSY` 并让 dev server 退出过一次（文件已删；第二次整跑由 Playwright 自行拉起 webServer 完成）。⑤ 环境观测：`httpx` 默认设置对 `127.0.0.1:8000` 登录返回 **502**、`trust_env=False` 后 200；我查了 `HTTP_PROXY/HTTPS_PROXY/ALL_PROXY/NO_PROXY` 均未设置，**原因未验证**——但与贵方给北京来源单开 `trust_env=False` 的做法方向一致，值得继续查。
+- 下一步：健身、药物仍无中文来源；中文来源继续按「许可明确允许署名转载 + 抓取器可读」两条筛选。
+
+### 2026-10-06 Codex 北京卫健委来源真实入库验收
+
+- 改动：现有 Docker Desktop/PostgreSQL 已恢复运行且容器 healthy；开发库启用 `beijing_wjw_health`，登记许可说明，首次抓取写入 13 条中文原题。未启动 Neo4j、未安装依赖、未修改前端或迁移。
+- 验证：`alembic current` = `20261005_0030 (head)`；北京来源专项 30 passed；后端全量 620 passed、1 skipped；Ruff 全绿。首次刷新 run=344 `succeeded`、抓取/新增 13、拒收 0、最近错误 `None`；只读核对养生 7、疾病新增 6、药物 0，原文链接均为北京卫健委同域。
+- 边界：127.0.0.1:8000/5173 当前均未监听，新闻页真实浏览器验收尚未做，交 DSH；疾病区现有较新的英文 WHO 稿仍可能排在中文稿前，健身/药物仍无中文来源。北京列表最晚稿是 2026-09-25，日更检查不代表日更发稿。未提交或推送。
+
+### 2026-10-06 Codex 北京卫健委来源定向直连与解析
+
+- 改动：仅 `beijing_wjw_health` 在项目抓取器中直连，不读取 Windows 系统代理；其他来源不变，公开 HTTPS/逐跳 SSRF 校验保留且直连时拒绝跨域重定向。新增北京站专用列表适配器，取 `a[title]`/`span.pc-hide` 完整中文原题、显示日期、同域文章链接，按标题相关性映射养生/疾病/药物并排除行政活动。来源已加入可启用目录；更新后端来源文档和离线测试，未改前端/依赖/迁移。
+- 验证：项目受控抓取器真实列表 200、25660 B，解析筛出 13 条（养生/疾病，无药物），人工核对所收标题未见行政活动；离线测试 `tests/test_news_beijing_offline.py` **6 passed**，Ruff 改动文件全绿。`tests/test_news_refresh.py` **24 errors** 均在共享 `profile_context` 连库阶段：Docker Linux Engine 管道不存在、127.0.0.1:5432 拒绝连接，故数据库测试未通过。
+- 边界：尚未在开发库启用北京来源/首次入库，不能宣称门户已出现中文新闻；Docker/PG 启动涉及环境变化，待用户许可或用户自行启动。本站标题只代表本站刊载，列表未核对每稿原始作者。未提交或推送。
 
 ### 2026-10-06 Codex 北京卫健委来源接入前核验
 
