@@ -409,6 +409,7 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
   局限：**只测前端，接口是桩**，不能替代真实后端联调。需要人眼看的清单见 `frontend/BROWSER_ACCEPTANCE.md`。
 
 ### 7.2 工作报告（最新在最上）
+**2026-10-06 DSH 补记（纠正）**：上一条提交 `61dffd3` 时 ruff 仍有 1 个 E501（在测试文件 docstring），即「提交前基线通过」没满足就提交了，这是我的流程错误。已在 `6a1e0b6` 修掉，`ruff check app tests` 与相关单测复跑通过。教训记下：ruff/pytest 必须在提交前同一次跑完并看过完整输出，不能只看末几行。
 ### 2026-10-06 DSH 机器预审误报修复（真实语料 16 → 1）
 
 - 改动：`backend/app/rag/prototype_precheck.py`（新增上下文抑制：`DISCLAIMER_CUES` / `TAKING_MEDICATION_CUES` / `NON_MEDICATION_CONTEXT` / 整句否定判断 / `diagnosis_tone` 只抑制被否定的绝对化 / `efficacy_claim` 一律上报；`PrecheckFinding` 增加 `suppressed` 与 `suppression_reason`；`PrecheckResult` 增加 `suppressed_counts`；新增 `scan_text_with_suppression`）、`backend/tests/test_prototype_precheck.py`（12 项，含一段人工构造的高危样文必须全部命中）。
