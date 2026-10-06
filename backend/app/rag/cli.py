@@ -183,6 +183,15 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     evaluation_parser.add_argument(
+        "--scope",
+        choices=("auto", "approved_only"),
+        default="auto",
+        help=(
+            "检索范围：auto（默认，development 环境按现状允许召回 prototype 语料）；"
+            "approved_only（只在 development 也强制仅 approved，用于正式知识上线的独立评测）"
+        ),
+    )
+    evaluation_parser.add_argument(
         "--gate-profile",
         choices=RELEVANCE_GATE_PROFILES,
         default="none",
@@ -295,6 +304,7 @@ async def run_command(args: argparse.Namespace) -> int:
                     split=args.split,
                     max_retries=args.max_retries,
                     checkpoint_path=args.checkpoint,
+                    scope=args.scope,
                     gate=gate_from_profile(
                         args.gate_profile,
                         vector_threshold=args.gate_vector_threshold,

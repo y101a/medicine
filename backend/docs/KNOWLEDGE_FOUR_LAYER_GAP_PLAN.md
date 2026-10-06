@@ -48,7 +48,7 @@
 
 ```powershell
 cd backend
-.\.venv\Scripts\python.exe -m app.rag.cli evaluate-prototype --dataset docs/medical_retrieval_evaluation_four_layer_batch1.json --split tune --mode keyword --top-k 3 --max-retries 0
+.\.venv-codex\Scripts\python.exe -m app.rag.cli evaluate-prototype --dataset docs/medical_retrieval_evaluation_four_layer_batch1.json --split tune --mode keyword --top-k 3 --max-retries 0
 ```
 
 首批候选内容完成后的预设检索门槛：同一冻结题集下，`tune` Top-3 ≥ **11/12**；内容与检索配置冻结后只跑一次 `holdout`，Top-3 ≥ **7/8**；合计 ≥ **18/20**，且每层 ≥ **4/5**、标为 `urgent`/`emergency` 的题必须找到对应主题。未达标只在 `tune` 分析修订，若看过 holdout 后再改内容或阈值，就必须另建干净留出集，不能重复宣称这 8 题是独立验收。
@@ -64,3 +64,17 @@ cd backend
 3. 有真实合格审核人后，按受控导入元数据逐篇审核；没有审核人或权限就停在原型/候选，不改成 `approved`。
 4. 只用 12 道 `tune` 做开发评测；内容冻结后跑 8 道 holdout 与人工安全核验。正式知识另跑 approved-only 评测。
 5. 仅把已审核、有效证据支持且适合表达为现有谓词的关系交给图谱审核；Neo4j 是投影，不是补知识的入口。
+
+## 追加（2026-10-06，DSH 实现）：approved-only 独立评测 + 命令修正
+
+- **命令修正**：本文件早期的复现命令使用 `backend\.venv`，该环境已损坏（缺 `anyio` / `annotated_types` / `annotated_doc`，FastAPI 无法导入）；后端权威环境是 `.venv-codex`（Python 3.12.6）。以上命令已按此修正。
+- **新增能力**：`evaluate-prototype` 增加 `--scope auto|approved_only`。
+  - `auto`（默认）：行为与历史逐位一致（development 环境允许召回 prototype 语料）。
+  - `approved_only`：**即使在 development 也强制只取 `ingestion_status=approved` 且 `review_status=approved`**，用于正式知识上线前的独立评测；报告 `metric` 变为 `approved_document_retrieval`，并新增 `scope` 字段，避免与原型成绩横比。
+  - `approved_only` 目前**不允许**与 `--checkpoint` 同用（断点身份未纳入 scope，跨范围复用会污染结果，故直接拒绝而不是静默算错）。
+- **实现位置**：`app/rag/retrieval.py`（`RetrievalScope` 与过滤分支）、`app/rag/evaluation.py`（`run_prototype_evaluation(scope=...)`、`build_report` 指标名与 `scope` 字段）、`app/rag/cli.py`（`--scope` 参数与透传）。
+- **实测（2026-10-06，`.venv-codex`，keyword / top-k=3 / 零外部调用）**：
+  - 四层第一批题集 `tune`：`--scope auto` 命中 **5/12**、Recall@3 **0.4167**（与本文档早先记录的零外部基线一致，说明默认路径未被改动）；
+  - `--scope approved_only` 命中 **0/12**、Recall@3 **0.0**（当前库已审核文档为 0 篇，属**预期**结果，不是检索失效）；
+  - `--scope approved_only --checkpoint ...` 返回 `{"ok": false, "error": "approved_only 评测暂不支持断点续跑（--checkpoint）"}`。
+- **仍未做**：26 篇原型的分层回填、四主题的来源/版权/医学审核、holdout 与 approved-only 正式评测。这些都需要人工审核人，代码侧不代做。

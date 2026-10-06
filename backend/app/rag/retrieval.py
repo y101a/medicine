@@ -113,6 +113,10 @@ def _fusion_score(
     )
 
 
+RetrievalScope = Literal["auto", "approved_only"]
+RETRIEVAL_SCOPES: tuple[RetrievalScope, ...] = ("auto", "approved_only")
+
+
 async def search_knowledge(
     db: AsyncSession,
     query: str,
@@ -121,6 +125,7 @@ async def search_knowledge(
     mode: RetrievalMode = "hybrid",
     embedder: QueryEmbedder | None = None,
     include_web_cache: bool = False,
+    scope: RetrievalScope = "auto",
 ) -> RetrievalResult:
     if top_k < 1 or top_k > 10:
         raise RetrievalError(422, "RETRIEVAL_LIMIT_INVALID", "召回数量必须为 1-10")
@@ -138,28 +143,37 @@ async def search_knowledge(
         KnowledgeSource.ingestion_status == "approved",
         KnowledgeDocument.review_status == "approved",
     )
-    if settings.app_environment == "development":
-        status_filter = or_(
-            and_(
-                KnowledgeSource.ingestion_status == "approved",
-                KnowledgeDocument.review_status == "approved",
-            ),
-            and_(
-                KnowledgeSource.ingestion_status == "prototype",
-                KnowledgeDocument.review_status == "prototype",
-            ),
+    if scope not in RETRIEVAL_SCOPES:
+        raise RetrievalError(
+            422,
+            "RETRIEVAL_SCOPE_INVALID",
+            "检索范围只能是 auto 或 approved_only",
         )
-    elif include_web_cache and settings.web_search_enabled:
-        # Only the consultation path may opt into unreviewed, expiring web
-        # excerpts. Knowledge API and document generation remain approved-only.
-        status_filter = or_(
-            status_filter,
-            and_(
-                KnowledgeSource.source_key == "web_search_prototype",
-                KnowledgeSource.ingestion_status == "prototype",
-                KnowledgeDocument.review_status == "prototype",
-            ),
-        )
+    # scope="approved_only" 时即使在 development 也绝不混入 prototype 语料：
+    # 正式知识上线前必须能单独验证「仅 approved」的召回，不能拿原型命中冒充正式通过。
+    if scope == "auto":
+        if settings.app_environment == "development":
+            status_filter = or_(
+                and_(
+                    KnowledgeSource.ingestion_status == "approved",
+                    KnowledgeDocument.review_status == "approved",
+                ),
+                and_(
+                    KnowledgeSource.ingestion_status == "prototype",
+                    KnowledgeDocument.review_status == "prototype",
+                ),
+            )
+        elif include_web_cache and settings.web_search_enabled:
+            # Only the consultation path may opt into unreviewed, expiring web
+            # excerpts. Knowledge API and document generation remain approved-only.
+            status_filter = or_(
+                status_filter,
+                and_(
+                    KnowledgeSource.source_key == "web_search_prototype",
+                    KnowledgeSource.ingestion_status == "prototype",
+                    KnowledgeDocument.review_status == "prototype",
+                ),
+            )
     base_filters = (
         status_filter,
         or_(

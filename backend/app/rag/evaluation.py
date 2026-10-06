@@ -159,6 +159,8 @@ class RetrievalEvaluationReport:
     # 报告必须自带模式：keyword 与 vector 的 similarity 语义不同
     # （pg_trgm word_similarity / 余弦相似度），不写明模式就没法横向对比。
     mode: RetrievalMode = "hybrid"
+    # 报告必须自带检索范围：approved_only 与 auto（development 混入原型）不可横比。
+    scope: str = "auto"
     # 报告也必须自带门槛：同一份召回在不同门槛下指标不同，不写清门槛数字，指标无法复核。
     gate_profile: str = "none"
     gate_thresholds: dict[str, float | None] = field(default_factory=dict)
@@ -173,11 +175,19 @@ async def _search_with_retry(
     top_k: int,
     mode: RetrievalMode,
     max_retries: int,
+    scope: str = "auto",
 ) -> tuple[RetrievalResult, int]:
     retry_count = 0
     while True:
         try:
-            result = await search_knowledge(db, case.query, top_k=top_k, mode=mode)
+            # 默认 auto 路径保持历史调用签名不变（既有评测桩只接受 top_k/mode）；
+            # 只有显式指定非默认 scope 时才多传一个关键字参数。
+            if scope == "auto":
+                result = await search_knowledge(db, case.query, top_k=top_k, mode=mode)
+            else:
+                result = await search_knowledge(
+                    db, case.query, top_k=top_k, mode=mode, scope=scope  # type: ignore[arg-type]
+                )
             return result, retry_count
         except RetrievalError as exc:
             if exc.code not in RETRYABLE_EVALUATION_ERRORS or retry_count >= max_retries:
@@ -476,9 +486,15 @@ async def run_prototype_evaluation(
     max_retries: int = 2,
     checkpoint_path: Path | None = None,
     gate: RelevanceGate | None = None,
+    scope: str = "auto",
 ) -> RetrievalEvaluationReport:
     if get_settings().app_environment != "development":
         raise RetrievalEvaluationError("原型语料评测只允许在 development 环境运行")
+    if scope not in ("auto", "approved_only"):
+        raise RetrievalEvaluationError("检索范围只能是 auto 或 approved_only")
+    if scope != "auto" and checkpoint_path is not None:
+        # 断点身份目前不含 scope，跨范围复用会污染结果：宁可直接拒绝，不静默算错。
+        raise RetrievalEvaluationError("approved_only 评测暂不支持断点续跑（--checkpoint）")
     if not 0 <= max_retries <= 5:
         raise RetrievalEvaluationError("单题重试次数必须为 0-5")
     active_gate = gate or no_gate()
@@ -516,6 +532,7 @@ async def run_prototype_evaluation(
             top_k=top_k,
             mode=mode,
             max_retries=max_retries,
+            scope=scope,
         )
         retry_count += case_retries
         result = score_case(case, retrieval.items, active_gate)
@@ -536,6 +553,7 @@ async def run_prototype_evaluation(
         top_k=top_k,
         retry_count=retry_count,
         gate=active_gate,
+        scope=scope,
     )
 
 
@@ -560,6 +578,7 @@ def build_report(
     top_k: int,
     retry_count: int,
     gate: RelevanceGate,
+    scope: str = "auto",
 ) -> RetrievalEvaluationReport:
     """把逐题结果汇总成报告。
 
@@ -589,7 +608,12 @@ def build_report(
         result.top_similarity for result in case_results if result.top_similarity is not None
     ]
     return RetrievalEvaluationReport(
-        metric="prototype_document_retrieval",
+        metric=(
+            "approved_document_retrieval"
+            if scope == "approved_only"
+            else "prototype_document_retrieval"
+        ),
+        scope=scope,
         case_count=len(case_results),
         supported_case_count=len(supported_results),
         unsupported_case_count=len(unsupported_results),

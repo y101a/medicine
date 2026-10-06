@@ -267,7 +267,9 @@ npm run e2e                                                  # 期望 39 passed�
 
 ## 7. 看板
 
+- **2026-10-06 DSH（用户当面临时跨边界授权）**：实现四层知识计划里唯一缺失的代码件——**「仅 approved」独立评测**。改动集中在 3 个文件：`app/rag/retrieval.py`（新增 `RetrievalScope`；`scope="approved_only"` 在 development 也强制只取 approved）、`app/rag/evaluation.py`（`run_prototype_evaluation(scope=...)`、报告新增 `scope` 字段与 `approved_document_retrieval` 指标、approved_only 拒绝与 `--checkpoint` 同用）、`app/rag/cli.py`（`evaluate-prototype --scope`），另修正 `docs/KNOWLEDGE_FOUR_LAYER_GAP_PLAN.md` 里失效的 `.venv` 命令。**开工前已核对：这三个文件均不在你的在途改动清单内**（news / document_extract / config / pyproject / API.md 等我一个都没碰）。请复核后接管所有权；若需回退，改动只在这三处。**我知道默认 `auto` 路径保持不额外传 `scope` 是为了不破坏既有 6 项评测桩的调用契约；你若要给 approved_only 补单测，需要给桩函数加参数。**
 ### 7.1 进行中（开工前先看这里；开工时在此登记，收工释放）
+2026-10-06 DSH：**跨边界实现 approved-only 评测（用户当面临时授权）已完成、无在途占用**——改 `app/rag/{retrieval,evaluation,cli}.py` 与 `docs/KNOWLEDGE_FOUR_LAYER_GAP_PLAN.md`；无迁移、未占数据库（评测只读）、未联网、未调用付费向量。**补记**：本轮先动手后登记，按 `AGENTS.md` 如实补上。详见 §7.2 顶部与 §6 对应条目。
 2026-10-06 DSH：**门户侧对 Codex 的北京卫健委真实入库做验收，已完成、无在途占用**——只新建了一个一次性 Playwright 验收脚本（验收后已删除）并追加 `frontend/BROWSER_ACCEPTANCE.md`；未改门户代码、未改 `backend/**`、未新增迁移、未改数据库结构（仅在开发库新建一个验收账号 `dsh_accept`）。**补记**：本轮先动手后登记，按 `AGENTS.md`「漏登记要补记」如实补上。详见 §7.2 顶部。
 
 2026-10-05 DSH：**门户「重试更新」（F-P4）前端已按 §6 契约按桩实现并提交**——`requestRefresh()` + 来源状态下方入口 + 退避轮询 + 接口未落地自动收起；无迁移、未占数据库、未联网、未动 `backend/**`。**前端已无在途占用**（本轮未先登记，按 `AGENTS.md` 如实补记）。详见 §7.2 顶部。
@@ -284,6 +286,12 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 执行者 | 任务 | 正在改的文件 | 迁移编号 | 占用数据库 | 开始时间 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
+| Codex | Neo4j 公共图只读查询、revision/证据校验、影子接线和 API 契约；不改四层内容或前端 | `backend/app/services/knowledge_graph_query.py`、`backend/app/api/routes/knowledge_graph.py`、`backend/app/api/router.py`、`backend/app/ai/graph_context.py`、`backend/tests/test_knowledge_graph_query.py`、`backend/docs/{API.md,KNOWLEDGE_GRAPH.md}`、`COORDINATION.md` | 无 | 否（测试时另行占用） | 2026-10-06 | 进行中 |
+| Codex | 本地 Tesseract 安装后真实 OCR 联调与已规划功能缺口核对（补记：代码调整先于登记） | `backend/app/services/document_extract_worker.py`、`backend/tests/test_document_ocr.py`、`backend/docs/DOCUMENT_TABLE_EXTRACTION.md`、`COORDINATION.md` | 无 | 否 | 2026-10-06 | 已释放（未提交；真实中英文 OCR 成功，637 passed、1 skipped，Ruff 全绿） |
+| Codex | 本地 Tesseract PDF 图片 OCR 代码与回归测试（不安装引擎、不外发） | `backend/app/services/document_extract_worker.py`、`backend/app/services/document_extract.py`、`backend/tests/test_document_ocr.py`、`backend/docs/DOCUMENT_TABLE_EXTRACTION.md`、`COORDINATION.md` | 无 | 否 | 2026-10-06 | 已释放（未提交；全量 637 passed、1 skipped，Ruff 全绿；真实 OCR 待安装授权） |
+| Codex | 修复 PDF 正文/目录误判为表格并误删，复测真实手册 | `backend/app/services/document_extract_worker.py`、`backend/tests/test_document_tables.py`、`backend/docs/DOCUMENT_TABLE_EXTRACTION.md`、`COORDINATION.md` | 无 | 否 | 2026-10-06 | 已释放（未提交；真实手册 34 页正文恢复；全量 631 passed、1 skipped，Ruff 全绿） |
+| Codex | 文字型 PDF 表格第二批：保守行列识别、拒绝不可靠布局、验收样本 | `backend/app/services/document_extract_worker.py`、`backend/tests/test_document_tables.py`、`backend/docs/DOCUMENT_TABLE_EXTRACTION.md`、`COORDINATION.md` | 无 | 否 | 2026-10-06 | 已释放（未提交；全量 629 passed、1 skipped，Ruff 全绿） |
+| Codex | 文档表格第一批：统一结构、DOCX/PPTX 行列保留与回归测试 | `backend/app/services/document_extract.py`、`backend/app/services/document_extract_worker.py`、`backend/tests/test_document_tables.py`、`backend/docs/DOCUMENT_TABLE_EXTRACTION.md`、`COORDINATION.md` | 无 | 否 | 2026-10-06 | 已释放（未提交；专项 22 passed；全量 623 passed、1 failed、1 skipped，失败项隔离复跑通过） |
 | Codex | 后端专区新闻来源扩展、分类与刷新验收（用户已允许联网核验） | `backend/app/services/news/{catalog.py,adapters.py,refresh.py,updates.py,auto.py}`、`backend/app/api/routes/news.py`、`backend/app/schemas/news.py`、`backend/tests/test_news*.py`、`backend/docs/{NEWS_SOURCE_EXPANSION.md,NEWS_UPDATE_PLAN.md,API.md}`、`COORDINATION.md` | 无 | 否 | 2026-10-05 | 已释放（3 来源可启用但未激活；610 passed、1 skipped；Ruff 全绿） |
 | Codex | 核对数据库状态并完成新闻专项及后端全量验收 | `COORDINATION.md`（仅协作记录）；测试读取 `backend/` | 无 | 是（回滚型测试） | 2026-10-05 | 已释放（容器原已健康；17 passed；全量 599 passed、1 skipped；补记：先核对后登记） |
 | Codex | 修复独立后端测试环境并验收新闻专区过滤 | `backend/pyproject.toml`、`backend/.gitignore`、`backend/tests/test_news_relevance.py`、`backend/.venv-codex/`（忽略）、`COORDINATION.md` | 无 | 否 | 2026-10-05 | 已释放（离线 2 passed；数据库不可达，集成测试待跑；补记：先创建环境后登记） |
@@ -398,6 +406,47 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
   局限：**只测前端，接口是桩**，不能替代真实后端联调。需要人眼看的清单见 `frontend/BROWSER_ACCEPTANCE.md`。
 
 ### 7.2 工作报告（最新在最上）
+### 2026-10-06 DSH 跨边界实现：四层知识「仅 approved」独立评测
+
+- 改动：`backend/app/rag/retrieval.py`（新增 `RetrievalScope = auto|approved_only` 与 `RETRIEVAL_SCOPES`；`search_knowledge(scope=...)`，`approved_only` 时 development 环境也只取 approved，不再混入 prototype 与 web 缓存）、`backend/app/rag/evaluation.py`（`run_prototype_evaluation(scope=...)`；`_search_with_retry` 透传；报告新增 `scope` 字段、`approved_only` 时 `metric=approved_document_retrieval`；`approved_only` 与 `--checkpoint` 同用直接报错）、`backend/app/rag/cli.py`（`evaluate-prototype --scope`）；另修正 `backend/docs/KNOWLEDGE_FOUR_LAYER_GAP_PLAN.md` 里失效的 `.venv` 复现命令并追加实现说明。**未碰 Codex 在途文件**（news / document_extract / core/config / pyproject / docs/API.md 等），无迁移、数据库只读、未联网、未付费。
+- 验证（`.venv-codex`）：AST 编译三个文件通过；`pytest tests/test_retrieval_evaluation.py` **25 passed**，`pytest tests/test_retrieval.py tests/test_retrieval_relevance_gate.py` **32 passed**；真实 CLI 两次运行（四层第一批题集 `tune`、keyword、top-k=3、`--max-retries 0`、零外部调用）：`--scope auto` 命中 **5/12**、Recall@3 **0.4167**（与文档既有零外部基线逐位一致 → 默认路径未被改动），`--scope approved_only` 命中 **0/12**、Recall@3 **0.0**、指标名为 `approved_document_retrieval`；`--scope approved_only --checkpoint` 返回明确错误。
+- 边界：①`approved_only` 得 0/12 是**预期**（当前库 `approved` 文档 0 篇、图谱发布 0），不代表检索失效，也**不能**用它宣称正式知识合格；②本轮**未做**分层回填、四主题内容、来源与版权/医学审核——这些卡在人工审核人，按计划停点不能自动提升状态；③默认路径为兼容既有 6 项评测桩而未额外传 `scope`，若后续补 approved_only 单测需同步改桩；④未跑后端完整套件（`.venv` 损坏，且本轮只涉及 rag 三个文件），未跑 holdout。
+- 下一步：人工完成 26 篇原型主层/副层/`topic_key` 回填与四主题来源审核后，再跑 `holdout` 与 approved-only 正式评测；分层回填工具目前仍缺（只有受控导入强制校验，没有独立回填/盘点命令）。
+### 2026-10-06 Codex 本地 Tesseract 真实 OCR 与规划缺口核对
+
+- 改动：用户明确授权后，从 Tesseract 官方文档推荐的 UB Mannheim 来源安装了签名有效的 Tesseract 5.3.0；`chi_sim` 从 Tesseract 官方 `tessdata_fast` 下载并与 `eng` 放在已忽略的 `backend/data/tessdata/`。Worker 在 Windows PATH 缺失时识别标准安装路径，OCR 子进程自动读取项目本地语言包；更新文档。无前端、数据库、迁移、Git 提交或推送。补记：代码调整先于 §7.1 登记，已如实补记并释放。
+- 验证：真实引擎在合成图片 PDF 中识别“白细胞 6.2 Glucose 5.6”，`parse_pdf` 产出 1 个带未核对标记的 OCR 块、0 个结构化表格；专项 35 passed；后端全量 637 passed、1 skipped；Ruff 全绿。默认沙盒阻断本地 DB 连接，改用允许访问本地 DB 的环境完成测试。
+- 边界：OCR 目前只处理 PDF 内嵌栅格图；DOCX/PPTX 图片及图片表格结构未做。盘点仅列实际代码缺口：四层正式知识补充/审核、MCP 自动调用与公开药品说明书工具、逐句医学事实复核、管理员端、咨询分类图表等；Neo4j 投影与 DOCX/PPTX 生成功能已有代码，不列为未实现。未安装任何常驻后台任务。
+- 下一步：优先为四层知识第一批主题补具体来源并走医学审核；OCR 对 DOCX/PPTX 图片扩展及图片表格识别另立安全任务，不与本次 PDF OCR 混同。
+
+### 2026-10-06 Codex PDF 内嵌图片本地 OCR 代码接入
+
+- 改动：文档解析子进程只调用本机 Tesseract（须含 `chi_sim` 与 `eng`），对 PDF 内嵌栅格图作有界 OCR；输出标记“未经核对、表格对应未验证”，不加入结构化表格。缺引擎时混合 PDF 保留正文并提示，纯图片 PDF 返回 `FILE_OCR_UNAVAILABLE`。新增 6 项测试与运行边界文档；未安装引擎、未联网、未改前端/数据库、未提交。
+- 验证：OCR+表格+附件专项 35 passed；后端全量 `pytest -q` 637 passed、1 skipped；`ruff check app tests migrations` 全绿。真实非医学手册在未安装引擎条件下，34 页正文、目录仍可检索，20 个含图片页面提示未读取，0 OCR 文字（如实）。
+- 边界：本机未安装 Tesseract，真实中文识字效果与 CLI 集成未验证；用户安装授权尚未答复，不自行下载或改 PATH。每份最多尝试 12 张图片、每页 3 张；不还原图片表格结构、不解释图像意义。此前的 `backend/-.png` 临时渲染文件仍在，待删除授权。
+- 下一步：得到安装与联网授权后，在本机安装 Tesseract + `chi_sim`/`eng`，用无敏感信息图片 PDF 做真实 OCR 验收。
+
+### 2026-10-06 Codex 修复 PDF 正文/目录误判
+
+- 改动：PDF 表格候选必须有相邻或隔一行的两行完整列网格；普通文字片段、目录和段落不再因拒绝表格而被删除。旋转或过密布局保留原文并标记表格关系未验证。新增普通段落/目录碎片化回归，并更新验收文档；未改数据库、前端或外部 PDF，未提交。
+- 验证：专项 `tests/test_document_tables.py tests/test_attachments.py` 29 passed；后端全量 `pytest -q` 631 passed、1 skipped；`ruff check app tests migrations` 全绿。非医学真实手册 34 页：修复前应用解析 3,076 字、34 页误报；修复后 11,272 字、34 正文块、0 误报、0 表格，目录/Vivado/Verilog 关键词可检索。
+- 边界：该文件的 40 张内嵌图片不做 OCR；无医学表格，不能证明医学数值关联准确。上轮本地渲染意外产生的 `backend/-.png` 仍在，已询问删除许可但未收到答复，未擅自删除。
+- 下一步：使用去标识化、确有医学表格的真实样本验证项目/数值/单位/参考范围对应。
+
+### 2026-10-06 Codex 文字型 PDF 表格第二批
+
+- 改动：基于现有 pypdf 文字坐标，仅接受稳定的 3～8 列网格；每页独立产生结构化单元格和带列号的检索块。偏移、缺格、短行或不支持的布局不猜列，剔除疑似表格数值并提示核对原件。新增合成 PDF 样本及验收文档；未安装依赖、未改数据库、未改前端、未提交。
+- 验证：`pytest -q` 629 passed、1 skipped（exit 0）；`ruff check app tests migrations` 全绿。PDF 样本覆盖乱序内容流、偏移、缺格、短行和跨页不误合并。
+- 边界：仅合成文字型样本已自动验证；真实检验报告尚未做视觉及人工医学核对。图片表格、扫描件、复杂布局和跨页单表仍不支持；无法按坐标分离的文本流可能只按普通正文提取，不能视为可靠表格。
+- 下一步：用去标识化真实 PDF 样本做视觉人工核对，再决定 OCR／视觉识别接入范围。
+
+### 2026-10-06 Codex 文档表格提取第一批
+
+- 改动：DOCX/PPTX 真表格输出统一单元格坐标结构，并以逐行、显式列号的文本块进入既有附件与个人知识库链路；合并单元格标记需核对。新增表格回归和验收矩阵；不改 PDF、OCR、数据库或前端，未提交。
+- 验证：专项 `tests/test_document_tables.py tests/test_attachments.py` 初次 22 passed；最终单独表格用例 4 passed、Ruff 全绿。全量 `pytest -q` 623 passed、1 failed、1 skipped；失败在 `test_account_deletion.py` 的审计事件时间排序，与本项代码路径无交集；该项隔离复跑 1 passed。
+- 边界：结构化表格只在本次上传的内存结果中保留；持久化仍为带坐标的加密文本块，不提供原始表格 API。图片表格、伪表格、PDF 表格未实现。合并单元格虽标记不确定，但仍需人工核对原件；下一批处理 PDF 表格与长行分块。
+- 下一步：建立带人工标注的文字型 PDF 样本，再做表格定位与低置信度拒绝。
+
 ### 2026-10-06 DSH 门户侧验收：北京卫健委中文来源真实入库
 
 - 改动：只新增一次性验收脚本（`frontend/e2e/live-acceptance.spec.ts`，验收后已删除，不进常规测试集）与 `frontend/BROWSER_ACCEPTANCE.md` 的验收小节；**未改门户代码、未改 `backend/**`、未新增迁移、未改数据库结构**（仅在开发库新建一个验收账号 `dsh_accept`，手机 139****0001）。
