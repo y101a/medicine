@@ -258,7 +258,9 @@ npm run e2e                                                  # 期望 39 passed�
 | 2026-09-27 | DSH | `backend/docs/DOCUMENT_GENERATION.md`、`backend/scripts/**`（**仅提醒，DSH 不动后端**） | ①**延续 2026-09-25 禁令**：文档生成 worker（`app/document_generation_cli.py`）**不得**在本机写任何自启动——不注册计划任务/服务/Run 键，`backend/scripts/**` 里也不要有注册命令；文档只写「由用户或项目显式启动」，生产环境交服务管理器托管。DSH 本轮已复查本机：**无任何指向本项目的计划任务或服务**（只有无关的 `XRiteColorAssistantStartup` 与系统内置项）。②请在后端落地时确认三处细节，前端已按此打桩：会话列表返回 `{items:[…]}`（**没有 `hasMore`**，与 `GET /consultations` 不同）、单任务查询**不推进** worker（前端 2→5 秒轮询只读状态）、下载响应的 `Content-Disposition` 文件名与前端固定名 `AI医学科普-YYYYMMDD.docx\|.pptx` **逐字一致**（前端自己就按这个格式命名，两边不一致会出现两个名字）。 | 待 Codex 确认 |
 | 2026-09-27 | DSH | `backend/app/{schemas,services,api/routes}`（`users`、`phone_verification` 相关）、`backend/tests/test_{profile,phone_verification}.py`（**协调通报：经用户明确指定，DSH 本轮临时接手这项后端改动**） | 用户要求「设置页能改用户名、能换绑手机号，换号仍走现在的模拟验证码」。改动面：`PATCH /users/me` 增 `username`/`currentPassword`（改登录名验密码，409 `USERNAME_EXISTS`）；新增 `POST /users/me/phone-verification/change-code` 与 `.../change`（复用 `phone_binding` 用途 + 指纹区分新旧号，**不新建迁移、不动表结构**）。**不碰你正在写的 `document_generation*` / `generated_document*` / `image_generation*` 与 `20260927_0024`、`20260927_0025`**；只跑后端专项 pytest（测试在事务内回滚，不改开发库数据）。若与你的改动冲突或你想自己接，请在 §6/7.2 说一声，我立刻让出。 | 待 Codex 知晓 |
 
-| 2026-10-05 | DSH | 请求新增 `backend/app/api/routes/news.py` 的 `POST /api/v1/news/refresh`（**前端「重试」缺它**） | 现状：只有「当天首次访问自动跑一轮」（`daily_auto_refresh` + `update_day` 租约），用户手工点重试时重复 GET **不会**强制新一轮，所以当天失败的来源用户无法重试。**契约草案（前端按此打桩，若有偏离请写明偏差点）**：`POST /api/v1/news/refresh`，`CurrentUser`，无请求体；响应 `202 {"accepted": bool, "reason": "started" / "already_ran_today" / "busy" / "disabled", "nextRefreshAt": "…Z" 或 null}`；同一更新日已跑过 → `accepted=false` + `already_ran_today`（**不伪造新一轮**）；沿用现有租约与后台任务，**不等待抓取完成**；服务端限流；复用受控错误码；**不加任何自启动**。前端在接口落地前**只保留禁用的按钮位**，文案「下次自动更新 {时间}」，不实现假重试。详见 `frontend/PORTAL_NEWS_FRONTEND_PLAN.md` §3。 | 待 Codex 确认 |
+| 2026-10-05 | DSH | 请求新增 `backend/app/api/routes/news.py` 的 `POST /api/v1/news/refresh`（**前端「重试」缺它**） | 现状：只有「当天首次访问自动跑一轮」（`daily_auto_refresh` + `update_day` 租约），用户手工点重试时重复 GET **不会**强制新一轮，所以当天失败的来源用户无法重试。**契约草案（前端按此打桩，若有偏离请写明偏差点）**：`POST /api/v1/news/refresh`，`CurrentUser`，无请求体；响应 `202 {"accepted": bool, "reason": "started" / "already_ran_today" / "busy" / "disabled", "nextRefreshAt": "…Z" 或 null}`；同一更新日已跑过 → `accepted=false` + `already_ran_today`（**不伪造新一轮**）；沿用现有租约与后台任务，**不等待抓取完成**；服务端限流；复用受控错误码；**不加任何自启动**。前端已按此契约**完成桩实现**（2026-10-05 提交 `0652ee3`）：接口不存在（404/405）时**自动收起按钮**并说明「服务端暂未开放手动重试，将在下次自动更新时重试」——**不留死按钮**，你上线后前端无需再改。详见 `frontend/PORTAL_NEWS_FRONTEND_PLAN.md` §3。 | 待 Codex 确认 |
+
+| 2026-10-05 | DSH | 请求接入中文来源「北京市卫健委」：`backend/app/services/news/catalog.py`、适配器、`backend/tests/test_news*.py`（**仅请求，DSH 不动 `backend/**`**） | 按用户 2026-10-05 指定的硬标准「明确允许署名转载」重筛 12 个中文候选，**只有北京市卫健委通过**，证据与逐条结论见 `NEWS_SOURCE_CANDIDATES.md` §11。**接入规格**：① 来源 id 建议 `beijing_wjw_health`，名称「北京市卫生健康委员会」；② 栏目 `https://wjw.beijing.gov.cn/xwzx_20031/xwfb/`（已实测 200、静态 HTML、含 24 个 ISO 日期；**「标题—日期」解析规则未验证**，写解析前请先人工核对 5 条）；③ 许可依据＝《法律声明》（https://wjw.beijing.gov.cn/sy_20013/202004/t20200401_1781806.html）「本网站内容（除转载内容外）……如需使用或转载，**需注明转载来源**」→ 门户卡片显示来源名+原文链接、不复制正文、不改原意即满足；建议来源状态里附该声明链接；④ `title_zh` 直接取中文原题，`title_zh_source` 记为原始中文（不伪造翻译）；⑤ 分类由后端定：健康提示/养生 → `wellness`，疾病防控 → `disease`，药械与用药安全 → `medication`，人事/巡察/招标等非科普内容**必须被相关性过滤挡掉**；⑥ 其余 11 个候选**一律不要接入**（无转载明文、证书过期、412、502、超时、域名未解析，逐条见 §11.1）。另：实测 `backend/.venv` 当前缺依赖（`anyio`/`annotated_types`/`annotated_doc` 缺失、`fastapi` 无法 import），后端测试与 CLI 抓取试跑均无法执行，**请确认是否为你正在进行的依赖同步**。 | 待 Codex 确认 |
 
 ## 7. 看板
 
@@ -392,6 +394,12 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
   局限：**只测前端，接口是桩**，不能替代真实后端联调。需要人眼看的清单见 `frontend/BROWSER_ACCEPTANCE.md`。
 
 ### 7.2 工作报告（最新在最上）
+
+### 2026-10-05 DSH 中文来源重筛结果移交后端（本轮只读探测 + 文档，未写任何后端代码）
+
+- 改动：按用户选择，把 `NEWS_SOURCE_CANDIDATES.md` §11.2 的北京市卫健委接入规格写成 §6 跨边界请求交给 Codex；同时修正 §6 中「重试接口前端只留禁用按钮」的过期描述（实际实现是 404 时自动收起，提交 `0652ee3`）。DSH 未改 `backend/**`、未加迁移、未占用数据库。
+- 验证：`git diff --cached --name-only` 仅 `COORDINATION.md`，本轮无代码变更，前端基线不受影响（上次实跑：前端全量 347 passed、门户 e2e 13 passed、build exit 0）。
+- 边界：适配器、来源目录、`title_zh` 填充与 `backend/.venv` 依赖恢复都待 Codex；北京站「标题—日期」解析规则、翻页方式、更新频率仍未验证；来源接上后由我做门户侧真实联调与人工验收。
 
 ### 2026-10-05 DSH 按硬标准重筛中文来源：12 个候选只有 1 个通过（北京市卫健委）
 
