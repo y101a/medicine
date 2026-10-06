@@ -270,3 +270,98 @@ WHO 版权页（上面表中最后一个地址，实测 200）原文两句：
 - 未做「接入后门户展示」的真实联调——需要后端先接上来源、`news_items` 有数据；且 §10.3 记录 `backend/.venv` 当前缺依赖，后端测试与 CLI 都跑不动。
 - 广东省卫健委、中国科普博览只是**域名没解析成功**，不等于站点不存在；若要继续，应先核实正确域名（未验证）。
 - 12 个候选来自本文件前几轮已列过的中文方向，本轮**没有新增未验证过的新站点**；若还要更多中文来源，方向应是「省级卫健委里同样写明『注明转载来源』的站点」——北京是第一个，方法可复制。
+## 11.4 北京站列表卡片最小 HTML 夹具与 `.venv-codex` 抓取器复测（2026-10-06，DSH 应 §6 第 175 行请求）
+
+### (1) `.venv-codex` 抓取器复测结论：**两个 URL 都失败，与 Codex 环境一致**
+
+- `fetch_document("https://wjw.beijing.gov.cn/xwzx_20031/xwfb/")` → `FetchError: FETCH_FAILED`
+- `fetch_document("https://wjw.beijing.gov.cn/xwzx_20031/xwfb/202609/t20260928_4883552.html")` → `FetchError: FETCH_FAILED`
+- 对照：**同一个探测 UA**（`MedicalAssistantNewsBot/0.1 (foreground operator-run; source verification)`）用 curl 读同一个列表页 → **200、22612 B、24 个文章链接**。
+- 差异只出现在客户端这一层（curl 与 httpx 的 TLS/HTTP 行为不同），**不是站点针对 UA 拒绝**；按 Codex 的要求**只记录差异、不绕过站点拦截**，故不做任何指纹/头伪装尝试。
+- 结论（按用户 2026-10-06 规则）：**北京站暂不启用**。
+
+### (2) 5 条列表卡片的最小 HTML 夹具（仅标签/属性/短标题/日期/路径，无正文）
+
+结构要点：容器 `div.weinei_left_con`；每张卡片一个 `div.weinei_left_con_line`。下面 5 条取自真实页面（标题与日期原样，路径原样），已去掉正文与站点其他区块。
+
+```html
+<div class="weinei_left_con">
+  <div class="weinei_left_con_line">
+    <div class="weinei_left_con_line_dian">·</div>
+    <div class="weinei_left_con_line_text">
+      <a href="./202609/t20260928_4883552.html" title="中秋国庆假期来啦~健康提示请您查收！" target="_blank">
+        <span class="pc-hide">中秋国庆假期来啦~健康提示请您查收！</span>
+        <span class="mobile-show">中秋国庆假期来啦~健康提示请...</span>
+      </a>
+    </div>
+    <div class="weinei_left_con_line_date">2026-09-25</div>
+  </div>
+  <div class="weinei_left_con_line">
+    <div class="weinei_left_con_line_dian">·</div>
+    <div class="weinei_left_con_line_text">
+      <a href="./202609/t20260928_4883523.html" title="“飞行的硫酸”来了？紧急提醒" target="_blank">
+        <span class="pc-hide">“飞行的硫酸”来了？紧急提醒</span>
+        <span class="mobile-show">“飞行的硫酸”来了？紧急提醒</span>
+      </a>
+    </div>
+    <div class="weinei_left_con_line_date">2026-09-17</div>
+  </div>
+  <div class="weinei_left_con_line">
+    <div class="weinei_left_con_line_dian">·</div>
+    <div class="weinei_left_con_line_text">
+      <a href="./202609/t20260911_4860170.html" title="2026年服贸会健康卫生服务专题创新成果发布活动在京举行" target="_blank">
+        <span class="pc-hide">2026年服贸会健康卫生服务专题创新成果发布活动在京举行</span>
+        <span class="mobile-show">2026年服贸会健康卫生服务专...</span>
+      </a>
+    </div>
+    <div class="weinei_left_con_line_date">2026-09-10</div>
+  </div>
+  <div class="weinei_left_con_line">
+    <div class="weinei_left_con_line_dian">·</div>
+    <div class="weinei_left_con_line_text">
+      <a href="./202609/t20260911_4860165.html" title="2026服贸会健康卫生服务专题今日正式启幕" target="_blank">
+        <span class="pc-hide">2026服贸会健康卫生服务专题今日正式启幕</span>
+        <span class="mobile-show">2026服贸会健康卫生服务专题...</span>
+      </a>
+    </div>
+    <div class="weinei_left_con_line_date">2026-09-09</div>
+  </div>
+  <div class="weinei_left_con_line">
+    <div class="weinei_left_con_line_dian">·</div>
+    <div class="weinei_left_con_line_text">
+      <a href="./202609/t20260902_4847952.html" title="北京初秋花粉高峰来了！过敏人群速看防护要点" target="_blank">
+        <span class="pc-hide">北京初秋花粉高峰来了！过敏人群速看防护要点</span>
+        <span class="mobile-show">北京初秋花粉高峰来了！过敏...</span>
+      </a>
+    </div>
+    <div class="weinei_left_con_line_date">2026-09-02</div>
+  </div>
+</div>
+```
+
+### (3) 字段映射与解析注意（都来自实测页面）
+
+- 卡片选择器：`div.weinei_left_con_line`（该页 24 个）。
+- **标题**：用 `a[title]` 属性，或 `span.pc-hide` 的文本（两者一致，都是完整标题）。**不要用 `span.mobile-show`**——那是移动端截断版（例：`…健康提示请您查收！` 被截成 `…健康提示请...`）。
+- **链接**：`a[href]` 是**相对路径**（`./YYYYMM/tYYYYMMDD_ID.html`），需按列表页 URL 解析；实测 24 条全部是这种形态。
+- **日期**：取 `div.weinei_left_con_line_date` 文本，格式 `YYYY-MM-DD`。
+- **注意**：URL 里的日期段与显示日期**不一致**（例：`t20260928_4883552.html` 显示的日期是 `2026-09-25`）→ **必须以日期节点为准**，不能从 URL 猜日期。
+- `div.weinei_left_con_line_dian`（内容是「·」）只是装饰，无信息。
+- 原始 HTML 里 `href` 与 `title` 分两行、属性之间有换行与制表符，解析不要依赖空白。
+- 该栏目是「新闻发布」，**混有非科普内容**（例：服贸会活动两条）→ 必须过相关性过滤，不能整栏当科普。
+
+### (4) 两处自查更正（写在我自己的文档里，避免留下错结论）
+
+- **更正 §11.2**：「`title_zh` 直接取中文原题，`title_zh_source` 记为原始中文」是错的——Codex 指出 `titleZhSource` 只允许 `machine`/`manual`。正确做法：**中文原题就存 `title`**，`titleZh` 留空、不标注，**无需迁移**。
+- **更正 §10.2**：我把中国疾控那份声明解读成「正落在需要事先授权的范围」**说得过头了**。原句「未经本网站协议授权转载、链接、转贴或以其他方式复制发表时**必须是全文或全部内容**，使用时必须注明『稿件来源：中国疾病预防控制中心』」在语义上可两读（「未获授权者须全文转载并署名」／「须先获授权」），属**法务判断**，我不该下定论。
+
+### (5) 找下一个可稳定读取的中文来源：本轮进展与卡点
+
+- **卡点（本轮最重要的发现）**：`wjw.beijing.gov.cn`、`wsjkw.sc.gov.cn`、`wjw.nmg.gov.cn`、`www.nhc.gov.cn`、`wsjkw.sh.gov.cn` 这些 gov.cn 站点，**项目抓取器（`.venv-codex`，httpx）一律 `FETCH_FAILED`，而同一个 UA 下 curl 能正常读**。也就是说：**中国政务站点目前不是「站点不让读」，而是项目抓取器读不了**。是否可通过调整客户端 TLS/HTTP 配置解决，交由 Codex 判断；**不得以伪装浏览器指纹的方式绕过**。
+- **许可明确通过、但抓取器读不了的**：**内蒙古自治区卫健委**《网站声明》（https://wjw.nmg.gov.cn/wzsm/ ）原文：「本网**欢迎其他网站转载或引用本网内容**，但是下列内容除外：……」「在使用本网所属内容时**必须注明来源为本网站及原创作者姓名**。」「转载或引用本网内容必须以新闻性或资料性等公共信息为使用目的，**不能用于赢利目的**。不得对本网内容原意进行曲解和篡改。」→ 符合「明确允许署名转载」，且首页有「健康科普知识」栏目（`./xwzx/jkzs/tw/`）；**卡在抓取器 `FETCH_FAILED`**。（另：条款含「不能用于赢利目的」，门户是否属赢利需用户确认。）
+- **抓取器读得动、但许可不过关的**：
+  - 国家食品安全风险评估中心 `/zxdt/gnwspaqdt/index.shtml` → `.venv-codex` **OK 39352 B**、静态、20 个 ISO 日期；但站点只有「版权所有」，**无转载许可**。
+  - 中国互联网联合辟谣平台 `/gz.htm` → `.venv-codex` **OK 10427 B**、静态、20 个 ISO 日期；首页「关于我们」只指向 cac.gov.cn，**未找到转载条款**。
+  - 中国疾控 `/jkkp/yyjk/swyy/` → `.venv-codex` **OK 29610 B**、**静态、12 个 ISO 日期**（注意：`/jkkp/yyjk/` 本身是 JS 外壳，子栏目 `swyy` 才是静态页）；但许可条款**语义有歧义**（见 (4)）。
+- **结论**：截至本轮，**没有第二个同时满足「许可明确允许署名转载」+「项目抓取器读得动」的中文来源**。最接近的两条路：① 让 Codex 判断 gov.cn 的抓取器失败能否在不伪装指纹的前提下解决——解决了内蒙古（以及北京、四川）就能启用；② 就中国疾控 `swyy` 的条款歧义取得法务/用户结论——它是目前唯一「抓取器读得动 + 列表静态带日期 + 内容对口」的中文科普栏目。
+- 四川省卫健委《免责说明》原文（同类条款）：「未经本网授权，任何媒体、互联网站和商业机构均不得进行**商业性的**原版原式地转载，也不得歪曲和篡改本网站所发布的内容。转发使用本网站的网络媒体，不应超越授权范围，须注明『来源：四川省卫生健康委员会』。」→ 单独看「非商业转发+署名」可行，但仍需法务判断，且同样卡在抓取器。
