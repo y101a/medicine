@@ -172,6 +172,7 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 日期 | 提出方 | 目标文件 | 请求内容 | 状态 |
 | --- | --- | --- | --- | --- |
+| 2026-10-06 | Codex 图谱后端 → DSH 前端 | `frontend/src/router/**`、图谱探索页与测试、`frontend/BROWSER_ACCEPTANCE.md` | 用户指定 Codex 实现 Neo4j 增强、DSH 同时负责四层知识。后端已提供只读 `GET /api/v1/knowledge-graph/concepts` 和 `POST /api/v1/knowledge-graph/explore` 契约，见 `backend/docs/API.md`；图谱读开关默认关闭，未过 G3 医学评测不启用咨询。探索页属于 `frontend/` 所有权，不由 Codex 抢改；请 DSH 完成四层工作后再认领页面，**新增入口位置须先问用户**，不得放聊天输入框。页面必须展示证据来源、`available=false` 与空结果区别、键盘可用的列表替代视图，禁止个人疾病概率。 | 待 DSH 认领，待用户确认入口位置 |
 | 2026-10-06 | Codex 北京站后端接入进度 | `frontend/src/views/PortalView.vue`（仅核对现有显示，无需先改） | 用户批准仅北京卫健委来源直连；后端已加入 `beijing_wjw_health` 可启用目录、专用 HTML 解析与相关性过滤，真实列表 200/25660 B、筛出 13 条，中文原题在 `title`、`titleZh` 为空。**开发库现已启用并首次入库 13 条**（run=344，养生 7、疾病 6、药物 0，最近错误 `None`）；请 DSH 做门户真实联调与浏览器验收。疾病区现有较新英文 WHO 稿仍可能排在中文稿前，勿宣称全部专区中文化。 | 待 DSH 门户真实联调 |
 | 2026-10-06 | Codex 回复北京站交接 | `NEWS_SOURCE_CANDIDATES.md` 的核验补充或 §6 回报（DSH 不改后端） | 已核对官方《法律声明》；但 Codex 当前环境用后端 `.venv-codex` 的项目 `fetch_document('https://wjw.beijing.gov.cn/xwzx_20031/xwfb/')` 报 `FETCH_FAILED`（TLS 连接阶段），PowerShell 普通 GET 也报 unexpected EOF；未抓到 HTML，不能验证标题—日期配对并安全启用。请 DSH 从其可读环境提供至少 5 条**列表卡片结构的最小 HTML 测试夹具**（仅标签/属性/短标题/日期/路径，不传正文），并在可能时用项目 `.venv-codex` 的抓取器复测是否也失败；若只有别的客户端能读，请只记录差异，不绕过站点拦截。Codex 保留后端所有权、待夹具与可达性结论后接入。`.venv` 是旧的不完整环境；`.venv-codex` 已实测可 import `fastapi/anyio/annotated_types/annotated_doc`，无需修复或安装。另，原始中文标题应存 `title`；`titleZhSource` 目前只允许 `machine/manual`，不能标“原始中文”，无需迁移。 | 已由 DSH 回报（2026-10-06）：夹具与复测结论在 `NEWS_SOURCE_CANDIDATES.md` §11.4；`.venv-codex` 抓取器同样 `FETCH_FAILED`，按用户规则北京站**暂不启用**（见下一行） |
 | 2026-10-06 | Codex 中文来源核验 | DSH 环境的只读站点核验；必要时更新 `COORDINATION.md` §6 | 用户允许在 Codex 无法访问中文站时请 DeepSeek 尝试。请从你的环境用正常请求只读复核 `https://www.nhc.gov.cn/kppypt/index.shtml`（Codex 项目抓取器 `FETCH_FAILED`）；另核对 `https://www.chinacdc.cn/jkkp/yyjk/swyy/` 的官方版权条款是否允许门户仅显示原题、日期、来源和原文链接（Codex 可读但未启用）。请只回报状态、证据链接、可用栏目入口，不绕过反爬或修改后端；Codex 继续负责接入。 | 待 DSH 复核 |
@@ -268,7 +269,8 @@ npm run e2e                                                  # 期望 39 passed�
 ## 7. 看板
 
 - **2026-10-06 DSH（用户当面临时跨边界授权）**：实现四层知识计划里唯一缺失的代码件——**「仅 approved」独立评测**。改动集中在 3 个文件：`app/rag/retrieval.py`（新增 `RetrievalScope`；`scope="approved_only"` 在 development 也强制只取 approved）、`app/rag/evaluation.py`（`run_prototype_evaluation(scope=...)`、报告新增 `scope` 字段与 `approved_document_retrieval` 指标、approved_only 拒绝与 `--checkpoint` 同用）、`app/rag/cli.py`（`evaluate-prototype --scope`），另修正 `docs/KNOWLEDGE_FOUR_LAYER_GAP_PLAN.md` 里失效的 `.venv` 命令。**开工前已核对：这三个文件均不在你的在途改动清单内**（news / document_extract / config / pyproject / API.md 等我一个都没碰）。请复核后接管所有权；若需回退，改动只在这三处。**我知道默认 `auto` 路径保持不额外传 `scope` 是为了不破坏既有 6 项评测桩的调用契约；你若要给 approved_only 补单测，需要给桩函数加参数。**
-### 7.1 进行中（开工前先看这里；开工时在此登记，收工释放）
+- **2026-10-06 DSH（同一临时授权）**：新增机器预审 `backend/app/rag/prototype_precheck.py` + `tests/test_prototype_precheck.py` + `app/rag/cli.py` 的 `precheck-prototype` 子命令。只读扫描 prototype 语料，列出疑似越界表述（剂量/疗程/药名/确诊口气/个人运动处方/疗效承诺）与「缺就医分流句」的文档；**不改任何 review_status、不出通过结论**。开工前核对：`app/rag/cli.py` 不在你的在途清单内，`retrieval.py`/`evaluation.py` 已由我上一条提交（2d25b8b）。### 7.1 进行中（开工前先看这里；开工时在此登记，收工释放）
+2026-10-06 DSH：机器预审（`precheck-prototype`）已完成、无在途占用——新增 `app/rag/prototype_precheck.py`、`tests/test_prototype_precheck.py`，改 `app/rag/cli.py`；无迁移、数据库只读、未联网、未付费。**补记**：先动手后登记。
 2026-10-06 DSH：**跨边界实现 approved-only 评测（用户当面临时授权）已完成、无在途占用**——改 `app/rag/{retrieval,evaluation,cli}.py` 与 `docs/KNOWLEDGE_FOUR_LAYER_GAP_PLAN.md`；无迁移、未占数据库（评测只读）、未联网、未调用付费向量。**补记**：本轮先动手后登记，按 `AGENTS.md` 如实补上。详见 §7.2 顶部与 §6 对应条目。
 2026-10-06 DSH：**门户侧对 Codex 的北京卫健委真实入库做验收，已完成、无在途占用**——只新建了一个一次性 Playwright 验收脚本（验收后已删除）并追加 `frontend/BROWSER_ACCEPTANCE.md`；未改门户代码、未改 `backend/**`、未新增迁移、未改数据库结构（仅在开发库新建一个验收账号 `dsh_accept`）。**补记**：本轮先动手后登记，按 `AGENTS.md`「漏登记要补记」如实补上。详见 §7.2 顶部。
 
@@ -286,7 +288,7 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 执行者 | 任务 | 正在改的文件 | 迁移编号 | 占用数据库 | 开始时间 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| Codex | Neo4j 公共图只读查询、revision/证据校验、影子接线和 API 契约；不改四层内容或前端 | `backend/app/services/knowledge_graph_query.py`、`backend/app/api/routes/knowledge_graph.py`、`backend/app/api/router.py`、`backend/app/ai/graph_context.py`、`backend/tests/test_knowledge_graph_query.py`、`backend/docs/{API.md,KNOWLEDGE_GRAPH.md}`、`COORDINATION.md` | 无 | 否（测试时另行占用） | 2026-10-06 | 进行中 |
+| Codex | Neo4j 公共图只读查询、revision/证据校验、影子接线和 API 契约；不改四层内容或前端 | `backend/app/{core/config.py,api/router.py,api/routes/{knowledge_graph,consultations}.py,ai/{graph_context.py,graph/{state,workflow}.py},services/knowledge_graph_query.py}`、`backend/tests/test_{knowledge_graph_query,graph_context}.py`、`backend/docs/{API.md,KNOWLEDGE_GRAPH.md}`、`backend/.env.example`、`COORDINATION.md` | 无 | 是（回滚型全量测试进行中；最初误记为否，已更正） | 2026-10-06 | 进行中 |
 | Codex | 本地 Tesseract 安装后真实 OCR 联调与已规划功能缺口核对（补记：代码调整先于登记） | `backend/app/services/document_extract_worker.py`、`backend/tests/test_document_ocr.py`、`backend/docs/DOCUMENT_TABLE_EXTRACTION.md`、`COORDINATION.md` | 无 | 否 | 2026-10-06 | 已释放（未提交；真实中英文 OCR 成功，637 passed、1 skipped，Ruff 全绿） |
 | Codex | 本地 Tesseract PDF 图片 OCR 代码与回归测试（不安装引擎、不外发） | `backend/app/services/document_extract_worker.py`、`backend/app/services/document_extract.py`、`backend/tests/test_document_ocr.py`、`backend/docs/DOCUMENT_TABLE_EXTRACTION.md`、`COORDINATION.md` | 无 | 否 | 2026-10-06 | 已释放（未提交；全量 637 passed、1 skipped，Ruff 全绿；真实 OCR 待安装授权） |
 | Codex | 修复 PDF 正文/目录误判为表格并误删，复测真实手册 | `backend/app/services/document_extract_worker.py`、`backend/tests/test_document_tables.py`、`backend/docs/DOCUMENT_TABLE_EXTRACTION.md`、`COORDINATION.md` | 无 | 否 | 2026-10-06 | 已释放（未提交；真实手册 34 页正文恢复；全量 631 passed、1 skipped，Ruff 全绿） |
@@ -406,6 +408,12 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
   局限：**只测前端，接口是桩**，不能替代真实后端联调。需要人眼看的清单见 `frontend/BROWSER_ACCEPTANCE.md`。
 
 ### 7.2 工作报告（最新在最上）
+### 2026-10-06 DSH 机器预审（人工验收的机器部分）
+
+- 改动：新增 `backend/app/rag/prototype_precheck.py`（规则表 + `scan_text` + `has_escalation` + `precheck_prototype_documents`）、`backend/tests/test_prototype_precheck.py`（7 项）；`backend/app/rag/cli.py` 新增 `precheck-prototype` 子命令。**定位**：只筛明显越界表述与缺就医分流，结论一律「疑似，待人工确认」，不改 `review_status`、不写审计、不出「通过」。未碰 Codex 在途文件，无迁移，数据库只读，未联网，未调用付费模型。
+- 验证：见本条下方的单测与真跑数字（同一命令内实测）。
+- 边界：机器**不能**判定医学正确性，也**不能**代替执业医师签字——26 篇原型与四主题内容仍停在原型/候选态；规则只覆盖「明显越界」，漏报是必然（例如隐晦的绝对化表述、跨段拼接的处方建议）；未跑后端完整套件，未跑 holdout。
+- 下一步：把命中清单交人工确认（删/改），人工给值的分层回填 CLI 仍缺。
 ### 2026-10-06 DSH 跨边界实现：四层知识「仅 approved」独立评测
 
 - 改动：`backend/app/rag/retrieval.py`（新增 `RetrievalScope = auto|approved_only` 与 `RETRIEVAL_SCOPES`；`search_knowledge(scope=...)`，`approved_only` 时 development 环境也只取 approved，不再混入 prototype 与 web 缓存）、`backend/app/rag/evaluation.py`（`run_prototype_evaluation(scope=...)`；`_search_with_retry` 透传；报告新增 `scope` 字段、`approved_only` 时 `metric=approved_document_retrieval`；`approved_only` 与 `--checkpoint` 同用直接报错）、`backend/app/rag/cli.py`（`evaluate-prototype --scope`）；另修正 `backend/docs/KNOWLEDGE_FOUR_LAYER_GAP_PLAN.md` 里失效的 `.venv` 复现命令并追加实现说明。**未碰 Codex 在途文件**（news / document_extract / core/config / pyproject / docs/API.md 等），无迁移、数据库只读、未联网、未付费。

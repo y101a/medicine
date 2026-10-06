@@ -27,6 +27,7 @@ from app.rag.relevance import (
     gate_from_profile,
 )
 from app.rag.retrieval import RETRIEVAL_MODES
+from app.rag.prototype_precheck import precheck_prototype_documents
 from app.rag.source_sync import SourceRegistryError, sync_approved_sources
 from app.rag.vectorizer import ControlledVectorizationError, vectorize_document
 
@@ -144,6 +145,11 @@ def build_parser() -> argparse.ArgumentParser:
         "embed-document", help="为一篇已批准文档生成阿里云向量"
     )
     vectorize_parser.add_argument("--document-id", type=UUID, required=True)
+
+    subparsers.add_parser(
+        "precheck-prototype",
+        help="机器预审：只列出原型语料里的疑似越界表述（只读、不改状态、不出通过结论）",
+    )
 
     seed_parser = subparsers.add_parser("seed-prototype", help="导入仅限开发环境的自编原型语料")
     seed_parser.add_argument("--directory", type=Path, default=None)
@@ -264,6 +270,8 @@ async def run_command(args: argparse.Namespace) -> int:
                 result = await import_markdown_document(db, args.file, args.metadata)
             elif args.command == "embed-document":
                 result = await vectorize_document(db, args.document_id)
+            elif args.command == "precheck-prototype":
+                result = await precheck_prototype_documents(db)
             elif args.command == "seed-prototype":
                 result = await seed_prototype_knowledge(db, args.directory)
             elif args.command == "embed-prototype":
