@@ -20,6 +20,7 @@ from app.rag.evaluation import (
     threshold_grid,
 )
 from app.rag.markdown_importer import ControlledImportError, import_markdown_document
+from app.rag.prototype_precheck import precheck_prototype_documents
 from app.rag.prototype_seed import PrototypeSeedError, seed_prototype_knowledge
 from app.rag.relevance import (
     RELEVANCE_GATE_PROFILES,
@@ -27,7 +28,6 @@ from app.rag.relevance import (
     gate_from_profile,
 )
 from app.rag.retrieval import RETRIEVAL_MODES
-from app.rag.prototype_precheck import precheck_prototype_documents
 from app.rag.source_sync import SourceRegistryError, sync_approved_sources
 from app.rag.vectorizer import ControlledVectorizationError, vectorize_document
 
