@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { House, ChatDotRound, Clock, Collection, Setting, Plus, Fold, Expand, ArrowDown } from '@element-plus/icons-vue'
+import { House, ChatDotRound, Clock, Collection, Share, Setting, Plus, Fold, Expand, ArrowDown } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../stores/auth'
 import { getApiErrorMessage } from '../api/http'
@@ -54,6 +54,9 @@ const links = [
   { path: '/app', label: '健康资讯', icon: House, names: ['home'] },
   { path: '/app/chat', label: '智能咨询', icon: ChatDotRound, names: ['chat', 'consultation'] },
   { path: '/app/history', label: '咨询历史', icon: Clock, names: ['history'] },
+  // 知识图谱探索（2026-10-07 产品决策）：独立路由页，**入口只在主导航**——
+  // 不放聊天输入框（`AGENTS.md` 的界面入口纪律：默认不进 `.composer`），页面内自带搜索框。
+  { path: '/knowledge-graph', label: '知识图谱', icon: Share, names: ['knowledge-graph'] },
   // 方案 §8.1：私人资料要有独立入口，不放进公共医学知识搜索页，也不塞进附件弹窗。
   { path: '/app/private-knowledge', label: '我的知识库', icon: Collection, names: ['private-knowledge'] },
 ]

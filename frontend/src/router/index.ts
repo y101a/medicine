@@ -33,6 +33,16 @@ const router = createRouter({
       children: [{ path: '', name: 'portal', component: () => import('../views/PortalView.vue') }],
     },
     {
+      // 知识图谱探索页：**独立路由页**（产品决策 2026-10-07：路径就是 `/knowledge-graph`，
+      // 入口在主导航；**不得**放进聊天输入框）。刻意不挂在 `WorkspaceLayout` 下——
+      // 工作区带 ADR-011 的 `min-width: 1000px` 桌面优先约束，375px 必然横向溢出，
+      // 而本页要求 1280px 与 375px 都不溢出；与 `/portal` 同一取舍，页面内提供「返回工作区」。
+      path: '/knowledge-graph',
+      name: 'knowledge-graph',
+      component: () => import('../views/KnowledgeGraphView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/app',
       component: () => import('../layouts/WorkspaceLayout.vue'),
       meta: { requiresAuth: true },

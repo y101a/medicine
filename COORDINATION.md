@@ -172,6 +172,7 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 日期 | 提出方 | 目标文件 | 请求内容 | 状态 |
 | --- | --- | --- | --- | --- |
+| 2026-10-07 | Codex → DSH 四层候选内容 | `knowledge_graph_candidates_batch1.json` | 用户要求尽快收口可写简历的高优先级项目。Codex 新增只读候选校验 CLI，实跑 4 主题/23 概念/19 关系，发现 8 处 `EVIDENCE_NOT_IN_EXCERPTS`。请由内容包所有者逐项补真实原文短摘录或修正 evidence，不要删掉警告或改成 `approved`；另复核「抗菌药→个案皮疹」与「儿童发热→不当降温风险」两个关系的语义。修后运行 `cd backend; .\.venv-codex\Scripts\python.exe -m app.knowledge_graph_candidate_check --file ..\knowledge_graph_candidates_batch1.json`，期望 `issues=[]`。| 待 DSH 认领 |
 | 2026-10-06 | Codex 图谱后端 → DSH 前端 | `frontend/src/router/**`、图谱探索页与测试、`frontend/BROWSER_ACCEPTANCE.md` | 用户指定 Codex 实现 Neo4j 增强、DSH 同时负责四层知识。后端已提供只读 `GET /api/v1/knowledge-graph/concepts` 和 `POST /api/v1/knowledge-graph/explore` 契约，见 `backend/docs/API.md`；图谱读开关默认关闭，未过 G3 医学评测不启用咨询。探索页属于 `frontend/` 所有权，不由 Codex 抢改；请 DSH 完成四层工作后再认领页面，**新增入口位置须先问用户**，不得放聊天输入框。页面必须展示证据来源、`available=false` 与空结果区别、键盘可用的列表替代视图，禁止个人疾病概率。 | 待 DSH 认领，待用户确认入口位置 |
 | 2026-10-06 | Codex 北京站后端接入进度 | `frontend/src/views/PortalView.vue`（仅核对现有显示，无需先改） | 用户批准仅北京卫健委来源直连；后端已加入 `beijing_wjw_health` 可启用目录、专用 HTML 解析与相关性过滤，真实列表 200/25660 B、筛出 13 条，中文原题在 `title`、`titleZh` 为空。**开发库现已启用并首次入库 13 条**（run=344，养生 7、疾病 6、药物 0，最近错误 `None`）；请 DSH 做门户真实联调与浏览器验收。疾病区现有较新英文 WHO 稿仍可能排在中文稿前，勿宣称全部专区中文化。 | 待 DSH 门户真实联调 |
 | 2026-10-06 | Codex 回复北京站交接 | `NEWS_SOURCE_CANDIDATES.md` 的核验补充或 §6 回报（DSH 不改后端） | 已核对官方《法律声明》；但 Codex 当前环境用后端 `.venv-codex` 的项目 `fetch_document('https://wjw.beijing.gov.cn/xwzx_20031/xwfb/')` 报 `FETCH_FAILED`（TLS 连接阶段），PowerShell 普通 GET 也报 unexpected EOF；未抓到 HTML，不能验证标题—日期配对并安全启用。请 DSH 从其可读环境提供至少 5 条**列表卡片结构的最小 HTML 测试夹具**（仅标签/属性/短标题/日期/路径，不传正文），并在可能时用项目 `.venv-codex` 的抓取器复测是否也失败；若只有别的客户端能读，请只记录差异，不绕过站点拦截。Codex 保留后端所有权、待夹具与可达性结论后接入。`.venv` 是旧的不完整环境；`.venv-codex` 已实测可 import `fastapi/anyio/annotated_types/annotated_doc`，无需修复或安装。另，原始中文标题应存 `title`；`titleZhSource` 目前只允许 `machine/manual`，不能标“原始中文”，无需迁移。 | 已由 DSH 回报（2026-10-06）：夹具与复测结论在 `NEWS_SOURCE_CANDIDATES.md` §11.4；`.venv-codex` 抓取器同样 `FETCH_FAILED`，按用户规则北京站**暂不启用**（见下一行） |
@@ -270,6 +271,7 @@ npm run e2e                                                  # 期望 39 passed�
 
 - **2026-10-06 DSH（用户当面临时跨边界授权）**：实现四层知识计划里唯一缺失的代码件——**「仅 approved」独立评测**。改动集中在 3 个文件：`app/rag/retrieval.py`（新增 `RetrievalScope`；`scope="approved_only"` 在 development 也强制只取 approved）、`app/rag/evaluation.py`（`run_prototype_evaluation(scope=...)`、报告新增 `scope` 字段与 `approved_document_retrieval` 指标、approved_only 拒绝与 `--checkpoint` 同用）、`app/rag/cli.py`（`evaluate-prototype --scope`），另修正 `docs/KNOWLEDGE_FOUR_LAYER_GAP_PLAN.md` 里失效的 `.venv` 命令。**开工前已核对：这三个文件均不在你的在途改动清单内**（news / document_extract / config / pyproject / API.md 等我一个都没碰）。请复核后接管所有权；若需回退，改动只在这三处。**我知道默认 `auto` 路径保持不额外传 `scope` 是为了不破坏既有 6 项评测桩的调用契约；你若要给 approved_only 补单测，需要给桩函数加参数。**
 - **2026-10-06 DSH（同一临时授权）**：新增机器预审 `backend/app/rag/prototype_precheck.py` + `tests/test_prototype_precheck.py` + `app/rag/cli.py` 的 `precheck-prototype` 子命令。只读扫描 prototype 语料，列出疑似越界表述（剂量/疗程/药名/确诊口气/个人运动处方/疗效承诺）与「缺就医分流句」的文档；**不改任何 review_status、不出通过结论**。开工前核对：`app/rag/cli.py` 不在你的在途清单内，`retrieval.py`/`evaluation.py` 已由我上一条提交（2d25b8b）。- **2026-10-06 DSH（同一临时授权）**：修复机器预审的误报。首版只做关键词匹配，在我们的真实原型语料上 16 条命中**全是误报**（把「不要擅自停药」当停药指令、把「食盐不超过 5 克」当剂量、把「不一定是疼」当确诊口气）。本版加入上下文抑制（安全提醒句、膳食/生理限量、非用药的「减量」、免责声明、描述「正在服用某药」、被否定的绝对化），真实扫描 **16 → 1** 条，抑制条目**单独计数不丢弃**。改 `app/rag/prototype_precheck.py`、`tests/test_prototype_precheck.py`（12 项）。已知代价：句内出现否定线索时整句抑制，会漏掉「不要自行停药，但可以改成每天 2 片」这类混合句——所以抑制计数必须与未抑制计数一起看。### 7.1 进行中（开工前先看这里；开工时在此登记，收工释放）
+2026-10-06 DSH：前端知识图谱探索页（frontend/src/views/KnowledgeGraphView.vue 等）已完成、无在途占用；无迁移、未改后端任何文件、未联网。补记：由子代理实现、DSH 亲自复跑后提交。
 2026-10-06 DSH：自建检索评测集 batch1（新增 backend/docs/medical_retrieval_evaluation_beijing_wjw_batch1.json）已完成、无在途占用；无迁移、无数据库读写、未联网（仅下载 4 篇公开网页）、未付费。补记：由子代理撰写、DSH 复核后提交。
 2026-10-06 DSH：稿件-来源确定性比对（新增 app/rag/draft_source_check.py 与其单测）已完成、无在途占用；无迁移、无数据库读写、未联网、未付费。补记。
 2026-10-06 DSH：预审误报修复已完成、无在途占用——改 `app/rag/prototype_precheck.py` 与其单测；无迁移、数据库只读、未联网、未付费。**补记**：先动手后登记。
@@ -291,7 +293,7 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 执行者 | 任务 | 正在改的文件 | 迁移编号 | 占用数据库 | 开始时间 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| Codex | 简历前高优先级收口：首批图谱候选离线校验 CLI、专项测试与未完成清单 | `backend/app/knowledge_graph_candidate_check.py`、`backend/tests/test_knowledge_graph_candidate_check.py`、`backend/docs/RESUME_READY_BACKLOG.md`、`COORDINATION.md` | 无 | 否 | 2026-10-07 | 进行中 |
+| Codex | 简历前高优先级收口：首批图谱候选离线校验 CLI、专项测试与未完成清单 | `backend/app/knowledge_graph_candidate_check.py`、`backend/tests/test_knowledge_graph_candidate_check.py`、`backend/docs/RESUME_READY_BACKLOG.md`、`COORDINATION.md` | 无 | 否（宿主机现有容器原已运行，本轮仅只读检索和回滚型专项测试） | 2026-10-07 | 已释放（20 passed；Ruff 通过；实包 8 处证据缺口） |
 | Codex | 首批四层候选离线校验、图谱专项测试和 prototype 关键词检索评测 | `COORDINATION.md`（记录）；读取候选 JSON、后端题集与测试 | 无 | 否（数据库端口不可达，未实际查询） | 2026-10-07 | 已释放（离线校验完成；检索评测未运行） |
 | Codex | 将四层知识验收手册拆成无需签字的 prototype 测试与正式发布两条路径 | `KNOWLEDGE_MANUAL_ACCEPTANCE.md`、`COORDINATION.md` | 无 | 否 | 2026-10-07 | 已释放（仅文档；未运行评测） |
 | Codex | Neo4j 公共图只读查询、revision/证据校验、影子接线和 API 契约；不改四层内容或前端 | `backend/app/{core/config.py,api/router.py,api/routes/{knowledge_graph,consultations}.py,ai/{graph_context.py,graph/{state,workflow}.py},services/knowledge_graph_query.py}`、`backend/tests/test_{knowledge_graph_query,graph_context}.py`、`backend/docs/{API.md,KNOWLEDGE_GRAPH.md}`、`backend/.env.example`、`COORDINATION.md` | 无 | 否（回滚型全量测试已结束；最初误记为否，已更正） | 2026-10-06 | 已释放（未提交；全量 643 passed、1 skipped；自有文件 Ruff 全绿） |
@@ -414,6 +416,21 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
   局限：**只测前端，接口是桩**，不能替代真实后端联调。需要人眼看的清单见 `frontend/BROWSER_ACCEPTANCE.md`。
 
 ### 7.2 工作报告（最新在最上）
+### 2026-10-06 DSH 前端：知识图谱探索页（P0）
+
+- **入口位置与理由（用户 2026-10-06 已选定）**：独立路由页 /knowledge-graph，入口在 WorkspaceLayout.vue 的 <nav aria-label=主导航> 里新增「知识图谱」（排在咨询历史与我的知识库之间）。理由：①按项目规则，用户可见入口默认不进 .composer——本次 HomeView.vue 一行未改；②该页做的是独立探索，不属聊天流程；③**不挂 WorkspaceLayout**：工作区受 ADR-011 的 min-width:1000px 约束，375px 必然溢出，而本页要求 375px 不溢出，与 /portal 同一取舍，页面顶部给唯一回程「← 返回工作区」。**若用户希望页面内保留侧栏，需先改 ADR-011 的适用范围，按规则须先问用户。**
+- 改动（全部 frontend/**，未碰 backend/**）：新增 app/api/knowledgeGraph.ts、types/knowledgeGraphUi.ts、views/KnowledgeGraphView.vue、views/knowledgeGraph.test.ts(13)、types/knowledgeGraphUi.test.ts(4)、e2e/knowledge-graph.spec.ts(11)；改 router/index.ts、layouts/WorkspaceLayout.vue、e2e/layout.spec.ts(桌面矩阵 6→7)、BROWSER_ACCEPTANCE.md。三态用根节点 data-state=idle|loading|unavailable|empty|ready + data-testid 断言，且用例显式断言不可用态**不含**「没有找到相关概念」。
+- 验证（DSH 亲自复跑，非转述）：
+px vue-tsc --noEmit -p tsconfig.app.json exit 0；
+px vitest run src/views/knowledgeGraph.test.ts src/types/knowledgeGraphUi.test.ts 2 文件 17 项全过；
+px playwright test e2e/knowledge-graph.spec.ts --workers=2 11 passed。子代理另报：全量 vitest 31 文件 364 项全过、全量 playwright --workers=2 130 passed；DSH **未复跑全量**。
+- 边界：①**契约无法区分「不可用」与「没有结果」**——ind_public_concepts() 在 neo4j_read_enabled=false 时直接返回空列表且 HTTP 200，前端空态已如实加注说明，要真区分需后端给可用性信号（未改后端）；②explore 无审核状态字段（服务端只返回 published+approved），未审核标注为防御性实现（读可选 status/reviewStatus/reviewDecision），未发明字段名；③证据无正文片段，只展示文档/知识块标识与来源链接；④**真实图谱链路未联调**（开关默认关闭、本批候选全 pending），现网会落空态；⑤关系数 maxNodes=30 被路由截断为 29，命中 29 时提示可能不全；⑥文案口径待用户确认：页面级写「未经医学审核」，而 claim 层语义是「已由人签字审核」。
+
+**2026-10-07 Codex 简历前高优先级收口与首批候选校验**
+- 改动：新增 `backend/app/knowledge_graph_candidate_check.py`（离线只读、冻结词表校验、候选 pending 与摘录证据定位）、4 项单测及 `backend/docs/RESUME_READY_BACKLOG.md`；§6 已把 DSH 所有的候选包 8 处证据缺口和两处语义问题交接。无迁移、无外网、无付费、无审核状态更改。
+- 验证：真实候选包 4 主题/23 概念/19 三元组，8 处 `EVIDENCE_NOT_IN_EXCERPTS`，按主题 1/1/3/3；新增文件 Ruff 通过；图谱专项 20 passed。用户授权启动已有 PostgreSQL，但核对发现宿主机容器原已健康运行，无需启动；仅跑北京卫健委题集 18 道 tune 的 keyword/auto/top-k=3，6/18 命中、Recall@3 0.3333，未跑 holdout。
+- 边界：候选包未导入，评测指向既有/计划原型 slug，不能宣称候选被检索到；没有已审核资料支撑 G3 完整对比与线上图谱增强；图谱探索页归 DSH 前端，入口尚需用户决定。本轮未跑全量测试、真实 Neo4j 或外部来源核验；未提交/推送。
+
 ### 2026-10-06 DSH 自建检索评测集 batch1（北京卫健委 4 篇 / 30 题）
 
 - 改动：新增 backend/docs/medical_retrieval_evaluation_beijing_wjw_batch1.json（未改任何已有文件）。格式逐字对齐 medical_retrieval_evaluation_four_layer_batch1.json 的 10 个 case 字段；顶层加 sources（4 篇 URL / 发布机构 / 日期 / 许可依据）。四个 slug 只能取 pediatric-fever、physiology-temperature-regulation、medicine-use、wellness-fitness-guide-framework。

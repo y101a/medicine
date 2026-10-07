@@ -22,6 +22,9 @@ const ROUTE_NAMES: Record<string, string> = {
   '/app/chat': '智能咨询',
   '/app/history': '咨询历史',
   '/app/settings': '设置',
+  // 知识图谱探索页是**独立路由页**（不在 `/app/*` 下，也不挂 WorkspaceLayout），
+  // 它自己的 375px 几何断言在 `knowledge-graph.spec.ts` 里——这里只并入桌面矩阵。
+  '/knowledge-graph': '知识图谱探索',
 }
 
 /** 未登录访客能访问、且已做移动端适配的页面。 */
