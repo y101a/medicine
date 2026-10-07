@@ -244,7 +244,7 @@ async def test_api_reports_ready_items_and_source_statuses(profile_context):
 
     ready = _source(source_id="news_ready_source")
     ready.last_success_at = NOW - timedelta(hours=3)
-    broken = _source(source_id="news_broken_source")
+    broken = _source(source_id="news_broken_source", scope=("fitness", "medication"))
     broken.last_error_code = "FETCH_TIMEOUT"
     db.add_all([ready, broken])
     await db.flush()
@@ -264,15 +264,34 @@ async def test_api_reports_ready_items_and_source_statuses(profile_context):
     assert body["asOf"] is not None
     assert body["nextRefreshAt"] is not None
     item = body["items"][0]
+    assert item["titleZh"] is None
+    assert item["titleZhSource"] is None
     assert item["sourceName"] == "测试来源"
     assert item["canonicalUrl"] == "https://example.org/a"
     assert item["medicalReviewed"] is False
     assert item["retrievedAt"] is not None
+    stored_page = await news_service.read_items(db, category="all", limit=20, offset=0, now=NOW)
+    stored = stored_page.rows[0][0]
+    stored.title_zh = "养生新知（中文标题）"
+    stored.title_zh_source = "manual"
+    await db.flush()
+    translated = (await client.get("/api/v1/news")).json()["items"][0]
+    assert translated["title"] == "养生新知"
+    assert translated["titleZh"] == "养生新知（中文标题）"
+    assert translated["titleZhSource"] == "manual"
     statuses = {entry["id"]: entry["status"] for entry in body["sourceStatuses"]}
     assert statuses == {"news_ready_source": "ready", "news_broken_source": "failed"}
+    assert {entry["id"]: entry["categories"] for entry in body["sourceStatuses"]} == {
+        "news_ready_source": ["wellness"],
+        "news_broken_source": ["fitness", "medication"],
+    }
 
     # 分类过滤：条目不进别的分类。
-    assert (await client.get("/api/v1/news", params={"category": "fitness"})).json()["total"] == 0
+    fitness = (await client.get("/api/v1/news", params={"category": "fitness"})).json()
+    assert fitness["total"] == 0
+    assert {entry["id"] for entry in fitness["sourceStatuses"]} == {
+        "news_ready_source", "news_broken_source"
+    }
 
 
 async def test_api_reports_failed_when_nothing_is_available(profile_context):

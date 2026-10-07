@@ -88,6 +88,7 @@ consultation_graph = build_consultation_graph()
 
 def _evidence_item(item) -> RetrievalEvidence:
     return {
+        "chunk_id": str(item.chunk_id),
         "source_key": item.source_key,
         "organization": item.organization,
         "title": item.title,

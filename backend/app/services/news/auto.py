@@ -50,3 +50,22 @@ async def daily_auto_refresh(*, fetcher=None) -> None:
         logger.info("news auto refresh: %s (%s)", summary.status, summary.update_day)
     except Exception:  # noqa: BLE001 - 后台任务抛异常只会污染日志，救不回已返回的响应
         logger.exception("news auto refresh failed")
+
+
+async def user_retry_refresh(run_id: int, *, fetcher=None) -> None:
+    """已由 API 在数据库中预留的一次全站重试；后台不再创建第二条运行记录。"""
+    if not AUTO_REFRESH_ENABLED or not get_settings().news_portal_enabled:
+        return
+    try:
+        async with SessionLocal() as db:
+            summary = await refresh_sources(
+                db,
+                now=datetime.now(UTC),
+                trigger="manual",
+                reserved_run_id=run_id,
+                fetcher=fetcher,
+            )
+            await db.commit()
+        logger.info("news user retry: %s (%s)", summary.status, summary.update_day)
+    except Exception:  # noqa: BLE001 - 后台失败只记录日志，租约过期后按失败处理
+        logger.exception("news user retry failed")

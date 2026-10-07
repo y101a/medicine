@@ -176,6 +176,16 @@ class Settings(BaseSettings):
     # privacy and medical-safety acceptance is completed for the deployment.
     web_search_enabled: bool = False
 
+    # Public, reviewed knowledge only. Both switches remain off until the
+    # graph quality gate has passed; a missing/failed graph never blocks RAG.
+    neo4j_read_enabled: bool = False
+    neo4j_shadow_enabled: bool = False
+    neo4j_consultation_enabled: bool = False
+    neo4j_uri: str | None = None
+    neo4j_database: str = "neo4j"
+    neo4j_read_username: str | None = None
+    neo4j_read_password: SecretStr | None = None
+
     # 健康资讯门户（`backend/docs/NEWS_UPDATE_PLAN.md`）：默认关闭自动刷新，来源必须
     # 逐站准入后才写库；这些参数只影响刷新器，不影响接口只读快照的行为。
     news_portal_enabled: bool = False

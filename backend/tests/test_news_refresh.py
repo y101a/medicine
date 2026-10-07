@@ -7,11 +7,12 @@ import pytest
 from sqlalchemy import delete
 
 from app.models import NewsItem, NewsRefreshRun, NewsSource
+from app.news_cli import normalized_chinese_title
 from app.services import news as news_service
 from app.services.news.adapters import parse_for_source, parse_who_outbreak_news
-from app.services.news.catalog import BLOCKED_SOURCES, CATALOG
+from app.services.news.catalog import BLOCKED_SOURCES, CATALOG, PENDING_SOURCES
 from app.services.news.feeds import FeedEntry, FeedParseError
-from app.services.news.fetcher import FetchError, assert_public_endpoint
+from app.services.news.fetcher import FetchError, assert_public_endpoint, fetch_document
 from app.services.news.refresh import refresh_sources
 
 NOW = datetime(2026, 10, 4, 12, 0, tzinfo=UTC)
@@ -113,7 +114,149 @@ async def test_assert_public_endpoint_rejects_before_any_network(url):
 
 def test_catalog_and_blocked_sources_are_disjoint():
     assert "who_disease_outbreak_news" in CATALOG
+    assert "beijing_wjw_health" in CATALOG
+    assert "who_zh_news" in CATALOG
     assert set(CATALOG) & set(BLOCKED_SOURCES) == set()
+    assert "ecdc_news" in PENDING_SOURCES
+    assert "ecdc_news" not in CATALOG  # 署名/许可标记未接线前不可通过 CLI 启用
+    assert "nmpaic_news" in PENDING_SOURCES
+    assert "nmpaic_news" not in CATALOG
+    assert "chinanutri_health_education" in PENDING_SOURCES
+    assert "chinanutri_health_education" not in CATALOG
+
+
+def test_beijing_cards_use_full_chinese_title_display_date_and_relevance_filter():
+    sample = '''<div class="weinei_left_con">
+      <div class="weinei_left_con_line">
+        <div class="weinei_left_con_line_text"><a
+          href="./202609/t20260928_4883552.html"
+          title="中秋国庆假期来啦~健康提示请您查收！">
+          <span class="pc-hide">中秋国庆假期来啦~健康提示请您查收！</span>
+          <span class="mobile-show">中秋国庆假期来啦~健康提示请...</span>
+        </a></div><div class="weinei_left_con_line_date">2026-09-25</div>
+      </div>
+      <div class="weinei_left_con_line"><a href="./202609/t20260928_4883523.html"
+        title="“飞行的硫酸”来了？紧急提醒"></a>
+        <div class="weinei_left_con_line_date">2026-09-17</div></div>
+      <div class="weinei_left_con_line"><a href="./202609/t20260911_4860170.html"
+        title="2026年服贸会健康卫生服务专题创新成果发布活动在京举行"></a>
+        <div class="weinei_left_con_line_date">2026-09-10</div></div>
+      <div class="weinei_left_con_line"><a href="./202609/t20260911_4860165.html"
+        title="2026服贸会健康卫生服务专题今日正式启幕"></a>
+        <div class="weinei_left_con_line_date">2026-09-09</div></div>
+      <div class="weinei_left_con_line"><a href="./202609/t20260902_4847952.html">
+        <span class="pc-hide">北京初秋花粉高峰来了！过敏人群速看防护要点</span>
+        <span class="mobile-show">北京初秋花粉高峰来了！过敏...</span></a>
+        <div class="weinei_left_con_line_date">2026-09-02</div></div>
+      <div class="weinei_left_con_line"><a href="./202608/t20260821_1234567.html"
+        title="关于HPV免疫规划接种家长最关心的9个问题"></a>
+        <div class="weinei_left_con_line_date">2026-08-21</div></div>
+      <div class="weinei_left_con_line"><a href="./202608/t20260820_1234567.html"
+        title="老年人合理用药指导项目公开遴选公告"></a>
+        <div class="weinei_left_con_line_date">2026-08-20</div></div>
+      <div class="weinei_left_con_line"><a href="https://evil.example/202608/t20260819_123.html"
+        title="安全用药提示"></a>
+        <div class="weinei_left_con_line_date">2026-08-19</div></div>
+    </div>'''.encode()
+    entries = parse_for_source("beijing_wjw_health", sample, fetch_mode="approved_page")
+    assert [(entry.title, entry.category) for entry in entries] == [
+        ("中秋国庆假期来啦~健康提示请您查收！", "wellness"),
+        ("北京初秋花粉高峰来了！过敏人群速看防护要点", "disease"),
+        ("关于HPV免疫规划接种家长最关心的9个问题", "disease"),
+    ]
+    assert entries[0].published_raw == "2026-09-25"  # 不从 URL 的 t20260928 猜日期。
+    assert entries[0].url == (
+        "https://wjw.beijing.gov.cn/xwzx_20031/xwfb/202609/t20260928_4883552.html"
+    )
+    assert all(entry.summary_raw is None for entry in entries)
+
+
+@pytest.mark.parametrize("url", ["https://evil.example/a", "https://wjw.beijing.gov.cn.evil/a"])
+async def test_beijing_direct_connection_rejects_other_hosts_without_network(url):
+    with pytest.raises(FetchError) as error:
+        await fetch_document(url, timeout_seconds=3, direct_beijing=True)
+    assert error.value.code == "FETCH_DIRECT_NOT_ALLOWED"
+
+
+def test_who_chinese_news_only_reads_disease_cards_and_same_site_links():
+    sample = '''<html>
+    <a href="/zh/news/item/25-09-2026-influenza-vaccine" class="link-container">
+      <span class="timestamp">2026年9月25日</span>
+      <p class="heading text-underline">世卫组织公布流感疫苗建议</p>
+    </a>
+    <a href="/zh/news/item/24-09-2026-meeting" class="link-container">
+      <span class="timestamp">2026年9月24日</span><p class="heading">会议动态</p>
+    </a>
+    <a href="https://evil.example/zh/news/item/23-09-2026-virus" class="link-container">
+      <span class="timestamp">2026年9月23日</span><p class="heading">病毒资讯</p>
+    </a></html>'''.encode()
+    entries = parse_for_source("who_zh_news", sample, fetch_mode="approved_page")
+    assert len(entries) == 1
+    assert entries[0].title == "世卫组织公布流感疫苗建议"
+    assert entries[0].url == "https://www.who.int/zh/news/item/25-09-2026-influenza-vaccine"
+    assert entries[0].published_raw == "2026-09-25"
+    assert entries[0].summary_raw is None
+
+
+def test_nmpaic_html_candidate_only_reads_same_site_article_metadata():
+    sample = '''<html><ul class="glDivMain_boList">
+    <li><a href="./202609/t20260929_431114.html">药品监管新消息</a>
+    <span class="secBox1Right_bo_time">2026-09-25</span></li>
+    <li><a href="https://evil.example/202609/t20260929_431114.html">外站消息</a>
+    <span>2026-09-25</span></li>
+    <li><a href="./202609/t20260928_431113.html">缺少日期</a></li>
+    </ul></html>'''.encode()
+    entries = parse_for_source("nmpaic_news", sample, fetch_mode="html_list")
+    assert len(entries) == 1
+    assert entries[0].title == "药品监管新消息"
+    assert entries[0].url == "https://www.nmpaic.org.cn/yjzxyw/202609/t20260929_431114.html"
+    assert entries[0].published_raw == "2026-09-25"
+    assert entries[0].summary_raw is None
+
+
+def test_chinanutri_candidate_splits_wellness_and_fitness_without_copying_text():
+    sample = '''<html><div class="art_list">
+    <a href="./202607/t20260710_1838065.html">
+      <div class="fl">&gt; 认识肌少症筛查</div><div class="right">2026-07-10</div>
+    </a>
+    <a href="./202607/t20260710_1838062.html">
+      <div class="fl">&gt; 小暑饮食攻略</div><div class="right">2026-07-10</div>
+    </a>
+    <a href="https://evil.example/a">
+      <div class="fl">外站链接</div><div class="right">2026-07-10</div>
+    </a>
+    </div></html>'''.encode()
+    entries = parse_for_source("chinanutri_health_education", sample, fetch_mode="html_list")
+    assert [(entry.title, entry.category) for entry in entries] == [
+        ("认识肌少症筛查", "fitness"),
+        ("小暑饮食攻略", "wellness"),
+    ]
+    assert entries[0].url == (
+        "https://www.chinanutri.cn/yyjkzxpt/yyjkkpzx/hdjl/202607/t20260710_1838065.html"
+    )
+    assert all(entry.summary_raw is None for entry in entries)
+
+
+def test_manual_chinese_title_validation_is_bounded():
+    assert normalized_chinese_title("  埃博拉病  暴发  ") == "埃博拉病 暴发"
+    assert normalized_chinese_title("English only") is None
+    assert normalized_chinese_title("<b>疫情</b>") is None
+    assert normalized_chinese_title("中" * 301) is None
+
+
+def test_ecdc_rss_candidate_parses_offline_without_copying_summary():
+    sample = b'''<?xml version="1.0"?><rss><channel><item>
+    <title>Ebola disease outbreak in the Democratic Republic of the Congo</title>
+    <link>https://www.ecdc.europa.eu/en/news-events/ebola-update</link>
+    <pubDate>Fri, 02 Oct 2026 17:36:21 +0200</pubDate>
+    <description>Do not republish this summary</description>
+    </item></channel></rss>'''
+    entries = parse_for_source("ecdc_news", sample, fetch_mode="rss")
+    assert len(entries) == 1
+    assert entries[0].title.startswith("Ebola disease outbreak")
+    assert entries[0].url == "https://www.ecdc.europa.eu/en/news-events/ebola-update"
+    assert entries[0].published_raw is not None
+    assert entries[0].summary_raw is None
 
 
 async def test_refresh_inserts_once_and_keeps_items_when_source_fails(profile_context):
@@ -182,9 +325,9 @@ def test_who_news_releases_adapter_uses_date_prefixed_slug():
     """新闻稿的真实地址带日期前缀（实测 200），必须用 ItemDefaultUrl 而不是 UrlName。"""
     payload = (
         b'{"value": ['
-        b'{"Title": "New WHO estimates show changing global health landscape",'
-        b' "UrlName": "new-who-estimates-show-changing-global-health-landscape",'
-        b' "ItemDefaultUrl": "/02-10-2026-new-who-estimates-show-changing-global-health-landscape",'
+        b'{"Title": "WHO reports progress against tuberculosis",'
+        b' "UrlName": "who-reports-progress-against-tuberculosis",'
+        b' "ItemDefaultUrl": "/02-10-2026-who-reports-progress-against-tuberculosis",'
         b' "PublicationDateAndTime": "2026-10-02T08:09:03Z"},'
         b'{"Title": "", "UrlName": "empty-title"}]}'
     )
@@ -192,10 +335,86 @@ def test_who_news_releases_adapter_uses_date_prefixed_slug():
     entries = parse_for_source("who_news_releases", payload, fetch_mode="official_api")
 
     assert [entry.url for entry in entries] == [
-        "https://www.who.int/news/item/02-10-2026-new-who-estimates-show-changing-global-health-landscape"
+        "https://www.who.int/news/item/02-10-2026-who-reports-progress-against-tuberculosis"
     ]
     assert entries[0].published_raw == "2026-10-02T08:09:03Z"
     assert entries[0].summary_raw is None
+
+
+def test_who_general_news_releases_do_not_fill_disease_section():
+    payload = (
+        b'{"value": ['
+        b'{"Title": "WHO appoints new regional director",'
+        b' "ItemDefaultUrl": "/02-10-2026-new-regional-director"},'
+        b'{"Title": "WHO launches cancer prevention initiative",'
+        b' "ItemDefaultUrl": "/02-10-2026-cancer-prevention"}]}'
+    )
+
+    entries = parse_for_source("who_news_releases", payload, fetch_mode="official_api")
+
+    assert [entry.title for entry in entries] == [
+        "WHO launches cancer prevention initiative"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("source_id", "category", "payload"),
+    [
+        (
+            "odphp_physical_activity",
+            "fitness",
+            b'<article><a class="c-teaser__link" href="/news/202610/physical-activity">'
+            b'Physical Activity for Health</a><p class="node__submitted">'
+            b'Posted on October 4, 2026 by ODPHP</p></article>',
+        ),
+        (
+            "odphp_food_nutrition",
+            "wellness",
+            b'<article><a class="c-teaser__link" href="/news/202610/healthy-eating">'
+            b'Healthy Eating Tips</a><p class="node__submitted">'
+            b'Posted on October 4, 2026 by ODPHP</p></article>',
+        ),
+        (
+            "fda_drug_updates",
+            "medication",
+            b'<rss><channel><item><title>FDA approves first drug for rare condition</title>'
+            b'<link>http://www.fda.gov/drugs/resources-information-approved-drugs/approval</link>'
+            b'<pubDate>Fri, 02 Oct 2026 15:31:02 EDT</pubDate></item></channel></rss>',
+        ),
+    ],
+)
+async def test_new_section_sources_refresh_into_correct_category(
+    profile_context, source_id, category, payload
+):
+    _client, db, _users = profile_context
+    spec = CATALOG[source_id]
+    db.add(
+        NewsSource(
+            id=spec.id,
+            name=spec.name,
+            organization=spec.organization,
+            homepage_url=spec.homepage_url,
+            feed_url=spec.feed_url,
+            fetch_mode=spec.fetch_mode,
+            category_scope=list(spec.category_scope),
+            license_note=spec.license_note,
+            enabled=True,
+        )
+    )
+    await db.flush()
+
+    async def fetcher(_url: str, *, timeout_seconds: float):
+        return "text/html" if spec.fetch_mode == "approved_page" else "application/rss+xml", payload
+
+    summary = await refresh_sources(db, now=NOW, trigger="manual", fetcher=fetcher)
+    page = await news_service.read_items(db, category=category, limit=20, offset=0, now=NOW)
+
+    assert summary.status == "succeeded"
+    assert summary.results[0].inserted == 1
+    assert page.total == 1
+    assert page.rows[0][0].category == category
+    if source_id == "fda_drug_updates":
+        assert page.rows[0][0].published_at == datetime(2026, 10, 2, 19, 31, 2, tzinfo=UTC)
 
 
 async def test_same_title_updates_are_kept_when_published_times_differ(profile_context):

@@ -198,3 +198,93 @@ async def test_no_sources_means_no_trigger(profile_context, hooks):
 
     assert body["status"] == "sources_not_connected"
     assert hooks == []
+
+
+async def test_user_retry_once_after_failed_auto_run(profile_context, hooks, monkeypatch):
+    client, db, users = profile_context
+    db.add(_source())
+    await db.flush()
+    _auth(client, users)
+
+    async def fail_fetch(_url: str, *, timeout_seconds: float):
+        raise FetchError("FETCH_TIMEOUT")
+
+    monkeypatch.setattr(refresh_module, "fetch_document", fail_fetch)
+    assert (await client.get("/api/v1/news")).status_code == 200
+    assert (await _auto_runs(db))[0].status == "failed"
+
+    async def good_fetch(url: str, *, timeout_seconds: float):
+        hooks.append(url)
+        return "application/rss+xml", RSS_SAMPLE
+
+    monkeypatch.setattr(refresh_module, "fetch_document", good_fetch)
+    first = await client.post("/api/v1/news/refresh")
+    assert first.status_code == 202
+    assert first.json()["accepted"] is True
+    assert first.json()["reason"] == "started"
+    assert first.json()["nextRefreshAt"] is not None
+    assert hooks == ["https://example.org/feed.xml"]
+    assert (await client.get("/api/v1/news")).json()["total"] == 1
+
+    second = await client.post("/api/v1/news/refresh")
+    assert second.status_code == 202
+    assert second.json()["accepted"] is False
+    assert second.json()["reason"] == "already_ran_today"
+    assert hooks == ["https://example.org/feed.xml"]
+    manual_runs = await db.scalars(select(NewsRefreshRun).where(NewsRefreshRun.trigger == "manual"))
+    assert len(list(manual_runs)) == 1
+
+
+async def test_user_retry_is_denied_when_auto_succeeded(profile_context, hooks):
+    client, db, users = profile_context
+    db.add(_source())
+    await db.flush()
+    _auth(client, users)
+    assert (await client.get("/api/v1/news")).status_code == 200
+
+    response = await client.post("/api/v1/news/refresh")
+
+    assert response.status_code == 202
+    assert response.json()["accepted"] is False
+    assert response.json()["reason"] == "already_ran_today"
+    assert hooks == ["https://example.org/feed.xml"]
+
+
+async def test_user_retry_respects_disabled_switch(profile_context, hooks, monkeypatch):
+    client, db, users = profile_context
+    db.add(_source())
+    await db.flush()
+    _auth(client, users)
+    monkeypatch.setattr(get_settings(), "news_portal_enabled", False)
+
+    response = await client.post("/api/v1/news/refresh")
+
+    assert response.status_code == 202
+    assert response.json()["accepted"] is False
+    assert response.json()["reason"] == "disabled"
+    assert hooks == []
+
+
+async def test_user_retry_requires_login_and_waits_for_auto_failure(profile_context, hooks):
+    client, db, users = profile_context
+    db.add(_source())
+    now = datetime.now(UTC)
+    db.add(
+        NewsRefreshRun(
+            update_day=update_day_for(now, hour=get_settings().news_update_hour),
+            trigger="auto",
+            status="running",
+            started_at=now,
+            lease_expires_at=now + timedelta(seconds=600),
+        )
+    )
+    await db.flush()
+
+    assert (await client.post("/api/v1/news/refresh")).status_code == 401
+    _auth(client, users)
+    response = await client.post("/api/v1/news/refresh")
+
+    assert response.status_code == 202
+    assert response.json()["accepted"] is False
+    assert response.json()["reason"] == "busy"
+    assert hooks == []

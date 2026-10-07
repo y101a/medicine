@@ -21,6 +21,10 @@ class NewsItemOut(BaseModel):
     id: str
     category: NewsItemCategory
     title: str
+    title_zh: str | None = Field(default=None, serialization_alias="titleZh")
+    title_zh_source: Literal["machine", "manual"] | None = Field(
+        default=None, serialization_alias="titleZhSource"
+    )
     #: 摘要可能为空：写不出可靠摘要时只给标题、来源与链接，不编造内容。
     summary: str | None = None
     source_name: str = Field(serialization_alias="sourceName")
@@ -41,6 +45,7 @@ class NewsTipOut(BaseModel):
 class NewsSourceStatusOut(BaseModel):
     id: str
     name: str
+    categories: list[NewsItemCategory]
     status: NewsSourceStatus
     last_success_at: datetime | None = Field(default=None, serialization_alias="lastSuccessAt")
     last_error_code: str | None = Field(default=None, serialization_alias="lastErrorCode")
@@ -62,3 +67,9 @@ class NewsPageOut(BaseModel):
     has_more: bool = Field(default=False, serialization_alias="hasMore")
     #: 是否有一轮自动刷新正在进行（当天首次访问触发；接口不等待它完成）。
     refreshing: bool = False
+
+
+class NewsRefreshOut(BaseModel):
+    accepted: bool
+    reason: Literal["started", "already_ran_today", "busy", "disabled"]
+    next_refresh_at: datetime | None = Field(serialization_alias="nextRefreshAt")

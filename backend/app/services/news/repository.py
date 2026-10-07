@@ -222,6 +222,10 @@ async def source_statuses(db: AsyncSession, *, now: datetime) -> list[dict[str, 
             {
                 "id": source.id,
                 "name": source.name,
+                "categories": [
+                    category for category in (source.category_scope or [])
+                    if category in NEWS_ITEM_CATEGORIES
+                ],
                 "status": status,
                 "lastSuccessAt": source.last_success_at,
                 "lastErrorCode": source.last_error_code,

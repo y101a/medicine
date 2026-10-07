@@ -58,6 +58,7 @@ async def refresh_sources(
     limit: int | None = None,
     timeout_seconds: float | None = None,
     fetcher=None,
+    reserved_run_id: int | None = None,
 ) -> RefreshSummary:
     """抓一轮。`fetcher=None` 时在**调用时**取默认抓取函数（便于测试注入替身）。
 
@@ -76,10 +77,19 @@ async def refresh_sources(
     if source_ids:
         wanted = set(source_ids)
         sources = [source for source in sources if source.id in wanted]
-    if not sources:
+    if not sources and reserved_run_id is None:
         return RefreshSummary(update_day=update_day, status="skipped")
 
-    if trigger == "auto":
+    if reserved_run_id is not None:
+        run = await db.get(NewsRefreshRun, reserved_run_id)
+        if run is None or run.status != "running" or run.trigger != "manual":
+            return RefreshSummary(update_day=update_day, status="skipped")
+        if not sources:
+            await finish_run(
+                db, run=run, status="skipped", ok_count=0, failed_count=0, now=now
+            )
+            return RefreshSummary(update_day=run.update_day, status="skipped", run_id=run.id)
+    elif trigger == "auto":
         run = await acquire_auto_run(
             db,
             now=now,
@@ -116,7 +126,12 @@ async def refresh_sources(
         payload: bytes | None = None
         for attempt in range(MAX_FETCH_ATTEMPTS):
             try:
-                _content_type, payload = await fetch(endpoint, timeout_seconds=timeout)
+                if fetcher is None and source.id == "beijing_wjw_health":
+                    _content_type, payload = await fetch_document(
+                        endpoint, timeout_seconds=timeout, direct_beijing=True
+                    )
+                else:
+                    _content_type, payload = await fetch(endpoint, timeout_seconds=timeout)
                 break
             except FetchError as error:
                 if attempt + 1 < MAX_FETCH_ATTEMPTS and _is_transient(error.code):

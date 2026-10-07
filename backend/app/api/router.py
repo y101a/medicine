@@ -9,6 +9,7 @@ from app.api.routes import (
     image_generations,
     images,
     knowledge,
+    knowledge_graph,
     models,
     navigation,
     news,
@@ -31,6 +32,7 @@ api_router.include_router(users.router)
 api_router.include_router(consultations.router)
 api_router.include_router(models.router)
 api_router.include_router(knowledge.router)
+api_router.include_router(knowledge_graph.router)
 api_router.include_router(navigation.router)
 api_router.include_router(news.router)
 api_router.include_router(health_records.router)

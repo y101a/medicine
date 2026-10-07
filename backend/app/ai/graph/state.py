@@ -13,6 +13,7 @@ RetrievalGateReason = Literal[
 
 
 class RetrievalEvidence(TypedDict):
+    chunk_id: NotRequired[str]
     source_key: str
     organization: str
     title: str

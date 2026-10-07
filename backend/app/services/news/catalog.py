@@ -55,15 +55,150 @@ WHO_NEWS_RELEASES = SourceSpec(
         "?$top=20&$orderby=PublicationDateAndTime%20desc"
     ),
     fetch_mode="official_api",
-    # 新闻稿覆盖公共卫生多个话题，暂归入「疾病」专区；这是本项目的取舍，不是来源自带的分类。
+    # 综合新闻稿仅保留标题明确涉及疾病/传染病防控的条目，其余不入疾病专区。
     category_scope=("disease",),
     license_note=_WHO_LICENSE_NOTE,
+)
+
+WHO_ZH_NEWS = SourceSpec(
+    id="who_zh_news",
+    name="世卫组织中文新闻",
+    organization="世界卫生组织（WHO）",
+    homepage_url="https://www.who.int/zh/news-room",
+    feed_url="https://www.who.int/zh/news-room",
+    fetch_mode="approved_page",
+    category_scope=("disease",),
+    license_note=(
+        _WHO_LICENSE_NOTE + "中文新闻列表 2026-10-06 用项目受控抓取器实测 200；"
+        "仅保存同域中文原题、日期和原文链接，按疾病词筛选，不复制正文或摘要。"
+    ),
+)
+
+BEIJING_WJW_HEALTH = SourceSpec(
+    id="beijing_wjw_health",
+    name="北京市卫生健康委员会",
+    organization="北京市卫生健康委员会",
+    homepage_url="https://wjw.beijing.gov.cn/xwzx_20031/xwfb/",
+    feed_url="https://wjw.beijing.gov.cn/xwzx_20031/xwfb/",
+    fetch_mode="approved_page",
+    category_scope=("wellness", "disease", "medication"),
+    license_note=(
+        "北京市卫健委《法律声明》 https://wjw.beijing.gov.cn/sy_20013/202004/"
+        "t20200401_1781806.html：本站自有内容如需使用或转载需注明转载来源。"
+        "仅保存本站刊载的中文原题、列表日期和原文链接，不复制正文/摘要/图片；"
+        "列表未标注稿件原始作者，展示来源名只表示刊载网站。"
+        "2026-10-06 项目 httpx 经定向直连可读，其他来源保持原代理行为。"
+    ),
+)
+
+ECDC_NEWS = SourceSpec(
+    id="ecdc_news",
+    name="ECDC 新闻与公告",
+    organization="欧洲疾病预防控制中心（ECDC）",
+    homepage_url="https://www.ecdc.europa.eu/en/news-events",
+    # ECDC 官方 RSS 列表指向该地址；2026-10-05 本机实测 200/application/rss+xml。
+    feed_url="https://www.ecdc.europa.eu/en/taxonomy/term/1307/feed",
+    fetch_mode="rss",
+    category_scope=("disease",),
+    license_note=(
+        "ECDC 官网新闻 RSS，2026-10-05 实测可读；版权页说明其自有网页内容默认 "
+        "CC BY 4.0，需署名、链接许可并标明改动；第三方材料不在许可内。"
+        "本项仅为待启用候选，门户完成许可归属和翻译标注展示前不得启用。"
+    ),
+)
+
+NMPAIC_NEWS = SourceSpec(
+    id="nmpaic_news",
+    name="国家药监局信息中心要闻",
+    organization="国家药品监督管理局信息中心",
+    homepage_url="https://www.nmpaic.org.cn/yjzxyw/",
+    feed_url="https://www.nmpaic.org.cn/yjzxyw/",
+    fetch_mode="html_list",
+    category_scope=("medication",),
+    license_note=(
+        "2026-10-05 栏目静态 HTML 可读；仅收标题、原文链接和列表日期，"
+        "不复制正文、图片或摘要。启用前需人工核对具体条目的原始发布者、"
+        "网站使用条件与门户来源标注；转载稿不得误标为该中心原创。"
+    ),
+)
+
+CHINANUTRI_EDUCATION = SourceSpec(
+    id="chinanutri_health_education",
+    name="中国疾控中心营养与健康所科普",
+    organization="中国疾病预防控制中心营养与健康所",
+    homepage_url="https://www.chinanutri.cn/yyjkzxpt/yyjkkpzx/hdjl/",
+    feed_url="https://www.chinanutri.cn/yyjkzxpt/yyjkkpzx/hdjl/",
+    fetch_mode="html_list",
+    category_scope=("wellness", "fitness"),
+    license_note=(
+        "2026-10-05 栏目静态 HTML 可读，含中文标题、同域文章链接与日期；"
+        "仅拟保存这些元数据，不复制正文或图片。网站页脚声明版权所有，"
+        "公开使用条件及转载稿归属仍待核对，故暂不允许启用。"
+    ),
+)
+
+ODPHP_FITNESS = SourceSpec(
+    id="odphp_physical_activity",
+    name="ODPHP 身体活动资讯",
+    organization="美国卫生与公众服务部疾病预防与健康促进办公室（ODPHP）",
+    homepage_url="https://odphp.health.gov/news/tag/physical-activity?page=0",
+    feed_url="https://odphp.health.gov/news/tag/physical-activity?page=0",
+    fetch_mode="approved_page",
+    category_scope=("fitness",),
+    license_note=(
+        "ODPHP https://odphp.health.gov/copyright-policy 说明本站文字属于公共领域，"
+        "使用须注明 ODPHP 并链接本站；仅取专题列表标题、日期和原文链接，"
+        "不复制图片/摘要/正文，不暗示机构背书。2026-10-05 httpx 200；robots.txt 未限制 /news/。"
+    ),
+)
+
+ODPHP_NUTRITION = SourceSpec(
+    id="odphp_food_nutrition",
+    name="ODPHP 营养与健康饮食资讯",
+    organization="美国卫生与公众服务部疾病预防与健康促进办公室（ODPHP）",
+    homepage_url="https://odphp.health.gov/news/tag/food-and-nutrition?page=0",
+    feed_url="https://odphp.health.gov/news/tag/food-and-nutrition?page=0",
+    fetch_mode="approved_page",
+    category_scope=("wellness",),
+    license_note=(
+        "ODPHP https://odphp.health.gov/copyright-policy 说明本站文字属于公共领域，"
+        "使用须注明 ODPHP 并链接本站；仅取专题列表标题、日期和原文链接，"
+        "不复制图片/摘要/正文，不暗示机构背书。2026-10-05 httpx 200；robots.txt 未限制 /news/。"
+    ),
+)
+
+FDA_DRUG_UPDATES = SourceSpec(
+    id="fda_drug_updates",
+    name="FDA 药物审批与安全资讯",
+    organization="美国食品药品监督管理局（FDA）",
+    homepage_url="https://www.fda.gov/drugs/news-events-human-drugs/whats-new-related-drugs",
+    # 官网“RSS Feed for This Page”的真实链接；先前猜测的小写 /drugs/rss.xml 是 404。
+    feed_url="https://www.fda.gov/AboutFDA/ContactFDA/StayInformed/RSSFeeds/Drugs/rss.xml",
+    fetch_mode="rss",
+    category_scope=("medication",),
+    license_note=(
+        "FDA https://www.fda.gov/about-fda/about-website/website-policies 说明本站自有文字"
+        "默认公共领域并允许链接，建议链接原文；只取原题、日期、同域 HTTPS 原文链接，"
+        "过滤行政/技术动态及第三方内容。2026-10-05 官网 RSS 链接经重定向后 httpx 200。"
+    ),
 )
 
 #: 已通过实测、可被 CLI 启用的来源。英文内容未做翻译，专区显示时按原题呈现。
 CATALOG: dict[str, SourceSpec] = {
     WHO_DISEASE_OUTBREAK_NEWS.id: WHO_DISEASE_OUTBREAK_NEWS,
     WHO_NEWS_RELEASES.id: WHO_NEWS_RELEASES,
+    WHO_ZH_NEWS.id: WHO_ZH_NEWS,
+    BEIJING_WJW_HEALTH.id: BEIJING_WJW_HEALTH,
+    ODPHP_FITNESS.id: ODPHP_FITNESS,
+    ODPHP_NUTRITION.id: ODPHP_NUTRITION,
+    FDA_DRUG_UPDATES.id: FDA_DRUG_UPDATES,
+}
+
+# 技术可读但展示许可条件尚未接线；不放入 CATALOG，CLI 因而无法启用。
+PENDING_SOURCES: dict[str, SourceSpec] = {
+    ECDC_NEWS.id: ECDC_NEWS,
+    NMPAIC_NEWS.id: NMPAIC_NEWS,
+    CHINANUTRI_EDUCATION.id: CHINANUTRI_EDUCATION,
 }
 
 #: 已知但**不**可自动读取、仅记录障碍的来源（不加入 CATALOG，CLI 拒绝启用）。

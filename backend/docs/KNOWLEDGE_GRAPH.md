@@ -1,5 +1,22 @@
 # 知识图谱治理层与 G2 全量投影
 
+## G2 只读查询与 G4 受控接线（2026-10-06）
+
+后端现有 `GET /api/v1/knowledge-graph/concepts?query=...` 和
+`POST /api/v1/knowledge-graph/explore`（仅登录用户）。查询端只接收 PostgreSQL
+登记的公共概念 UUID，使用固定 Cypher 模板和枚举关系类型；Neo4j 返回值必须与
+PostgreSQL 期望 revision 一致，且每条关系再次核对发布状态、医学审核和当前有效的
+公共知识证据。图谱故障、版本落后、证据撤回时返回 `available=false` 和空关系列表，
+不泄露数据库地址、Cypher 或用户原文。首版探索限制 1 跳、最多 30 个节点。
+
+`NEO4J_READ_ENABLED`、`NEO4J_SHADOW_ENABLED`、`NEO4J_CONSULTATION_ENABLED`
+均默认 `false`。影子模式只记录匹配关系数量，不送给模型；咨询开关即使开启，也只
+能把**证据 chunk ID 已经出现在本轮审核 RAG 来源编号中**的关系作为组织回答的附加提示，不另造
+来源编号、不能越过 RAG 相关度门槛。没有正式医学资料和 G3 独立评测前不得开启
+咨询开关。读取使用单独配置的 `NEO4J_READ_USERNAME`/`NEO4J_READ_PASSWORD`；
+Community Edition 无细粒度只读角色时，不得把发布账号凭据直接交给线上读服务。
+图谱探索前端页面仍归 DSH，需按协作协议交接并确定入口位置。
+
 ## G2 增量说明（2026-10-03）
 
 已增加 `app/knowledge_graph_worker.py`：从 PostgreSQL 已发布且证据有效的公共 Claim 构造完整快照，用固定参数化 Cypher 在**单个 Neo4j 写事务**里替换旧图。概念改名、关系撤回、已审核文档被取代、来源注册表降级都会产生新 revision；空图也可投影以清除旧知识。图中只含概念、关系、证据定位 ID，不复制正文，不含用户/患者或健康记录。

@@ -7,6 +7,8 @@
 
 import argparse
 import asyncio
+import re
+import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy import delete, func, select
@@ -14,8 +16,17 @@ from sqlalchemy import delete, func, select
 from app.db.session import SessionLocal
 from app.models.news import NewsItem, NewsRefreshRun, NewsSource
 from app.services.news import repository
-from app.services.news.catalog import BLOCKED_SOURCES, CATALOG, get_spec
+from app.services.news.catalog import BLOCKED_SOURCES, CATALOG, PENDING_SOURCES, get_spec
 from app.services.news.refresh import refresh_sources
+
+
+def normalized_chinese_title(raw: str | None) -> str | None:
+    title = " ".join((raw or "").split())
+    if not title or len(title) > 300 or not re.search(r"[\u3400-\u9fff]", title):
+        return None
+    if "<" in title or ">" in title:
+        return None
+    return title
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -40,11 +51,35 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--items", metavar="CATEGORY", default=None, help="查看某分类在展示期的条目"
     )
+    parser.add_argument(
+        "--set-title-zh", metavar="ITEM_UUID", help="为一条新闻录入已人工核对的中文译题"
+    )
+    parser.add_argument("--zh-title", default=None, help="配合 --set-title-zh 使用，最多 300 字")
     return parser
 
 
 async def _run(args: argparse.Namespace) -> int:
     async with SessionLocal() as db:
+        if args.set_title_zh:
+            try:
+                item_id = uuid.UUID(args.set_title_zh)
+            except ValueError:
+                print("拒绝写入：无效条目 UUID。")
+                return 2
+            title = normalized_chinese_title(args.zh_title)
+            if title is None:
+                print("拒绝写入：中文译题须含汉字、长 1–300 字且不得包含 HTML 标记。")
+                return 2
+            item = await db.get(NewsItem, item_id)
+            if item is None:
+                print("拒绝写入：没有这条新闻。")
+                return 2
+            item.title_zh = title
+            item.title_zh_source = "manual"
+            await db.commit()
+            print(f"已保存人工核对译题：{item.id}；英文原题未修改。")
+            return 0
+
         if args.catalog:
             for spec in CATALOG.values():
                 print(
@@ -54,6 +89,8 @@ async def _run(args: argparse.Namespace) -> int:
                 print(f"          许可记录：{spec.license_note}")
             for source_id, reason in BLOCKED_SOURCES.items():
                 print(f"[不可自动读取] {source_id}：{reason}")
+            for spec in PENDING_SOURCES.values():
+                print(f"[待接线不可启用] {spec.id}：{spec.license_note}")
             return 0
 
         if args.enable:

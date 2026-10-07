@@ -12,9 +12,10 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from app.api.dependencies import DbSession, get_current_user
 from app.core.config import get_settings
 from app.schemas.news import NewsCategory as CategoryParam
-from app.schemas.news import NewsItemOut, NewsPageOut, NewsSourceStatusOut
+from app.schemas.news import NewsItemOut, NewsPageOut, NewsRefreshOut, NewsSourceStatusOut
 from app.services import news as news_service
-from app.services.news.auto import daily_auto_refresh
+from app.services.news import auto as news_auto
+from app.services.news.updates import acquire_user_retry_run
 
 router = APIRouter(
     prefix="/news", tags=["健康资讯"], dependencies=[Depends(get_current_user)]
@@ -63,7 +64,7 @@ async def read_news(
 
     if settings.news_portal_enabled:
         # 每日首次访问触发一轮有界刷新：**不等待**，失败也只写来源状态。
-        background_tasks.add_task(daily_auto_refresh)
+        background_tasks.add_task(news_auto.daily_auto_refresh)
 
     return NewsPageOut(
         category=category,
@@ -80,6 +81,8 @@ async def read_news(
                 id=str(item.id),
                 category=item.category,
                 title=item.title,
+                title_zh=item.title_zh,
+                title_zh_source=item.title_zh_source,
                 summary=item.summary,
                 source_name=source.name,
                 canonical_url=item.canonical_url,
@@ -93,6 +96,7 @@ async def read_news(
             NewsSourceStatusOut(
                 id=str(entry["id"]),
                 name=str(entry["name"]),
+                categories=entry["categories"],
                 status=entry["status"],
                 last_success_at=entry["lastSuccessAt"],
                 last_error_code=entry["lastErrorCode"],
@@ -103,3 +107,28 @@ async def read_news(
         has_more=offset + len(page.rows) < page.total,
         refreshing=refreshing,
     )
+
+
+@router.post("/refresh", response_model=NewsRefreshOut, status_code=202)
+async def request_news_retry(db: DbSession, background_tasks: BackgroundTasks) -> NewsRefreshOut:
+    """当日自动轮失败/部分失败后，全站只允许一次后台重试。"""
+    settings = get_settings()
+    now = datetime.now(UTC)
+    next_at = news_service.next_refresh_at(now, hour=settings.news_update_hour)
+    if not settings.news_portal_enabled or not news_auto.AUTO_REFRESH_ENABLED:
+        return NewsRefreshOut(accepted=False, reason="disabled", next_refresh_at=next_at)
+    if not await news_service.enabled_sources(db):
+        return NewsRefreshOut(accepted=False, reason="disabled", next_refresh_at=next_at)
+
+    run, reason = await acquire_user_retry_run(
+        db,
+        now=now,
+        hour=settings.news_update_hour,
+        lease_seconds=settings.news_refresh_lease_seconds,
+    )
+    if run is None:
+        await db.commit()  # 租约过期时可能已把自动轮标为 failed。
+        return NewsRefreshOut(accepted=False, reason=reason, next_refresh_at=next_at)
+    await db.commit()  # 后台任务使用独立会话，必须先持久化预留轮次。
+    background_tasks.add_task(news_auto.user_retry_refresh, run.id)
+    return NewsRefreshOut(accepted=True, reason="started", next_refresh_at=next_at)

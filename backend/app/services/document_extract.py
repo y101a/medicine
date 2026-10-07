@@ -19,6 +19,7 @@ ERROR_STATUS = {
     "FILE_PAGE_LIMIT": 422,
     "FILE_ENCRYPTED": 422,
     "FILE_NO_TEXT": 422,
+    "FILE_OCR_UNAVAILABLE": 422,
     "FILE_TEXT_TOO_LARGE": 422,
     "FILE_ZIP_UNSAFE": 422,
     "FILE_PARSE_FAILED": 422,
@@ -33,6 +34,22 @@ class ExtractedChunk:
 
 
 @dataclass(frozen=True)
+class ExtractedTableCell:
+    row: int
+    column: int
+    text: str
+
+
+@dataclass(frozen=True)
+class ExtractedTable:
+    locator: str
+    row_count: int
+    column_count: int
+    layout_uncertain: bool
+    cells: tuple[ExtractedTableCell, ...]
+
+
+@dataclass(frozen=True)
 class ExtractedDocument:
     display_name: str
     kind: str
@@ -41,6 +58,54 @@ class ExtractedDocument:
     char_count: int
     preview: str
     chunks: tuple[ExtractedChunk, ...]
+    tables: tuple[ExtractedTable, ...] = ()
+
+
+def _parse_tables(payload: object) -> tuple[ExtractedTable, ...]:
+    if not isinstance(payload, list):
+        raise AppError(422, "FILE_PARSE_FAILED", "文档表格解析结果无效")
+    tables = []
+    for item in payload:
+        if not isinstance(item, dict):
+            raise AppError(422, "FILE_PARSE_FAILED", "文档表格解析结果无效")
+        locator = item.get("locator")
+        rows = item.get("row_count")
+        columns = item.get("column_count")
+        uncertain = item.get("layout_uncertain")
+        raw_cells = item.get("cells")
+        if (
+            not isinstance(locator, str)
+            or not locator.strip()
+            or len(locator) > 64
+            or type(rows) is not int
+            or rows < 1
+            or type(columns) is not int
+            or columns < 1
+            or type(uncertain) is not bool
+            or not isinstance(raw_cells, list)
+            or len(raw_cells) != rows * columns
+        ):
+            raise AppError(422, "FILE_PARSE_FAILED", "文档表格解析结果无效")
+        cells = []
+        for cell in raw_cells:
+            if not isinstance(cell, dict):
+                raise AppError(422, "FILE_PARSE_FAILED", "文档表格解析结果无效")
+            row, column, value = cell.get("row"), cell.get("column"), cell.get("text")
+            if (
+                type(row) is not int
+                or type(column) is not int
+                or not 1 <= row <= rows
+                or not 1 <= column <= columns
+                or not isinstance(value, str)
+            ):
+                raise AppError(422, "FILE_PARSE_FAILED", "文档表格解析结果无效")
+            cells.append(ExtractedTableCell(row, column, value))
+        if {(cell.row, cell.column) for cell in cells} != {
+            (row, column) for row in range(1, rows + 1) for column in range(1, columns + 1)
+        }:
+            raise AppError(422, "FILE_PARSE_FAILED", "文档表格解析结果无效")
+        tables.append(ExtractedTable(locator, rows, columns, uncertain, tuple(cells)))
+    return tuple(tables)
 
 
 def _safe_display_name(filename: str | None) -> tuple[str, str]:
@@ -140,7 +205,8 @@ def _run_worker(
         )
     except subprocess.TimeoutExpired as exc:
         raise AppError(422, "FILE_PARSE_TIMEOUT", "文档解析超时，请缩小文件后重试") from exc
-    if completed.returncode != 0 or len(completed.stdout) > max_chars * 6 + 100_000:
+    # Structured table cells duplicate section text in the worker response.
+    if completed.returncode != 0 or len(completed.stdout) > max_chars * 12 + 100_000:
         raise AppError(422, "FILE_PARSE_FAILED", "文档无法解析")
     try:
         payload = json.loads(completed.stdout)
@@ -190,6 +256,7 @@ async def extract_document(
     page_count = payload.get("pageCount")
     char_count = payload.get("charCount")
     sections = payload.get("sections")
+    tables = _parse_tables(payload.get("tables"))
     if (
         kind not in {"pdf", "docx", "pptx", "txt", "md"}
         or not isinstance(char_count, int)
@@ -209,4 +276,5 @@ async def extract_document(
         char_count=char_count,
         preview=preview,
         chunks=chunks,
+        tables=tables,
     )

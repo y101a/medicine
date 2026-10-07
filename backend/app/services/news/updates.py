@@ -34,11 +34,10 @@ def next_refresh_at(now: datetime, *, hour: int = 4) -> datetime:
 
 
 async def running_auto_run(db: AsyncSession, *, now: datetime) -> NewsRefreshRun | None:
-    """正在进行且租约未过期的自动运行（用于「刷新中」状态）。"""
+    """正在进行且租约未过期的自动或用户重试运行。"""
     result = await db.execute(
         select(NewsRefreshRun)
         .where(
-            NewsRefreshRun.trigger == "auto",
             NewsRefreshRun.status == "running",
             NewsRefreshRun.lease_expires_at > now,
         )
@@ -46,6 +45,52 @@ async def running_auto_run(db: AsyncSession, *, now: datetime) -> NewsRefreshRun
         .limit(1)
     )
     return result.scalar_one_or_none()
+
+
+async def acquire_user_retry_run(
+    db: AsyncSession, *, now: datetime, hour: int = 4, lease_seconds: int = 900
+) -> tuple[NewsRefreshRun | None, str]:
+    """仅在当日自动运行失败/部分失败后，允许全站一次用户重试。
+
+    锁住当天唯一的 auto 行，串行化多用户/多进程并发请求；CLI 的手动轮次也占用额度。
+    调用方必须提交事务，再启动脱离请求事务的后台抓取。
+    """
+    day = update_day_for(now, hour=hour)
+    auto_run = await db.scalar(
+        select(NewsRefreshRun)
+        .where(NewsRefreshRun.update_day == day, NewsRefreshRun.trigger == "auto")
+        .with_for_update()
+    )
+    if auto_run is None:
+        return None, "busy"
+    if auto_run.status == "running":
+        if auto_run.lease_expires_at > now:
+            return None, "busy"
+        auto_run.status = "failed"
+        auto_run.error_code = "LEASE_EXPIRED"
+        auto_run.finished_at = now
+    if auto_run.status not in ("failed", "partial"):
+        return None, "already_ran_today"
+    manual_run = await db.scalar(
+        select(NewsRefreshRun)
+        .where(NewsRefreshRun.update_day == day, NewsRefreshRun.trigger == "manual")
+        .order_by(NewsRefreshRun.started_at.desc())
+        .limit(1)
+    )
+    if manual_run is not None:
+        if manual_run.status == "running" and manual_run.lease_expires_at > now:
+            return None, "busy"
+        return None, "already_ran_today"
+    run = NewsRefreshRun(
+        update_day=day,
+        trigger="manual",
+        status="running",
+        started_at=now,
+        lease_expires_at=now + timedelta(seconds=lease_seconds),
+    )
+    db.add(run)
+    await db.flush()
+    return run, "started"
 
 
 async def latest_run(db: AsyncSession) -> NewsRefreshRun | None:

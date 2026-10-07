@@ -5,8 +5,11 @@
 ## 健康资讯首页框架
 
 `GET /news?category=all|wellness|fitness|disease|medication`，缺省分类为 `all`，要求登录 Cookie。
-当前只提供页面接线用的空状态：`{"category":"all","status":"sources_not_connected","asOf":null,"items":[],"tips":[]}`。
-非法分类返回 422，未登录返回 401。**尚未接入任何新闻源、自动更新或小贴士内容**；前端必须据此显示“新闻源尚未接入”，不得显示虚构的当日新闻。后续字段与交付阶段见 `NEWS_PORTAL_IMPLEMENTATION.md`。
+
+新闻条目保留原题 `title`；可选 `titleZh` 和 `titleZhSource`（`machine|manual`）用于中文译题展示。两字段为 `null` 时前端显示原题，不得推断已翻译；机器译题必须保留原题并标注未经审核。新增来源和翻译启用边界见 `NEWS_SOURCE_EXPANSION.md`。
+`sourceStatuses` 始终列出全局所有已启用来源，不因 `category` 参数过滤；每项必带 `categories`（`wellness|fitness|disease|medication` 数组，取来源的 `category_scope`）。前端可据此区分某专区“未接入来源”与“已接入但暂时无条目”。无来源时响应 `status=sources_not_connected`、`sourceStatuses=[]`；非法分类返回 422，未登录返回 401。WHO 两源已启用，其他中文来源仍待准入；`tips` 暂为空，不得虚构新闻或小贴士。后续字段与交付阶段见 `NEWS_PORTAL_IMPLEMENTATION.md`。
+
+`POST /news/refresh` 要求登录 Cookie、无请求体，始终返回 HTTP 202 和 `{accepted,reason,nextRefreshAt}`。只有当天自动轮次为 `failed` 或 `partial` 时，允许**全站一次**手动后台重试；返回 `accepted=true, reason="started"` 表示已预留运行并派发，**不是已抓取成功**。自动轮仍在运行或尚未开始返回 `busy`，自动轮成功或当天已有 CLI/用户手动轮返回 `already_ran_today`；功能开关关闭或无启用来源返回 `disabled`。后台不等待抓取，结果随后通过 `GET /news` 的 `refreshing`、`sourceStatuses`、`asOf` 读取。此接口不允许普通用户无限触发外网；每天自动最多一轮、失败后手动最多一轮，不注册自启动。新增 ODPHP 身体活动、营养及 FDA 药物来源已列入可启用目录，但须运维显式启用；其原题仍为英文，详见 `NEWS_SOURCE_EXPANSION.md`。
 
 ## 注册
 
@@ -554,3 +557,15 @@ Cookie，并通过数据库级联永久删除用户的会话、消息、健康�
 
 私人检索响应和流式 `start.privateKnowledge.sources` 不含正文；助手消息只保存并返回实际引用的
 `privateKnowledgeCitations`。详情、错误码和隐私边界见 `docs/PRIVATE_KNOWLEDGE.md`。
+
+## 公共医学知识图谱（只读，默认关闭）
+
+`GET /knowledge-graph/concepts?query=主题名` 返回当前已发布公共概念的精确名称或别名匹配，
+最多 5 项：`{"items":[{"id":"uuid","name":"...","type":"topic"}]}`。
+`POST /knowledge-graph/explore` 仅接受
+`{"conceptId":"uuid","relationshipTypes":["HAS_RED_FLAG"],"depth":1,"maxNodes":30}`；
+所有字段受限，额外字段拒绝。返回 `available`、`revision`、`relations`；每条关系包含
+`claimId`、`subject`、`object`、`predicate` 和经 PostgreSQL 复核的 `evidence`
+（`documentId`、`chunkId`、`title`、`section`、`url`）。未启用、版本失配或图谱故障时
+返回 `available:false, revision:null, relations:[]`，不得展示为“没有医学关系”。
+前端不得提交 Cypher，也不得把用户个人症状作为节点保存。当前仅支持 1 跳。

@@ -115,6 +115,10 @@ class NewsItem(Base):
     )
     category: Mapped[str] = mapped_column(String(16), nullable=False)
     title: Mapped[str] = mapped_column(String(300), nullable=False)
+    #: 可选的中文译题；原题始终保留在 title，翻译不会改去重指纹。
+    title_zh: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    #: 译题来源。机器翻译必须明示，人工核对后才可标 manual。
+    title_zh_source: Mapped[str | None] = mapped_column(String(16), nullable=True)
     #: 自编短摘要。无法可靠生成时为 NULL —— 只显示标题、来源与链接，不编造内容。
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     canonical_url: Mapped[str] = mapped_column(String(1000), nullable=False)
@@ -134,6 +138,11 @@ class NewsItem(Base):
         CheckConstraint(
             "category IN ('wellness', 'fitness', 'disease', 'medication')",
             name="category_supported",
+        ),
+        CheckConstraint(
+            "(title_zh IS NULL AND title_zh_source IS NULL) OR "
+            "(title_zh IS NOT NULL AND title_zh_source IN ('machine', 'manual'))",
+            name="title_zh_provenance_valid",
         ),
         Index("ix_news_items_source_fingerprint", "source_id", "fingerprint"),
         Index("ix_news_items_category_last_seen", "category", "last_seen_at"),

@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Query, Response
@@ -18,6 +19,7 @@ from app.ai.follow_up import (
 from app.ai.generated_image_context import build_generated_image_context
 from app.ai.graph import render_rag_context, run_consultation_generation
 from app.ai.graph.retrieval_gate import evaluate_retrieval_gate
+from app.ai.graph_context import build_public_graph_context
 from app.ai.no_evidence import no_evidence_reply, unverified_web_risk_reply
 from app.ai.private_knowledge_context import (
     audit_private_citations,
@@ -43,6 +45,7 @@ from app.services import health_records as health_service
 from app.services.model_credentials import get_model_for_user
 
 router = APIRouter(prefix="/consultations", tags=["咨询"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("", response_model=ConsultationOut, status_code=201)
@@ -181,6 +184,25 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
         or None
     )
     rag_context = render_rag_context(graph_result["retrieval_items"])
+    graph_settings = get_settings()
+    if (
+        graph_settings.neo4j_read_enabled
+        and (graph_settings.neo4j_shadow_enabled or graph_settings.neo4j_consultation_enabled)
+        and graph_result.get("retrieval_intent", False)
+        and graph_result["retrieval_items"]
+    ):
+        graph_public_context, graph_relation_count = await build_public_graph_context(
+            db, user_text, graph_result["retrieval_items"]
+        )
+        logger.info(
+            "public_graph_probe matched_relations=%d injected=%s",
+            graph_relation_count,
+            bool(graph_public_context and graph_settings.neo4j_consultation_enabled),
+        )
+        if graph_settings.neo4j_consultation_enabled and graph_public_context:
+            private_context = "\n\n".join(
+                item for item in (private_context, graph_public_context) if item
+            )
     safety_reply = no_evidence_reply(
         user_text,
         graph_result,
