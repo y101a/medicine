@@ -1,0 +1,73 @@
+{
+  "schema_version": "1.0",
+  "status": "draft_pending_medical_review",
+  "purpose": "北京市卫健委官网四篇科普全文衍生的文档检索验收；只评估找对资料，不证明医学结论、剂量或回答安全。",
+  "case_count": 30,
+  "split_policy": "18 tune 可先跑关键词基线；12 holdout 在内容与检索配置冻结前不得查看结果或据此改写语料。",
+  "covered_document_slugs": ["pediatric-fever", "physiology-temperature-regulation", "medicine-use", "wellness-fitness-guide-framework"],
+  "sources": [
+    {
+      "slug": "pediatric-fever",
+      "url": "https://wjw.beijing.gov.cn/bmfw_20143/jkzs/jksh/202512/t20251216_4344978.html",
+      "publisher": "首都医科大学附属北京佑安医院（北京市卫生健康委员会官网发布）",
+      "url_date": "2025-12-08",
+      "license_basis": "北京市卫生健康委员会官网《法律声明》：署名转载可用"
+    },
+    {
+      "slug": "physiology-temperature-regulation",
+      "url": "https://wjw.beijing.gov.cn/bmfw_20143/jkzs/jksh/202509/t20250930_4214811.html",
+      "publisher": "北京市垂杨柳医院（北京市卫生健康委员会官网发布）",
+      "url_date": "2025-09-30",
+      "license_basis": "北京市卫生健康委员会官网《法律声明》：署名转载可用"
+    },
+    {
+      "slug": "medicine-use",
+      "url": "https://wjw.beijing.gov.cn/bmfw_20143/jkzs/jksh/202605/t20260506_4638136.html",
+      "publisher": "北京市垂杨柳医院（北京市卫生健康委员会官网发布）",
+      "url_date": "2026-05-06",
+      "license_basis": "北京市卫生健康委员会官网《法律声明》：署名转载可用"
+    },
+    {
+      "slug": "wellness-fitness-guide-framework",
+      "url": "https://wjw.beijing.gov.cn/xwzx_20031/jcdt/202504/t20250423_4072360.html",
+      "publisher": "北京大学第三医院（北京市卫生健康委员会官网发布）",
+      "url_date": "2025-04-23",
+      "license_basis": "北京市卫生健康委员会官网《法律声明》：署名转载可用"
+    }
+  ],
+  "cases": [
+    {"id":"bjw_d_fever_antipyretic_timing","query":"孩子烧到多少度、什么状态才需要吃退烧药？","expected_topics":["儿童发热","退烧药使用时机"],"expected_document_slugs":["pediatric-fever"],"safety_class":"education","case_type":"supported","body_system":"pediatric","query_style":"colloquial","split":"tune","knowledge_layer":"disease"},
+    {"id":"bjw_d_fever_weight_based_dose","query":"给孩子喂退烧药，剂量是按年龄还是按体重算？","expected_topics":["儿童发热","按体重计算剂量"],"expected_document_slugs":["pediatric-fever"],"safety_class":"education","case_type":"supported","body_system":"pediatric","query_style":"scenario","split":"tune","knowledge_layer":"disease"},
+    {"id":"bjw_d_fever_covering_sweat","query":"老人说发烧要多盖被子捂出汗，这样做对吗？","expected_topics":["儿童发热","捂汗风险"],"expected_document_slugs":["pediatric-fever"],"safety_class":"urgent","case_type":"supported","body_system":"pediatric","query_style":"colloquial","split":"tune","knowledge_layer":"disease"},
+    {"id":"bjw_d_fever_alcohol_rub","query":"孩子发烧能用酒精擦身体来降温吗？","expected_topics":["儿童发热","物理降温","酒精擦浴"],"expected_document_slugs":["pediatric-fever"],"safety_class":"urgent","case_type":"supported","body_system":"pediatric","query_style":"colloquial","split":"tune","knowledge_layer":"disease"},
+    {"id":"bjw_d_fever_home_care","query":"孩子发热在家，除了吃药还能做些什么护理？","expected_topics":["儿童发热","家庭护理"],"expected_document_slugs":["pediatric-fever"],"safety_class":"education","case_type":"supported","body_system":"pediatric","query_style":"broad_topic","split":"tune","knowledge_layer":"disease"},
+    {"id":"bjw_d_fever_alternate_antipyretics","query":"两种退烧药能不能换着吃，间隔多久才算安全？","expected_topics":["儿童发热","退烧药间隔","不随意交替使用"],"expected_document_slugs":["pediatric-fever"],"safety_class":"education","case_type":"supported","body_system":"pediatric","query_style":"scenario","split":"holdout","knowledge_layer":"disease"},
+    {"id":"bjw_d_fever_cooling_patch","query":"退热贴到底管不管用，孩子不让贴还要勉强吗？","expected_topics":["儿童发热","退热贴"],"expected_document_slugs":["pediatric-fever"],"safety_class":"education","case_type":"supported","body_system":"pediatric","query_style":"differential","split":"holdout","knowledge_layer":"disease"},
+    {"id":"bjw_d_fever_infant_age_limit","query":"三个月的宝宝发热，能用和大孩子一样的退烧药吗？","expected_topics":["儿童发热","婴幼儿适用年龄"],"expected_document_slugs":["pediatric-fever"],"safety_class":"urgent","case_type":"supported","body_system":"pediatric","query_style":"scenario","split":"holdout","knowledge_layer":"disease"},
+
+    {"id":"bjw_p_inflammation_basics","query":"发炎到底是怎么回事，身体为什么会有这种反应？","expected_topics":["炎症反应","防御反应"],"expected_document_slugs":["physiology-temperature-regulation"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"broad_topic","split":"tune","knowledge_layer":"physiology"},
+    {"id":"bjw_p_inflammation_signs","query":"伤口发炎的地方为什么又红又肿还发烫？","expected_topics":["炎症表现","红肿热痛"],"expected_document_slugs":["physiology-temperature-regulation"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"colloquial","split":"tune","knowledge_layer":"physiology"},
+    {"id":"bjw_p_fever_vs_inflammation","query":"发烧和发炎是一回事吗，两者有什么区别？","expected_topics":["发热与炎症区别","局部反应与全身反应"],"expected_document_slugs":["physiology-temperature-regulation"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"differential","split":"tune","knowledge_layer":"physiology"},
+    {"id":"bjw_p_setpoint_mechanism","query":"发烧的时候身体是怎么把体温调高的？","expected_topics":["体温调节中枢","下丘脑","致热源"],"expected_document_slugs":["physiology-temperature-regulation"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"broad_topic","split":"tune","knowledge_layer":"physiology"},
+    {"id":"bjw_p_fever_discomfort","query":"为什么一发烧就浑身难受、只想躺着不动？","expected_topics":["发热的意义","警示信号"],"expected_document_slugs":["physiology-temperature-regulation"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"colloquial","split":"tune","knowledge_layer":"physiology"},
+    {"id":"bjw_p_local_inflammation_only","query":"手上小伤口发炎了却没有发烧，这样正常吗？","expected_topics":["局部炎症","无全身发热"],"expected_document_slugs":["physiology-temperature-regulation"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"scenario","split":"holdout","knowledge_layer":"physiology"},
+    {"id":"bjw_p_masked_fever_elderly","query":"家里老人感染了却一直不发烧，是不是就没事？","expected_topics":["免疫缺陷","发热被掩盖"],"expected_document_slugs":["physiology-temperature-regulation"],"safety_class":"urgent","case_type":"supported","body_system":"cross_system","query_style":"scenario","split":"holdout","knowledge_layer":"physiology"},
+    {"id":"bjw_p_fever_without_inflammation","query":"为什么有的人发烧却找不到明显发炎的地方？","expected_topics":["无明显炎症的发热","药物热","肿瘤相关发热"],"expected_document_slugs":["physiology-temperature-regulation"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"confusable","split":"holdout","knowledge_layer":"physiology"},
+
+    {"id":"bjw_m_cold_antibiotic","query":"感冒发烧就吃两片抗菌药，是不是能好得快一点？","expected_topics":["抗菌药物","病毒感染无效","上呼吸道感染"],"expected_document_slugs":["medicine-use"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"colloquial","split":"tune","knowledge_layer":"pharmacology"},
+    {"id":"bjw_m_antibiotic_vs_antiinflammatory","query":"抗菌药和平时说的消炎药是一样的吗？","expected_topics":["抗菌药物与消炎药区别"],"expected_document_slugs":["medicine-use"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"confusable","split":"tune","knowledge_layer":"pharmacology"},
+    {"id":"bjw_m_stop_when_better","query":"抗菌药吃了两天不难受了，能不能直接停掉？","expected_topics":["按疗程服用","擅自停药"],"expected_document_slugs":["medicine-use"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"scenario","split":"tune","knowledge_layer":"pharmacology"},
+    {"id":"bjw_m_leftover_medicine","query":"上次生病剩下的抗菌药，这次症状差不多还能吃吗？","expected_topics":["剩余药品","不对症用药"],"expected_document_slugs":["medicine-use"],"safety_class":"urgent","case_type":"supported","body_system":"cross_system","query_style":"scenario","split":"tune","knowledge_layer":"pharmacology"},
+    {"id":"bjw_m_newer_pricier","query":"越贵越新的抗菌药，效果是不是就越好？","expected_topics":["用药误区","对症用药"],"expected_document_slugs":["medicine-use"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"colloquial","split":"holdout","knowledge_layer":"pharmacology"},
+    {"id":"bjw_m_rash_after_use","query":"吃过的抗菌药还在有效期内，这次却起了皮疹，怎么回事？","expected_topics":["药物不良反应","抗菌药过敏"],"expected_document_slugs":["medicine-use"],"safety_class":"urgent","case_type":"supported","body_system":"cross_system","query_style":"scenario","split":"holdout","knowledge_layer":"pharmacology"},
+    {"id":"bjw_m_when_antibiotic_needed","query":"什么样的咳嗽发烧才真的需要用抗菌药？","expected_topics":["细菌感染指征","医生指导下使用"],"expected_document_slugs":["medicine-use"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"broad_topic","split":"holdout","knowledge_layer":"pharmacology"},
+
+    {"id":"bjw_w_start_safely","query":"刚开始锻炼，怎么安排才不容易受伤？","expected_topics":["科学运动","循序渐进","因人而异"],"expected_document_slugs":["wellness-fitness-guide-framework"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"broad_topic","split":"tune","knowledge_layer":"wellness_fitness"},
+    {"id":"bjw_w_warmup_cooldown","query":"运动结束后拉拉筋、休息一下，有必要吗？","expected_topics":["运动后牵拉","放松肌肉和关节"],"expected_document_slugs":["wellness-fitness-guide-framework"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"colloquial","split":"tune","knowledge_layer":"wellness_fitness"},
+    {"id":"bjw_w_overload_signs","query":"怎么判断自己是不是运动过量了？","expected_topics":["运动过量","心慌心悸","减少运动量"],"expected_document_slugs":["wellness-fitness-guide-framework"],"safety_class":"urgent","case_type":"supported","body_system":"cross_system","query_style":"colloquial","split":"tune","knowledge_layer":"wellness_fitness"},
+    {"id":"bjw_w_elderly_assessment","query":"家里老人想开始运动，运动前要注意什么？","expected_topics":["老年人群","运动前评估","防止跌倒骨折"],"expected_document_slugs":["wellness-fitness-guide-framework"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"scenario","split":"tune","knowledge_layer":"wellness_fitness"},
+    {"id":"bjw_w_joint_deformity","query":"运动时听到关节响、腿也变形了，该怎么做？","expected_topics":["运动损伤","禁止活动","及时就医"],"expected_document_slugs":["wellness-fitness-guide-framework"],"safety_class":"emergency","case_type":"supported","body_system":"cross_system","query_style":"scenario","split":"holdout","knowledge_layer":"wellness_fitness"},
+    {"id":"bjw_w_ankle_sprain","query":"打球扭了脚踝肿起来，现场应该怎么处理？","expected_topics":["运动损伤处理","加压包扎","抬高肢体"],"expected_document_slugs":["wellness-fitness-guide-framework"],"safety_class":"urgent","case_type":"supported","body_system":"cross_system","query_style":"scenario","split":"holdout","knowledge_layer":"wellness_fitness"},
+    {"id":"bjw_w_diabetes_timing","query":"家里有糖尿病的人想运动，什么时间练、练多久合适？","expected_topics":["糖尿病人群","运动时机","运动时长"],"expected_document_slugs":["wellness-fitness-guide-framework"],"safety_class":"education","case_type":"supported","body_system":"cross_system","query_style":"scenario","split":"holdout","knowledge_layer":"wellness_fitness"}
+  ]
+}

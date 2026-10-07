@@ -270,6 +270,7 @@ npm run e2e                                                  # 期望 39 passed�
 
 - **2026-10-06 DSH（用户当面临时跨边界授权）**：实现四层知识计划里唯一缺失的代码件——**「仅 approved」独立评测**。改动集中在 3 个文件：`app/rag/retrieval.py`（新增 `RetrievalScope`；`scope="approved_only"` 在 development 也强制只取 approved）、`app/rag/evaluation.py`（`run_prototype_evaluation(scope=...)`、报告新增 `scope` 字段与 `approved_document_retrieval` 指标、approved_only 拒绝与 `--checkpoint` 同用）、`app/rag/cli.py`（`evaluate-prototype --scope`），另修正 `docs/KNOWLEDGE_FOUR_LAYER_GAP_PLAN.md` 里失效的 `.venv` 命令。**开工前已核对：这三个文件均不在你的在途改动清单内**（news / document_extract / config / pyproject / API.md 等我一个都没碰）。请复核后接管所有权；若需回退，改动只在这三处。**我知道默认 `auto` 路径保持不额外传 `scope` 是为了不破坏既有 6 项评测桩的调用契约；你若要给 approved_only 补单测，需要给桩函数加参数。**
 - **2026-10-06 DSH（同一临时授权）**：新增机器预审 `backend/app/rag/prototype_precheck.py` + `tests/test_prototype_precheck.py` + `app/rag/cli.py` 的 `precheck-prototype` 子命令。只读扫描 prototype 语料，列出疑似越界表述（剂量/疗程/药名/确诊口气/个人运动处方/疗效承诺）与「缺就医分流句」的文档；**不改任何 review_status、不出通过结论**。开工前核对：`app/rag/cli.py` 不在你的在途清单内，`retrieval.py`/`evaluation.py` 已由我上一条提交（2d25b8b）。- **2026-10-06 DSH（同一临时授权）**：修复机器预审的误报。首版只做关键词匹配，在我们的真实原型语料上 16 条命中**全是误报**（把「不要擅自停药」当停药指令、把「食盐不超过 5 克」当剂量、把「不一定是疼」当确诊口气）。本版加入上下文抑制（安全提醒句、膳食/生理限量、非用药的「减量」、免责声明、描述「正在服用某药」、被否定的绝对化），真实扫描 **16 → 1** 条，抑制条目**单独计数不丢弃**。改 `app/rag/prototype_precheck.py`、`tests/test_prototype_precheck.py`（12 项）。已知代价：句内出现否定线索时整句抑制，会漏掉「不要自行停药，但可以改成每天 2 片」这类混合句——所以抑制计数必须与未抑制计数一起看。### 7.1 进行中（开工前先看这里；开工时在此登记，收工释放）
+2026-10-06 DSH：自建检索评测集 batch1（新增 backend/docs/medical_retrieval_evaluation_beijing_wjw_batch1.json）已完成、无在途占用；无迁移、无数据库读写、未联网（仅下载 4 篇公开网页）、未付费。补记：由子代理撰写、DSH 复核后提交。
 2026-10-06 DSH：稿件-来源确定性比对（新增 app/rag/draft_source_check.py 与其单测）已完成、无在途占用；无迁移、无数据库读写、未联网、未付费。补记。
 2026-10-06 DSH：预审误报修复已完成、无在途占用——改 `app/rag/prototype_precheck.py` 与其单测；无迁移、数据库只读、未联网、未付费。**补记**：先动手后登记。
 2026-10-06 DSH：机器预审（`precheck-prototype`）已完成、无在途占用——新增 `app/rag/prototype_precheck.py`、`tests/test_prototype_precheck.py`，改 `app/rag/cli.py`；无迁移、数据库只读、未联网、未付费。**补记**：先动手后登记。
@@ -290,6 +291,7 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 执行者 | 任务 | 正在改的文件 | 迁移编号 | 占用数据库 | 开始时间 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
+| Codex | 简历前高优先级收口：首批图谱候选离线校验 CLI、专项测试与未完成清单 | `backend/app/knowledge_graph_candidate_check.py`、`backend/tests/test_knowledge_graph_candidate_check.py`、`backend/docs/RESUME_READY_BACKLOG.md`、`COORDINATION.md` | 无 | 否 | 2026-10-07 | 进行中 |
 | Codex | 首批四层候选离线校验、图谱专项测试和 prototype 关键词检索评测 | `COORDINATION.md`（记录）；读取候选 JSON、后端题集与测试 | 无 | 否（数据库端口不可达，未实际查询） | 2026-10-07 | 已释放（离线校验完成；检索评测未运行） |
 | Codex | 将四层知识验收手册拆成无需签字的 prototype 测试与正式发布两条路径 | `KNOWLEDGE_MANUAL_ACCEPTANCE.md`、`COORDINATION.md` | 无 | 否 | 2026-10-07 | 已释放（仅文档；未运行评测） |
 | Codex | Neo4j 公共图只读查询、revision/证据校验、影子接线和 API 契约；不改四层内容或前端 | `backend/app/{core/config.py,api/router.py,api/routes/{knowledge_graph,consultations}.py,ai/{graph_context.py,graph/{state,workflow}.py},services/knowledge_graph_query.py}`、`backend/tests/test_{knowledge_graph_query,graph_context}.py`、`backend/docs/{API.md,KNOWLEDGE_GRAPH.md}`、`backend/.env.example`、`COORDINATION.md` | 无 | 否（回滚型全量测试已结束；最初误记为否，已更正） | 2026-10-06 | 已释放（未提交；全量 643 passed、1 skipped；自有文件 Ruff 全绿） |
@@ -412,6 +414,13 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
   局限：**只测前端，接口是桩**，不能替代真实后端联调。需要人眼看的清单见 `frontend/BROWSER_ACCEPTANCE.md`。
 
 ### 7.2 工作报告（最新在最上）
+### 2026-10-06 DSH 自建检索评测集 batch1（北京卫健委 4 篇 / 30 题）
+
+- 改动：新增 backend/docs/medical_retrieval_evaluation_beijing_wjw_batch1.json（未改任何已有文件）。格式逐字对齐 medical_retrieval_evaluation_four_layer_batch1.json 的 10 个 case 字段；顶层加 sources（4 篇 URL / 发布机构 / 日期 / 许可依据）。四个 slug 只能取 pediatric-fever、physiology-temperature-regulation、medicine-use、wellness-fitness-guide-framework。
+- 验证（.venv-codex，DSH 亲自复跑）：JSON 解析 OK；case_count 30 = 实际 30；split tune 18 / holdout 12；layers 8/8/7/7；SLUGS 仅四个值；load_evaluation_set 实测 LOADER_OK cases = 30 且 knowledge_layer 保留（evaluation.py 的 EvaluationSet/EvaluationCase 为 extra=allow）。30 题的 id/query/expected_topics 已逐题目视复核，均为那四篇文章确实讲过的话题，未见硬凑。
+- 边界：①未跑检索评测，所以**命中率未知**；②safety_class/case_type/query_style/body_system 四项未逐题复看（子代理报称与基准一致），未验证；③「署名转载可用」依据来自 DSH 早前对北京卫健委《法律声明》的核实，子代理未独立复核；④status=draft_pending_medical_review，话题归属由人工判定、未经医学审核人复核；⑤第一篇文章全文无「何时必须就医」清单，故未编造就医分流题。
+- 用途：**内部回归评测集，不是对外 benchmark**；只能证明自家改动好坏，不能与业界比。
+
 ### 2026-10-06 DSH 稿件-来源确定性比对（不依赖模型的上线前检查）
 
 - 改动：新增 backend/app/rag/draft_source_check.py（A1 逐句按字符 3-gram 覆盖率找来源；A2 情态升级、A3 丢限定做整篇比较；B 类复用 prototype_precheck 的规则与抑制；元话语句跳过 A1）与 backend/tests/test_draft_source_check.py（8 项，含同输入两次结果必须相同）。自带 python -m 入口，无数据库、无网络。未改 cli.py，未碰 Codex 在途文件。
