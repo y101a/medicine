@@ -97,7 +97,7 @@ async def test_consultation_planner_only_sends_redacted_question_and_fixed_style
     assert guidance == "保持简短，优先回答用户问的核心问题。"
 
 
-async def test_evidence_reviewer_can_only_delete_paragraphs(monkeypatch):
+async def test_evidence_reviewer_keeps_only_claims_with_locatable_source_quotes(monkeypatch):
     model = ModelConfig(
         id="qwen3.8-flash",
         name="test",
@@ -111,7 +111,7 @@ async def test_evidence_reviewer_can_only_delete_paragraphs(monkeypatch):
 
     async def fake_request(_model, _prompt, payload):
         seen.update(payload)
-        return {"dropParagraphIndexes": [1]}
+        return {"supported": [{"index": 0, "sourceId": 1, "quote": "有据段落"}]}
 
     monkeypatch.setattr(consultation_evidence_reviewer, "request_agent_json", fake_request)
     checked = await consultation_evidence_reviewer.check_answer_evidence(
@@ -121,6 +121,97 @@ async def test_evidence_reviewer_can_only_delete_paragraphs(monkeypatch):
     )
     assert checked == "有据段落[来源1]。"
     assert seen["sources"][0]["content"] == "有据段落"
+    assert seen["claims"] == ["有据段落[来源1]。", "无据段落。"]
+
+
+async def test_evidence_reviewer_rejects_a_fabricated_source_quote(monkeypatch):
+    model = ModelConfig(
+        id="qwen3.8-flash", name="test", provider="qwen", provider_name="test",
+        description="test", base_url="https://example.test/v1", api_key=SecretStr("test"),
+    )
+    monkeypatch.setattr(
+        consultation_evidence_reviewer,
+        "request_agent_json",
+        AsyncMock(return_value={"supported": [
+            {"index": 0, "sourceId": 1, "quote": "来源中根本不存在"}
+        ]}),
+    )
+    with pytest.raises(ValueError, match="quote absent"):
+        await consultation_evidence_reviewer.check_answer_evidence(
+            model,
+            "药物一定有效。",
+            [{"reference_number": 1, "title": "来源", "content": "疗效因人而异"}],
+        )
+
+
+async def test_evidence_reviewer_drops_unsupported_clause_in_same_paragraph(monkeypatch):
+    model = ModelConfig(
+        id="qwen3.8-flash", name="test", provider="qwen", provider_name="test",
+        description="test", base_url="https://example.test/v1", api_key=SecretStr("test"),
+    )
+    monkeypatch.setattr(
+        consultation_evidence_reviewer,
+        "request_agent_json",
+        AsyncMock(return_value={"supported": [
+            {"index": 0, "sourceId": 1, "quote": "需要结合情况评估"}
+        ]}),
+    )
+    checked = await consultation_evidence_reviewer.check_answer_evidence(
+        model,
+        "需要结合情况评估，保证治好。",
+        [{"reference_number": 1, "title": "来源", "content": "需要结合情况评估"}],
+    )
+    assert "需要结合情况评估" in checked
+    assert "保证治好" not in checked
+
+
+async def test_evidence_reviewer_rejects_citation_for_another_source(monkeypatch):
+    model = ModelConfig(
+        id="qwen3.8-flash", name="test", provider="qwen", provider_name="test",
+        description="test", base_url="https://example.test/v1", api_key=SecretStr("test"),
+    )
+    monkeypatch.setattr(
+        consultation_evidence_reviewer,
+        "request_agent_json",
+        AsyncMock(return_value={"supported": [
+            {"index": 0, "sourceId": 1, "quote": "需要结合情况评估"}
+        ]}),
+    )
+    with pytest.raises(ValueError, match="citation does not match"):
+        await consultation_evidence_reviewer.check_answer_evidence(
+            model,
+            "需要结合情况评估[来源2]。",
+            [
+                {"reference_number": 1, "title": "一", "content": "需要结合情况评估"},
+                {"reference_number": 2, "title": "二", "content": "其他内容"},
+            ],
+        )
+
+
+async def test_evidence_reviewer_refuses_when_no_claim_has_evidence(monkeypatch):
+    model = ModelConfig(
+        id="qwen3.8-flash", name="test", provider="qwen", provider_name="test",
+        description="test", base_url="https://example.test/v1", api_key=SecretStr("test"),
+    )
+    monkeypatch.setattr(
+        consultation_evidence_reviewer,
+        "request_agent_json",
+        AsyncMock(return_value={"supported": []}),
+    )
+    checked = await consultation_evidence_reviewer.check_answer_evidence(
+        model,
+        "保证治好。",
+        [{"reference_number": 1, "title": "来源", "content": "需要进一步评估"}],
+    )
+    assert "保证治好" not in checked
+    assert "未能通过证据核查" in checked
+
+
+def test_evidence_reviewer_rejects_unreviewable_drafts():
+    assert not consultation_evidence_reviewer.reviewable_answer("医学结论", [])
+    assert not consultation_evidence_reviewer.reviewable_answer(
+        "医学结论", [{"reference_number": index} for index in range(9)]
+    )
 
 
 def _citation() -> RetrievalCitation:
@@ -422,9 +513,17 @@ async def test_consultation_stream_runs_optional_planner_and_exposes_workflow(
     assert _nodes(events[-1]["workflow"])["reviewer"]["status"] == "completed"
 
 
-async def test_consultation_p1_checks_evidence_before_exposing_delta(profile_context, monkeypatch):
+@pytest.mark.parametrize(
+    ("multi_agent", "answer_format", "review_fails", "private_source"),
+    [(True, "plain", False, False), (False, "plain", False, False),
+     (False, "card", False, False), (False, "plain", True, False),
+     (False, "plain", False, True)],
+)
+async def test_consultation_p1_checks_evidence_before_exposing_delta(
+    profile_context, monkeypatch, multi_agent, answer_format, review_fails, private_source
+):
     client, _, (user, _) = profile_context
-    monkeypatch.setattr(get_settings(), "multi_agent_enabled", True)
+    monkeypatch.setattr(get_settings(), "multi_agent_enabled", multi_agent)
     client.cookies.set(ACCESS_COOKIE, create_access_token(user.id))
     created = await client.post("/api/v1/consultations", json={"clientRequestId": str(uuid4())})
     cid = created.json()["id"]
@@ -444,6 +543,16 @@ async def test_consultation_p1_checks_evidence_before_exposing_delta(profile_con
     monkeypatch.setattr(
         "app.api.routes.consultations.get_model_for_user", AsyncMock(return_value=model)
     )
+    if private_source:
+        monkeypatch.setattr(
+            "app.api.routes.consultations.build_private_knowledge_context",
+            AsyncMock(return_value=("私人资料片段", [{
+                "reference_number": 1, "document_name": "用户选择的文件",
+                "content": "头痛记录", "collection_id": uuid4(),
+                "collection_name": "测试", "document_id": uuid4(),
+                "locator": "1", "similarity": 0.9,
+            }])),
+        )
     evidence = {
         "source_key": "test",
         "organization": "test",
@@ -471,7 +580,11 @@ async def test_consultation_p1_checks_evidence_before_exposing_delta(profile_con
         yield "需要结合情况评估[来源1]。\n\n"
         yield "保证治好。"
 
-    checker = AsyncMock(return_value="需要结合情况评估[来源1]。")
+    checker = (
+        AsyncMock(side_effect=RuntimeError("review unavailable"))
+        if review_fails
+        else AsyncMock(return_value="需要结合情况评估[来源1]。")
+    )
     monkeypatch.setattr("app.api.routes.consultations.run_consultation_generation", fake_graph)
     monkeypatch.setattr(
         "app.api.routes.consultations.plan_consultation_answer", AsyncMock(return_value="")
@@ -480,11 +593,19 @@ async def test_consultation_p1_checks_evidence_before_exposing_delta(profile_con
     monkeypatch.setattr("app.ai.provider.stream_chat", fake_stream)
     response = await client.post(
         f"/api/v1/consultations/{cid}/stream",
-        json={"clientRequestId": str(uuid4()), "modelId": model.id},
+        json={"clientRequestId": str(uuid4()), "modelId": model.id,
+              "answerFormat": answer_format},
     )
     events = [json.loads(line) for line in response.text.splitlines()]
     assert [event["type"] for event in events] == ["start", "delta", "done"]
-    assert events[1]["content"] == "需要结合情况评估[来源1]。"
+    if review_fails:
+        assert "未能完成证据核查" in events[1]["content"]
+    else:
+        assert events[1]["content"] == "需要结合情况评估[来源1]。"
     assert "保证治好" not in response.text
     assert checker.await_count == 1
-    assert _nodes(events[-1]["workflow"])["evidence_reviewer"]["status"] == "completed"
+    if private_source:
+        assert any(item["reference_number"] == "P1" for item in checker.call_args.args[2])
+    assert _nodes(events[-1]["workflow"])["evidence_reviewer"]["status"] == (
+        "failed" if review_fails else "completed"
+    )

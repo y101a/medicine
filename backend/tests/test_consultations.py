@@ -171,13 +171,17 @@ async def test_stream_answer_is_incremental_and_persisted(
         yield "疼痛位置[来源2]。"
 
     monkeypatch.setattr("app.ai.provider.stream_chat", fake_stream)
+    monkeypatch.setattr(
+        "app.api.routes.consultations.check_answer_evidence",
+        AsyncMock(side_effect=lambda _model, content, _sources: content),
+    )
     response = await client.post(
         url + "/stream",
         json={"clientRequestId": str(uuid4()), "modelId": selected_model.id},
     )
     assert response.status_code == 200
     events = [json.loads(line) for line in response.text.splitlines()]
-    assert [event["type"] for event in events] == ["start", "delta", "delta", "done"]
+    assert [event["type"] for event in events] == ["start", "delta", "done"]
     assert "".join(event.get("content", "") for event in events) == "先了解疼痛位置[来源2]。"
     assert events[-1]["message"]["role"] == "assistant"
     assert events[0]["model"]["id"] == selected_model.id
@@ -373,9 +377,7 @@ async def test_structured_follow_up_is_validated_persisted_and_restored(
         },
     )
     events = [json.loads(line) for line in response.text.splitlines()]
-    assert [event["type"] for event in events] == ["start", "delta", "done"]
-    assert events[1]["content"] == "先提供一段普通说明。\n\n"
-    assert "FOLLOW" not in events[1]["content"]
+    assert [event["type"] for event in events] == ["start", "done"]
     assert events[0]["retrieval"]["status"] == "completed"
     assert events[0]["retrieval"]["sources"][0]["trustLevel"] == "prototype"
     assert "content" not in events[0]["retrieval"]["sources"][0]

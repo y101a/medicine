@@ -296,16 +296,34 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
             planner_status = "failed"
 
     evidence_review_enabled = bool(
-        graph_settings.multi_agent_enabled
-        and safety_reply is None
-        and answer_format == "plain"
-        and graph_result["retrieval_items"]
-        and not private_knowledge_snapshots
+        safety_reply is None
+        and (
+            graph_result["retrieval_gate_reason"] == "medical_content"
+            or answer_format == "card"
+            or attachment_context
+            or private_knowledge_snapshots
+        )
     )
     review_sources = [
         {"reference_number": index, "title": item["title"], "content": item["content"]}
         for index, item in enumerate(graph_result["retrieval_items"], start=1)
     ]
+    review_sources.extend(
+        {
+            "reference_number": f"P{item['reference_number']}",
+            "title": str(item["document_name"]),
+            "content": str(item["content"]),
+        }
+        for item in private_knowledge_snapshots
+    )
+    if attachment_context:
+        review_sources.append(
+            {
+                "reference_number": "attachment",
+                "title": "本轮用户附件摘录",
+                "content": attachment_context.partition("用户附件片段 JSON：\n")[2],
+            }
+        )
 
     def encode(event: dict) -> str:
         return json.dumps(event, ensure_ascii=False, default=str) + "\n"
@@ -461,8 +479,18 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
                                 cid,
                             )
                             evidence_reviewer_status = "failed"
+                            content = (
+                                "本轮回答未能完成证据核查，不能可靠提供具体医学结论。"
+                                "请向医生或药师核实。\n\n"
+                                "以上仅供健康科普参考，不作确诊，不能替代医生面诊。"
+                            )
                     else:
-                        evidence_reviewer_status = "skipped"
+                        evidence_reviewer_status = "failed"
+                        content = (
+                            "本轮缺少可核查的医学证据，无法可靠回答具体医学问题。"
+                            "请向医生或药师核实。\n\n"
+                            "以上仅供健康科普参考，不作确诊，不能替代医生面诊。"
+                        )
                 content, verified_citations = audit_answer_citations(content, citation_snapshots)
                 content, verified_private_citations = audit_private_citations(
                     content, private_knowledge_snapshots

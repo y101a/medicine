@@ -135,9 +135,13 @@ async def test_stream_final_message_saves_only_real_references_without_database(
         "get_model_for_user",
         AsyncMock(
             return_value=SimpleNamespace(
-                id="test", name="隔离模型", provider="test"
+                id="test", name="隔离模型", provider="test", provider_name="测试供应商"
             )
         ),
+    )
+    monkeypatch.setattr(
+        route, "check_answer_evidence",
+        AsyncMock(side_effect=lambda _model, content, _sources: content),
     )
     monkeypatch.setattr(route.provider, "stream_chat", chunks)
     response = await route.stream_answer(

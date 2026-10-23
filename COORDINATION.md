@@ -296,6 +296,8 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 执行者 | 任务 | 正在改的文件 | 迁移编号 | 占用数据库 | 开始时间 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
+| Codex | 医疗回答逐条证据核查，来源原文定位后再输出 | `backend/app/ai/consultation_evidence_reviewer.py`、相关测试/文档、`COORDINATION.md` | 无 | 否（本地测试库占用已释放） | 2026-10-23 | 已释放（相关 75 passed、10 deselected；Ruff 通过） |
+| Codex | 医疗咨询生成后证据核查覆盖全部路径并失败关闭 | `backend/app/ai/consultation_evidence_reviewer.py`、`backend/app/api/routes/consultations.py`、相关测试与方案文档、`COORDINATION.md` | 无 | 否（测试库占用已释放） | 2026-10-23 | 已释放（咨询相关 67 passed、10 deselected；Ruff 通过） |
 | Codex | 登录密码计算移出事件循环并进行受控同条件复测 | `backend/app/core/password_work.py`、`backend/app/services/auth.py`、`backend/pyproject.toml`、相关测试/压测脚本/报告、`COORDINATION.md` | 无 | 否（graph-eval占用已释放；临时服务已停止） | 2026-10-21 | 已释放（9 passed、Ruff通过；1/10/30并发各两轮前后对照完成；证据已归档） |
 | Codex | 核验用户提供的压测结果并归档原始脚本及报告 | `backend/docs/PERFORMANCE_20261021_VERIFIED.md`、证据目录、`backend/docs/PERFORMANCE_20261021.md`、`COORDINATION.md` | 无 | 否（仅只读核对隔离库计数） | 2026-10-21 | 已释放（五接口并发30证据、隔离库计数与SHA核实；未改认证业务代码或复跑负载） |
 | Codex | 排查命令工具与 Docker 故障，准备并执行本地 HTTP 性能测试 | `backend/scripts/performance_*.py`、`backend/scripts/performance_admin_diagnostics.ps1`、`backend/tests/test_performance_load.py`、`backend/docs/PERFORMANCE_20261021.md`、`backend/compose.perf.yaml`、`COORDINATION.md` | 无新增迁移 | 否（Docker 虚拟化阻塞） | 2026-10-21 | 已释放（脚本专项 3 passed；Ruff 与管理员诊断脚本语法检查通过；真实压测待管理员诊断/恢复 Docker） |
@@ -432,6 +434,20 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
   局限：**只测前端，接口是桩**，不能替代真实后端联调。需要人眼看的清单见 `frontend/BROWSER_ACCEPTANCE.md`。
 
 ### 7.2 工作报告（最新在最上）
+
+**2026-10-23 Codex｜医疗回答逐条来源核查**
+
+- 改动：核查从段落改为陈述单元；模型须逐条提供来源 ID 与原文摘录，代码核对摘录实际存在且与答案引用编号一致；未获支持的单元删除，伪造摘录/错引触发失败关闭。更新测试与 `backend/docs/MEDICAL_ANSWER_REVIEW_PLAN.md`；未联网、未调用真实模型、无 Git 操作。
+- 验证：咨询及私人知识相关 75 passed、10 deselected，Ruff 通过。全量在补私人知识测试桩前 721 passed、3 failed、1 skipped；该项补桩后单独通过。
+- 边界：另外两项全量失败为多轮记忆 `test_stream_receives_old_excerpts_as_user_data_not_system_prompt` 与新闻 `test_api_reports_ready_items_and_source_statuses`；前者原因尚未确定，后者实得 `stale` 而断言 `partial`。本轮未做真实模型误删/漏删评测；原文摘录存在不证明医学结论正确。
+- 下一步：用真实模型和人工标注的“混入无据断言”题集评估误删、漏删、延迟和成本；修复两项全量测试失败后再宣称完整回归通过。
+
+**2026-10-23 Codex｜医疗咨询生成后核查覆盖扩展**
+
+- 改动：医疗普通回答、卡片及本轮附件/私人知识路径在发送前缓冲并核查，独立于多 Agent 开关；无证据、超限、核查失败返回固定提示；更新接口与方案文档、相关测试。用户明确允许本轮选中私人资料再次发送给所选模型核查。
+- 验证：咨询相关 67 passed、10 deselected（模型调用使用桩）；改动范围 Ruff 通过。Docker 已由用户授权启动，本地测试库占用已释放。
+- 边界：模型核查按段落删除，不能证明逐句医学真实性；医疗内容识别仍依赖规则门控；未做真实付费模型调用及全量后端测试。结构化追问卡仅做格式校验，红旗分流保持确定性规则。
+- 下一步：用独立边缘问法评测医疗门控漏判，真实模型对照评估核查误删与漏删、延迟和成本，再决定是否调整门控和段落粒度。
 
 **2026-10-21 Codex｜登录密码计算移出事件循环，受控对照完成**
 

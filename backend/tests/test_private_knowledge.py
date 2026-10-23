@@ -315,6 +315,10 @@ async def test_stream_uses_only_selected_private_knowledge_and_persists_cited_so
     monkeypatch.setattr(
         "app.api.routes.consultations.run_consultation_generation", no_public_evidence
     )
+    monkeypatch.setattr(
+        "app.api.routes.consultations.check_answer_evidence",
+        AsyncMock(side_effect=lambda _model, content, _sources: content),
+    )
     monkeypatch.setattr("app.ai.provider.stream_chat", fake_stream)
     response = await client.post(
         f"/api/v1/consultations/{cid}/stream",
