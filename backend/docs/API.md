@@ -271,6 +271,22 @@ GET 响应只返回掩码，永不返回明文：
 status 可能为 completed、empty、failed 或 skipped。事件不会返回证据正文、原始用户
 问题或数据库对象。
 
+多 Agent P0：现有 NDJSON `start`、`done`、`error` 事件现在还带 `workflow`，不会新增
+事件类型。`workflow.scene=consultation`，`mode=centralized`，`nodes` 顺序为
+`triage/evidence/planner/fallback/writer/reviewer`；每个节点有 `id`、`label`、
+`status`、`executor=code|model`，`edges` 提供画图连线。该对象只含受控状态，不含
+用户问题、健康记录或检索正文。红旗分流和证据门槛仍由既有代码执行；`planner`
+只返回 `direct|clarify|brief` 表达顺序，不能决定诊断、是否检索或是否紧急。
+`MULTI_AGENT_ENABLED=false` 时它显示 `skipped`，原有模型调用量不变；设为 `true`
+时普通回答最多增加一次当前用户所选模型的 JSON 规划调用，失败退回原回答流程。
+
+多 Agent P1 受限版在同一开关下为普通文字回答增加 `evidence_reviewer` 节点：仅有
+公共检索证据、无私人知识且草稿不超过 4000 字/8 段时才调用一次证据核查模型。
+该模型只能返回待删除段落索引，不能补写医学事实；代码引用核验仍在其后执行。
+这一路径先发 `start`，等完整草稿核查后再发一条正文 `delta`，因此首字等待较 P0 长。
+卡片、无证据和私人知识分支仍按原时序处理；核查失败时节点标 `failed`，并退回
+既有代码引用审计，不得解读为专业医学审核通过。节点状态不含草稿或证据正文。
+
 `retrieval.gateReason` 说明门控结果：`medical_content` 表示医学相关并执行检索，
 `non_medical_content` 表示普通聊天并跳过检索，`emergency` 表示红旗路线已经终止。
 
@@ -469,6 +485,14 @@ AES-256-GCM 数据密钥加密保存 90 天。任务响应包含 `contentId`；�
 `queued|generating|rendering|completed|failed|cancelled|expired`。每个任务至多生成一份
 DOCX 和一份 PPTX；DOCX 的 `pageCount` 固定返回 `null`（Office 分页依赖渲染环境），PPTX
 返回精确幻灯片数。响应和日志均不返回模型密钥、供应商原始响应、检索正文或用户健康记录。
+
+文档任务的创建、列表和单任务响应还带 `workflow`，`scene=document_generation`，
+节点为 `coordinator/evidence/planner/writer/reviewer/layout/delivery`；`workflow_stage`
+持久化在任务行中，以便刷新后恢复真实检查点。`planner` 和 `reviewer` 在任务创建时
+`MULTI_AGENT_ENABLED=true` 才调用配置的文档模型（每个任务比原流程多两次模型调用），
+否则规划节点显示 `skipped`、审校节点仅执行原有代码校验。模型复核仅是机器筛查，
+不代表医学专业审核；高风险结果使任务失败，不会继续渲染。已有任务的开关状态不受
+后续环境变量变化影响。工作流图应绘制在现有文档任务卡／回答结果区，不需新增输入框按钮。
 
 内容只使用服务端医学知识库的检索证据，生成自编摘要、少量引用和原始 URL；不读取用户上传
 附件、健康记录或图片。服务端固定模型生成结构化内容计划，再由本地 `python-docx`、

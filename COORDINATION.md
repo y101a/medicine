@@ -172,7 +172,8 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 日期 | 提出方 | 目标文件 | 请求内容 | 状态 |
 | --- | --- | --- | --- | --- |
-| 2026-10-07 | Codex → DSH 四层候选内容 | `knowledge_graph_candidates_batch1.json` | 用户要求尽快收口可写简历的高优先级项目。Codex 新增只读候选校验 CLI，实跑 4 主题/23 概念/19 关系，发现 8 处 `EVIDENCE_NOT_IN_EXCERPTS`。请由内容包所有者逐项补真实原文短摘录或修正 evidence，不要删掉警告或改成 `approved`；另复核「抗菌药→个案皮疹」与「儿童发热→不当降温风险」两个关系的语义。修后运行 `cd backend; .\.venv-codex\Scripts\python.exe -m app.knowledge_graph_candidate_check --file ..\knowledge_graph_candidates_batch1.json`，期望 `issues=[]`。| 待 DSH 认领 |
+| 2026-10-14 | Codex 多 Agent P0 后端 → DSH 前端 | `frontend/src/api/consultations.ts`、`frontend/src/api/documentGenerations.ts`（按实际文件名）、咨询回答结果区、现有文档任务卡及测试 | 用户确认 P0 同时覆盖健康问答与 PPT/Word，并希望可视化各角色工作。后端契约见 `backend/docs/API.md`：咨询 NDJSON `start/done/error.workflow`，文档创建/列表/单任务响应 `workflow`，格式 `{scene,mode,version,nodes:[{id,label,status,executor}],edges:[{from,to}]}`。请在**现有回答结果区与文档任务卡**绘制工作流图及无图列表替代视图，不新增输入框入口；状态仅按后端实际值显示，不能把 `code` 步骤称作独立 LLM Agent，失败/跳过明确区分，移动端不溢出并补单测/e2e。Codex 不直接修改 DSH 所有权的前端。 | 待 DSH 认领 |
+| 2026-10-07 | Codex → DSH 四层候选内容 | `knowledge_graph_candidates_batch1.json` | 用户要求尽快收口可写简历的高优先级项目。Codex 新增只读候选校验 CLI，实跑 4 主题/23 概念/19 关系，发现 8 处 `EVIDENCE_NOT_IN_EXCERPTS`。2026-10-08 已逐项打开四篇北京卫健委原文核对，8 处处理建议见 `backend/docs/KNOWLEDGE_GRAPH_BATCH1_SOURCE_AUDIT.md`；其中抗菌药个案皮疹建议剔除，不要把个案泛化。请由内容包所有者修正原文件，保持 `pending`，不要改成 `approved`。修后运行 `cd backend; .\.venv-codex\Scripts\python.exe -m app.knowledge_graph_candidate_check --file ..\knowledge_graph_candidates_batch1.json --evaluation-manifest`，期望 `ok=true` 且 `eligible_for_publication=false`。| 待 DSH 认领 |
 | 2026-10-06 | Codex 图谱后端 → DSH 前端 | `frontend/src/router/**`、图谱探索页与测试、`frontend/BROWSER_ACCEPTANCE.md` | 用户指定 Codex 实现 Neo4j 增强、DSH 同时负责四层知识。后端已提供只读 `GET /api/v1/knowledge-graph/concepts` 和 `POST /api/v1/knowledge-graph/explore` 契约，见 `backend/docs/API.md`；图谱读开关默认关闭，未过 G3 医学评测不启用咨询。探索页属于 `frontend/` 所有权，不由 Codex 抢改；请 DSH 完成四层工作后再认领页面，**新增入口位置须先问用户**，不得放聊天输入框。页面必须展示证据来源、`available=false` 与空结果区别、键盘可用的列表替代视图，禁止个人疾病概率。 | 待 DSH 认领，待用户确认入口位置 |
 | 2026-10-06 | Codex 北京站后端接入进度 | `frontend/src/views/PortalView.vue`（仅核对现有显示，无需先改） | 用户批准仅北京卫健委来源直连；后端已加入 `beijing_wjw_health` 可启用目录、专用 HTML 解析与相关性过滤，真实列表 200/25660 B、筛出 13 条，中文原题在 `title`、`titleZh` 为空。**开发库现已启用并首次入库 13 条**（run=344，养生 7、疾病 6、药物 0，最近错误 `None`）；请 DSH 做门户真实联调与浏览器验收。疾病区现有较新英文 WHO 稿仍可能排在中文稿前，勿宣称全部专区中文化。 | 待 DSH 门户真实联调 |
 | 2026-10-06 | Codex 回复北京站交接 | `NEWS_SOURCE_CANDIDATES.md` 的核验补充或 §6 回报（DSH 不改后端） | 已核对官方《法律声明》；但 Codex 当前环境用后端 `.venv-codex` 的项目 `fetch_document('https://wjw.beijing.gov.cn/xwzx_20031/xwfb/')` 报 `FETCH_FAILED`（TLS 连接阶段），PowerShell 普通 GET 也报 unexpected EOF；未抓到 HTML，不能验证标题—日期配对并安全启用。请 DSH 从其可读环境提供至少 5 条**列表卡片结构的最小 HTML 测试夹具**（仅标签/属性/短标题/日期/路径，不传正文），并在可能时用项目 `.venv-codex` 的抓取器复测是否也失败；若只有别的客户端能读，请只记录差异，不绕过站点拦截。Codex 保留后端所有权、待夹具与可达性结论后接入。`.venv` 是旧的不完整环境；`.venv-codex` 已实测可 import `fastapi/anyio/annotated_types/annotated_doc`，无需修复或安装。另，原始中文标题应存 `title`；`titleZhSource` 目前只允许 `machine/manual`，不能标“原始中文”，无需迁移。 | 已由 DSH 回报（2026-10-06）：夹具与复测结论在 `NEWS_SOURCE_CANDIDATES.md` §11.4；`.venv-codex` 抓取器同样 `FETCH_FAILED`，按用户规则北京站**暂不启用**（见下一行） |
@@ -272,6 +273,8 @@ npm run e2e                                                  # 期望 39 passed�
 - **2026-10-06 DSH（用户当面临时跨边界授权）**：实现四层知识计划里唯一缺失的代码件——**「仅 approved」独立评测**。改动集中在 3 个文件：`app/rag/retrieval.py`（新增 `RetrievalScope`；`scope="approved_only"` 在 development 也强制只取 approved）、`app/rag/evaluation.py`（`run_prototype_evaluation(scope=...)`、报告新增 `scope` 字段与 `approved_document_retrieval` 指标、approved_only 拒绝与 `--checkpoint` 同用）、`app/rag/cli.py`（`evaluate-prototype --scope`），另修正 `docs/KNOWLEDGE_FOUR_LAYER_GAP_PLAN.md` 里失效的 `.venv` 命令。**开工前已核对：这三个文件均不在你的在途改动清单内**（news / document_extract / config / pyproject / API.md 等我一个都没碰）。请复核后接管所有权；若需回退，改动只在这三处。**我知道默认 `auto` 路径保持不额外传 `scope` 是为了不破坏既有 6 项评测桩的调用契约；你若要给 approved_only 补单测，需要给桩函数加参数。**
 - **2026-10-06 DSH（同一临时授权）**：新增机器预审 `backend/app/rag/prototype_precheck.py` + `tests/test_prototype_precheck.py` + `app/rag/cli.py` 的 `precheck-prototype` 子命令。只读扫描 prototype 语料，列出疑似越界表述（剂量/疗程/药名/确诊口气/个人运动处方/疗效承诺）与「缺就医分流句」的文档；**不改任何 review_status、不出通过结论**。开工前核对：`app/rag/cli.py` 不在你的在途清单内，`retrieval.py`/`evaluation.py` 已由我上一条提交（2d25b8b）。- **2026-10-06 DSH（同一临时授权）**：修复机器预审的误报。首版只做关键词匹配，在我们的真实原型语料上 16 条命中**全是误报**（把「不要擅自停药」当停药指令、把「食盐不超过 5 克」当剂量、把「不一定是疼」当确诊口气）。本版加入上下文抑制（安全提醒句、膳食/生理限量、非用药的「减量」、免责声明、描述「正在服用某药」、被否定的绝对化），真实扫描 **16 → 1** 条，抑制条目**单独计数不丢弃**。改 `app/rag/prototype_precheck.py`、`tests/test_prototype_precheck.py`（12 项）。已知代价：句内出现否定线索时整句抑制，会漏掉「不要自行停药，但可以改成每天 2 片」这类混合句——所以抑制计数必须与未抑制计数一起看。### 7.1 进行中（开工前先看这里；开工时在此登记，收工释放）
 2026-10-06 DSH：前端知识图谱探索页（frontend/src/views/KnowledgeGraphView.vue 等）已完成、无在途占用；无迁移、未改后端任何文件、未联网。补记：由子代理实现、DSH 亲自复跑后提交。
+2026-10-08 Codex：新增“暂未经专业医学审核”的图谱评测数据路径；仅改 `backend/app/knowledge_graph_candidate_check.py`、其测试和 `backend/docs/KNOWLEDGE_GRAPH.md`，不改正式 `approved`/发布/线上咨询，不占数据库、不联网、无迁移。已释放；专项 6 passed、Ruff 通过，实包仍有 8 处证据摘录缺口，未导出评测清单。
+2026-10-08 Codex：隔离图谱评测与咨询图谱主题匹配修复；占用 `backend/docs/knowledge_graph_evaluation_batch1*.json`、`backend/app/{ai/graph_context.py,services/knowledge_graph_query.py}`、相关测试及 `COORDINATION.md`。不改正式发布状态，不占数据库、无迁移；已释放。实跑材料校验 8 passed、Ruff 全绿；异步图谱测试挂起原因未明，PostgreSQL/Neo4j 均未监听，真实 A/B 待用户授权启动隔离容器与付费 API。
 2026-10-06 DSH：自建检索评测集 batch1（新增 backend/docs/medical_retrieval_evaluation_beijing_wjw_batch1.json）已完成、无在途占用；无迁移、无数据库读写、未联网（仅下载 4 篇公开网页）、未付费。补记：由子代理撰写、DSH 复核后提交。
 2026-10-06 DSH：稿件-来源确定性比对（新增 app/rag/draft_source_check.py 与其单测）已完成、无在途占用；无迁移、无数据库读写、未联网、未付费。补记。
 2026-10-06 DSH：预审误报修复已完成、无在途占用——改 `app/rag/prototype_precheck.py` 与其单测；无迁移、数据库只读、未联网、未付费。**补记**：先动手后登记。
@@ -293,6 +296,19 @@ npm run e2e                                                  # 期望 39 passed�
 
 | 执行者 | 任务 | 正在改的文件 | 迁移编号 | 占用数据库 | 开始时间 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
+| Codex | 登录密码计算移出事件循环并进行受控同条件复测 | `backend/app/core/password_work.py`、`backend/app/services/auth.py`、`backend/pyproject.toml`、相关测试/压测脚本/报告、`COORDINATION.md` | 无 | 否（graph-eval占用已释放；临时服务已停止） | 2026-10-21 | 已释放（9 passed、Ruff通过；1/10/30并发各两轮前后对照完成；证据已归档） |
+| Codex | 核验用户提供的压测结果并归档原始脚本及报告 | `backend/docs/PERFORMANCE_20261021_VERIFIED.md`、证据目录、`backend/docs/PERFORMANCE_20261021.md`、`COORDINATION.md` | 无 | 否（仅只读核对隔离库计数） | 2026-10-21 | 已释放（五接口并发30证据、隔离库计数与SHA核实；未改认证业务代码或复跑负载） |
+| Codex | 排查命令工具与 Docker 故障，准备并执行本地 HTTP 性能测试 | `backend/scripts/performance_*.py`、`backend/scripts/performance_admin_diagnostics.ps1`、`backend/tests/test_performance_load.py`、`backend/docs/PERFORMANCE_20261021.md`、`backend/compose.perf.yaml`、`COORDINATION.md` | 无新增迁移 | 否（Docker 虚拟化阻塞） | 2026-10-21 | 已释放（脚本专项 3 passed；Ruff 与管理员诊断脚本语法检查通过；真实压测待管理员诊断/恢复 Docker） |
+| Codex | 将咨询历史从固定 30 条改为按上下文预算动态截取，并保留早期自述摘要 | `backend/app/ai/{context_budget.py,provider.py}`、`backend/app/api/routes/consultations.py`、`backend/app/services/consultations.py`、相关配置/测试/文档、`COORDINATION.md` | 无 | 否（数据库连接被拒绝，未占用） | 2026-10-19 | 已释放（离线 30 passed；记忆专项 5 passed、2 error 因 PostgreSQL 未监听；Ruff 全绿） |
+| Codex | 图谱 batch2 新 51 题隔离真实对照评测与逐题报告 | `backend/docs/{knowledge_graph_evaluation_batch2_isolated_result.json,KNOWLEDGE_GRAPH.md}`、`COORDINATION.md` | 无（仅对 tmpfs 隔离库迁移至 head） | 是（仅 `medical_assistant_graph_eval:55432` 与临时 Neo4j；已停止并清除） | 2026-10-14 | 已释放（51 题真实评测完成；22/25 来源命中、15/25 图谱期望命中、15/26 负例关系误返回；专项 3 passed、Ruff 全绿） |
+| Codex | 扩充检索与图谱评测题集至 200 条精确去重题，图谱专项新增 51 条并保留历史 18 条 | `backend/docs/knowledge_graph_evaluation_batch2_cases.json`、`backend/app/knowledge_graph_evaluation.py`、`backend/tests/test_knowledge_graph_evaluation_batch1.py`、`backend/docs/KNOWLEDGE_GRAPH.md`、`COORDINATION.md` | 无 | 否（仅离线数据与测试） | 2026-10-14 | 已释放（四份题集规范化去重 200/200，图谱 69；专项 3 passed、Ruff 全绿；新 51 题真实 A/B 未跑） |
+| Codex | 多 Agent P0/P1 公开合成题真实模型对照评测 | `backend/app/ai/multi_agent_ab_benchmark.py`、`backend/docs/{MULTI_AGENT_P1_PLAN.md,MULTI_AGENT_P1_AB_RESULTS.md}`、`COORDINATION.md` | 无 | 是（只读检索、会话回滚；公开原型片段外发经用户明确允许） | 2026-10-14 | 已释放（2 题真实 P0/P1 各一轮，结果已记录；Ruff 全绿） |
+| Codex | 多 Agent P1 后端首批：有界 DAG、文档一次删减修订、问答发送前证据核查及模型调用上限 | `backend/app/ai/{bounded_workflow_plan.py,consultation_evidence_reviewer.py,workflow_progress.py}`、`backend/app/services/{document_generations.py,document_generation_content.py}`、`backend/app/api/routes/consultations.py`、`backend/tests/test_multi_agent_workflow.py`、`backend/docs/{API.md,MULTI_AGENT_P1_PLAN.md}`、`COORDINATION.md` | 无 | 是（回滚型全量测试，不调用付费模型） | 2026-10-14 | 已释放（主链路组合 70 passed；全量在 DAG 校验前为 693 passed、1 failed、1 skipped；Ruff 全绿） |
+| Codex | 多 Agent P0 中心化编排后端：文档与咨询双场景、角色进度与工作流契约 | `backend/app/ai/{workflow_progress.py,agent_provider.py,consultation_planner.py}`、`backend/app/api/routes/consultations.py`、`backend/app/services/{document_generations.py,document_generation_content.py}`、`backend/app/models/generated_document.py`、`backend/app/schemas/document_generations.py`、`backend/app/core/config.py`、`backend/.env.example`、`backend/migrations/versions/20261014_0032_workflow_progress.py`、`backend/tests/test_multi_agent_workflow.py`、`backend/docs/{API.md,MULTI_AGENT_P0.md}`、`COORDINATION.md` | `20261014_0032` | 是（迁移及回滚型测试已结束） | 2026-10-14 | 已释放（全量 687 passed、1 failed、1 skipped；Ruff 全绿） |
+| Codex | 咨询压缩记忆结构化抽取：自述类别、消息序号、记录时间、脱敏原句及旧缓存重建 | `backend/app/services/conversation_memory.py`、`backend/tests/test_conversation_memory.py`、`COORDINATION.md` | 无 | 是（回滚型专项测试已结束） | 2026-10-14 | 已释放（58 passed；Ruff 全绿；见 §7.2 顶部） |
+| Codex | 会话压缩记忆重要性过滤：健康事实优先、套话与重复抑制、旧缓存重建及测试 | `backend/app/services/conversation_memory.py`、`backend/tests/test_conversation_memory.py`、`COORDINATION.md` | 无 | 是（回滚型专项测试已结束） | 2026-10-14 | 已释放（57 passed；Ruff 全绿；见 §7.2 顶部） |
+| Codex | 咨询 benchmark 低分记录、红旗漏判与检索弱项改进、专项及 API 实测 | `backend/docs/CONSULTATION_BENCHMARK_20261008.md`、`backend/app/safety/triage.py`、`backend/tests/test_triage.py`、`backend/app/rag/consultation_smoke_benchmark.py`、两个 hybrid 断点、`COORDINATION.md` | 无 | 是（只读评测；测试事务回滚） | 2026-10-08 | 已释放（全量 669 passed、1 skipped；Ruff 全绿；结果见 §7.2 顶部） |
+| Codex | 更正刷新令牌轮换与 `auth_version` 的简历/项目文档口径（补记：先改文档后登记） | `RESUME_HIGHLIGHTS.md`、`PROJECT_FULL_CHAIN.md`、`backend/docs/DATA_MODEL.md`、`COORDINATION.md` | 无 | 否 | 2026-10-07 | 已释放（仅文档，未改认证代码） |
 | Codex | 简历前高优先级收口：首批图谱候选离线校验 CLI、专项测试与未完成清单 | `backend/app/knowledge_graph_candidate_check.py`、`backend/tests/test_knowledge_graph_candidate_check.py`、`backend/docs/RESUME_READY_BACKLOG.md`、`COORDINATION.md` | 无 | 否（宿主机现有容器原已运行，本轮仅只读检索和回滚型专项测试） | 2026-10-07 | 已释放（20 passed；Ruff 通过；实包 8 处证据缺口） |
 | Codex | 首批四层候选离线校验、图谱专项测试和 prototype 关键词检索评测 | `COORDINATION.md`（记录）；读取候选 JSON、后端题集与测试 | 无 | 否（数据库端口不可达，未实际查询） | 2026-10-07 | 已释放（离线校验完成；检索评测未运行） |
 | Codex | 将四层知识验收手册拆成无需签字的 prototype 测试与正式发布两条路径 | `KNOWLEDGE_MANUAL_ACCEPTANCE.md`、`COORDINATION.md` | 无 | 否 | 2026-10-07 | 已释放（仅文档；未运行评测） |
@@ -416,6 +432,131 @@ Codex 回来后后端仍归 Codex。若 DSH 需要继续动后端，会重新登
   局限：**只测前端，接口是桩**，不能替代真实后端联调。需要人眼看的清单见 `frontend/BROWSER_ACCEPTANCE.md`。
 
 ### 7.2 工作报告（最新在最上）
+
+**2026-10-21 Codex｜登录密码计算移出事件循环，受控对照完成**
+
+- 改动：先原样备份 auth/pyproject；新增 `password_work.py`，AnyIO专用限额每worker最多2项密码计算，登录正常/不存在账号分支均移出事件循环；校验后凭据行锁定重读，防并发失败丢计数与密码变更期间使用旧校验结果。新增专项测试、前后对照脚本、报告和原始样本归档。声明已安装的AnyIO直接依赖，无依赖安装、迁移或Git操作。
+- 验证：隔离库认证专项9 passed（3.75秒）、相关Ruff通过；before/after均单worker、同机同账号、1/10/30并发每档15秒重复两次，原始样本合并后30并发登录P50 4134.44→1149.61ms、P95 6198.62→1747.95ms、P99 8029.43→1803.34ms、成功RPS 6.84→22.45；同时健康接口P99 1256.27→29.18ms；各档登录及探测均0错误。
+- 边界：开发机短时对照，不是生产容量；单并发登录77.21→81.15ms略慢，P99样本均不足1000；30并发after两轮18.92/26.12RPS存在波动。未做IP速率限制、未迁移注册/重置密码计算、未测真实AI生成或付费接口。仅认证专项，未重跑全套后端。临时58110服务已停止，其他服务未停止。
+- 下一步：正式部署前按worker数/Argon2内存预算调配并行度，明确延迟SLO后进行长时固定到达率与多用户验证。详情 `backend/docs/AUTH_ASYNC_IMPROVEMENT_20261021.md`；可写开发机对照结果，不写生产最大QPS。
+
+**2026-10-21 Codex｜核验并归档已有五接口性能测试**
+
+- 改动：新增 `backend/docs/PERFORMANCE_20261021_VERIFIED.md` 与四份原始证据的独立归档，补充原准备报告的时效说明。提供防止各并发档结果互相覆盖的复跑命令，不改业务代码。
+- 验证：原件与归档四文件 SHA-256 一致，5 场景均为并发 30，共 2532 次 HTTP 成功、0 HTTP 错误；隔离库只读计数为会话2726、消息1335、预检265、健康记录0，Alembic 20261014_0032。HypervisorPresent true、Docker及正式/隔离数据库容器均运行。当前登录代码确有同步哈希/校验直接运行于 async 路径。
+- 边界：原始 JSON 仅保留并发30，没有1/10档或P95/逐请求样本。消息写入共用同一cid并触发FOR UPDATE，48.5 RPS不能称系统上限；265/1335约19.85%，不是恰好1/5；健康记录0不是账单级零调用证明。消息发送主路径未发现记忆更新调用，不将其列为该场景耗时来源。未复跑负载，未修复登录，未提交或推送。
+- 下一步：登录移出事件循环时需覆盖正常校验和不存在账号的哈希分支，并控制并行Argon2资源；修复前后保留各档原始证据，补充独立用户/会话场景、P95与更长时间验证，不能先写性能提升幅度。该修复尚未实施。
+
+**2026-10-21 Codex｜已授权将 hypervisorlaunchtype 从 Off 改为 Auto，待用户重启**
+
+- 改动：用户明确授权后，通过 UAC 执行 `bcdedit /set hypervisorlaunchtype auto`；新增单项修复脚本，结果保存至 `backend/data/perf-hypervisor-change-20261021-01.json`，更新性能报告。
+- 验证：命令退出码 0，读回当前 BCD 启动项确认为 Auto，verifiedAuto true、restartPerformed false。
+- 边界：未自动重启、未改其他启动配置；Docker 恢复及业务压测仍未验证，没有本轮 P50/P95/P99/QPS 数值。
+- 下一步：等待用户保存工作并手动重启；恢复后核对 HypervisorPresent 与 Docker，再按 `backend/docs/PERFORMANCE_20261021.md` 继续用户已授权的本地隔离压测，无需重复询问启动 Docker/隔离库的权限。付费模型调用仍未授权。
+
+**2026-10-21 Codex｜管理员只读诊断确认 Docker 启动阻塞**
+
+- 改动：用户批准 UAC 后执行已准备的只读诊断，保存结果到 `backend/data/perf-admin-diagnostics-20261021-01.json`，补充性能报告；未改生产代码。
+- 验证：VirtualMachinePlatform 与 WSL 均 Enabled、固件虚拟化 true；BCD 当前启动项明确 `hypervisorlaunchtype Off`，HypervisorPresent false。
+- 边界：仅执行只读管理员诊断，未修改 Windows 组件、BCD 或权限，未重启；数据库与 HTTP 压测仍未执行。
+- 下一步：申请用户允许将 `hypervisorlaunchtype` 改为 Auto，之后由用户保存工作并手动重启，再继续已授权的 Docker 与隔离压测。
+
+**2026-10-21 Codex｜性能压测工具与宿主机阻塞诊断**
+
+- 改动：新增本地 HTTP 压测驱动、隔离用户/加密历史夹具、临时 pgvector compose、只读管理员诊断脚本及 `backend/docs/PERFORMANCE_20261021.md`。统计成功/全部请求延迟分位数、成功 QPS 与错误率，校验业务响应；原生产业务代码未修改。
+- 验证：宿主机通道专项测试 3 passed（复核 0.12 秒）、Ruff 全绿、两份 Python CLI 帮助正常、PowerShell 诊断脚本语法通过；合成写入文本确定性红旗路径为 emergency。数据库迁移、种子入库及业务 HTTP 压测均未执行，不存在本轮性能数字。
+- 边界：原沙箱刷新失败明确为工作目录 ACL WRITE_DAC 被拒绝；沙箱外命令可用，恢复后普通命令也能启动，但一次异步离线测试卡住，已停止本轮测试进程并在宿主机复核。用户允许启动 Docker/临时压测；实际 Docker 报 hasNoVirtualization=true，固件虚拟化 true、HypervisorPresent=false，管理员组件/BCD 读取被拒绝。未安装依赖、未修改 ACL/系统配置、未调用付费模型、未提交或推送。
+- 下一步：已请求用户允许通过 UAC 执行已准备的只读诊断，待 Windows 虚拟化与 Docker 恢复后执行隔离 API 压测；检索/真实 AI 时延须单独确定范围与外部调用授权。不能把准备完成、统计测试通过写成业务压测通过。
+
+**2026-10-19 Codex｜对话压缩接入本地 Qwen 分词器**
+
+- 改动：在 `app/ai/context_budget.py` 中用固定版本的 Qwen 分词器统计咨询上下文，按 2 倍 token 数留冗余；分词器资源和来源、校验值随包提供，资源不可用时回退到 UTF-8 字节估算。只影响对话压缩预算；不改检索分词。改动前另存预算相关文件 ZIP。
+- 验证：离线上下文与相关回归 33 passed、2 deselected（数据库集成项）；改动文件 Ruff、`git diff --check` 通过；wheel 包含分词器资源和依赖。合成中等长度对话保留 81/81 条，原字节估算保留 28/81 条；该结果只说明预算利用率。
+- 边界：开源 Qwen 分词器仅是四个托管模型的共同代理，2 倍系数与余量未通过服务商真实用量校准，不能称为精确计数或回答质量提升。未调用付费模型；未提交或推送。用户已允许联网核实及向项目现有虚拟环境安装依赖。
+- 下一步：数据库可用时复跑集成项；如需校准系数，应以服务商实际 usage 和窗口限额验证。
+
+**2026-10-19 Codex｜咨询上下文改为预算驱动截取**
+
+- 改动：先将当前 590 个代码文件保存为独立 ZIP 快照并校验；新增 `app/ai/context_budget.py`，咨询最近消息扫描上限从 30 改为 200，再按完整提示、预留输出和摘要空间动态保留最新消息。供应商请求明确 `max_tokens`；新增可配置预算、文档和离线测试。无迁移，不改前端。
+- 验证：模型请求、健康上下文、预算和记忆离线测试 30 passed；记忆专项 5 passed、2 error（需数据库的两项在本机 PostgreSQL 连接被拒绝）；改动文件 Ruff 全绿，`git diff --check` 通过；合成上下文长度 0/2000/4000 字均保留本轮问题。
+- 边界：UTF-8 字节数是保守估算，不是各服务商精确 token；32768 是部署预算，非已核实模型窗口。若固定提示与本轮问题太长则受控拒绝；内存摘要空间不足时本轮跳过摘要。未启动容器、未联网、未安装依赖、未提交或推送。
+- 下一步：待 PostgreSQL 已正常运行时复跑 2 项集成测试，并用各服务商真实 tokenizer/窗口信息校准配置；本轮未做真实付费模型调用。
+
+**2026-10-14 Codex｜新增图谱 51 题真实隔离评测**
+
+- 改动：新增 `backend/docs/knowledge_graph_evaluation_batch2_isolated_result.json`，保存 51 题逐题结果和题集 SHA-256；`KNOWLEDGE_GRAPH.md` 同步真实指标与失败分类。不改图谱检索算法、正式知识或线上开关。
+- 验证：临时 PostgreSQL 迁移到 `20261014_0032 (head)`、Neo4j 空图投影后运行 batch2；25 道关系题 RAG 来源命中 22、图谱对象命中 15；26 道负例有 15 道返回无关关系。结果 JSON 51 行、无替换乱码、SHA-256 与题集一致；专项 3 passed、Ruff 全绿。
+- 边界：只测关键词 RAG 与图谱关系检索，不调用模型、不评估回答或医学正确率。历史 batch1 结果未重跑；batch2 已查看，后续据此调参不能再称其为未见过的 holdout。隔离容器已 `down`，tmpfs 运行数据随之清除，逐题文件保留。
+
+**2026-10-14 Codex｜评测题集扩容**
+
+- 改动：新增 `backend/docs/knowledge_graph_evaluation_batch2_cases.json` 51 道图谱专项冻结题；旧 18 题和结果保持原样。`app/knowledge_graph_evaluation.py` 增 `--case-set batch2`；新增数据契约和四集去重测试，同步 `docs/KNOWLEDGE_GRAPH.md`。
+- 验证：四份题集分别 80/51/18/51 道，规范化问题 200/200 唯一；图谱专项合计 69 道，新集 25 条已收录关系题覆盖全部 9 个候选对象、26 条无覆盖/易混题；专项 pytest 3 passed，Ruff 全绿，CLI 帮助输出含 batch2。
+- 边界：新 51 题尚未运行隔离 PostgreSQL/Neo4j；200 只是四种题集的去重总数，不是统一 benchmark 分数，也不能称 200 题已实测。无数据库、外网、付费 API 或正式医学内容改动。
+**2026-10-14 Codex：多 Agent P0/P1 真实模型对照完成**
+
+- 改动：用户明确允许发送公开原型片段后，用 `backend/app/ai/multi_agent_ab_benchmark.py` 对两道公开合成题分别跑 P0/P1；报告写入 `backend/docs/MULTI_AGENT_P1_AB_RESULTS.md`，更新 P1 状态。脚本限定 `developer_prototype_knowledge` 来源，不发送用户聊天、私人知识库或健康记录；数据库会话回滚。
+- 验证：头晕题 P0/P1 7773/17480 ms，尿路感染题 7034/24947 ms；每题模型成功调用 1/3 次，P1 均完成删段核查，双方均有 2 个有效引用来源且无无效编号、安全提示均保留。脚本 Ruff 通过。
+- 边界：样本只有 2 题，且是已知开发题；没有逐句医学事实核对、token 账单或真实用户数据。P1 耗时约 2.9 倍，不能宣称比 P0 医学准确；默认开关保持关闭。未提交或推送。
+
+**2026-10-14 Codex：多 Agent P0/P1 真实对照准备及执行拦截**
+
+- 改动：新增 `backend/app/ai/multi_agent_ab_benchmark.py`，使用两个公开合成咨询题、同一轮检索结果对照 P0/P1，只输出耗时/引用/段落/调用状态，不打印回答或密钥；有 `--allow-paid` 显式开关，且强制来源只属于 `developer_prototype_knowledge`。更新 P1 状态文档。
+- 验证：脚本 `--help` 可运行，Ruff 全绿；真实模型命令在启动前被执行环境拒绝，**0 次付费调用、0 条真实结果**，不可报告 P0/P1 胜负。
+- 边界：执行环境认为“授权公开合成题测评”尚不足以授权将本地检索片段发送给外部千问服务。已向用户追问明确外发范围；收到确认并核对来源后才能重试。未提交或推送。
+
+**2026-10-14 Codex：多 Agent P1 首批后端切片**
+
+- 改动：固定工作流 DAG 增加白名单、节点/边上限和无环校验，但未让模型动态决定任务；文档复核 `uncertain` 且指定章节时最多调用一次定向修订模型，代码强制只删减原章节句子/来源，`high` 与无法定向的意见仍失败；协同文档任务最多两次工作尝试。普通文字咨询在有公共证据且无私人知识时，模型草稿先缓冲，证据核查角色只能删段落，随后仍走代码引用核验并发送；无证据、紧急、卡片等分支沿用 P0。状态更新见 `backend/docs/MULTI_AGENT_P1_PLAN.md`，P1-5 仍未完成。
+- 验证：P1＋咨询＋文档组合 **70 passed**（模型桩）；DAG 校验加入前的后端全量 **693 passed、1 failed、1 skipped**；`ruff check app tests` 全绿。唯一失败仍是新闻固定日期断言 `test_api_reports_ready_items_and_source_statuses` 期望 `partial`、实得 `stale`，与本轮文件无交集。未调用真实付费模型。
+- 边界：问答发送前核查会增加首字等待；核查失败退回原代码引用审计并标记失败，不表示医学审核通过。文档工作尝试上限防止无界重试，但修订次数未独立持久化；尚无真实模型 P0/P1 对照评测。前端由 DSH 所有，本轮未改；未提交或推送。
+
+**2026-10-14 Codex：多 Agent P0 中心化编排后端（问答＋PPT/Word）**
+
+- 改动：新增受控 `workflow` 节点／连线／执行器契约；问答保留原红旗与 RAG 图，普通回答在显式开关开启时增加一次脱敏、枚举化的回答规划模型调用，失败退回原回答；文档任务固化开关并记录持久化阶段，开启时在原内容生成之外增加章节规划与机器复核模型调用，复核高风险停止渲染。`20261014_0032` 为文档任务增加无原文的检查点与开关。API/设计见 `backend/docs/{API.md,MULTI_AGENT_P0.md}`，前端图交接见 §6 顶部。默认开关关闭，未修改 DSH 前端。
+- 验证：本地 PostgreSQL `alembic current` = `20261014_0032 (head)`；双场景专项 7 passed、文档／咨询等组合 82 passed；后端全量 687 passed、1 skipped、1 failed；`ruff check .` 全绿。唯一失败仍是 `tests/test_news.py::test_api_reports_ready_items_and_source_statuses` 固定日期 `NOW=2026-10-04` 在 2026-10-14 已过期导致期望 `partial` 实得 `stale`，与本功能无关。所有新增模型调用测试均为桩，未发生真实付费调用。
+- 边界：这是受控中心化分工，非自主工具调用或医学审核；前端工作流图仍待 DSH 接线；`MULTI_AGENT_ENABLED=false` 需显式设为 `true` 并重启后端才会新增模型调用，文档任务会固化创建时开关。未执行迁移降级以免删除已有列，未提交或推送。
+
+**2026-10-14 Codex：咨询旧消息结构化抽取**
+
+- 改动：`backend/app/services/conversation_memory.py` 将加密记忆缓存升级为 v3，每条用户节选保存 `category`、`source=user_statement`、原消息 `sequence`、`recorded_at`（消息发送时间）和脱敏 `text`；输出标明类别只是话题标签，不代表事实核实，发送时间不是症状起始时间。v1/v2 缓存在下次使用时从本咨询原消息重建，无数据库迁移、无额外模型调用。增加教育性问题排除，避免把“我想了解过敏是什么”标成个人过敏。
+- 验证：记忆、咨询图、咨询、安全分流及健康记录隔离相关测试 58 passed；新增记忆专项 7 passed；`ruff check .` 全绿。
+- 边界：仅存用户明确表述的分类节选，不抽取确定诊断、疾病实体或药品标准名，不写正式健康记录，不跨咨询共享；词表外说法可能遗漏。未跑全量后端套件，未提交或推送。
+
+**2026-10-14 Codex：会话压缩记忆重要性过滤**
+
+- 改动：`backend/app/services/conversation_memory.py` 将“我／之前”等泛词加分替换为明确的自述过敏、用药、病史、症状与表达偏好分级；纯寒暄和无明确价值的句子不入摘要，同义标点差异去重，历史描述降权但原文保留。旧版加密摘要在下次使用时从本咨询原消息重建（不新增迁移、不调用模型）。`backend/tests/test_conversation_memory.py` 补充否定、历史与当前冲突、重复、旧缓存重建测试。
+- 验证：记忆、咨询图、安全分流与健康记录隔离相关测试 57 passed；`ruff check .` 全绿。未跑全量套件；未改前端、未提交或推送。
+- 边界：仍是可追溯的规则选句，不做语义判断或结构化病历抽取；“没有过敏”原句不会被改写成“有过敏”。规则外的重要新说法仍可能遗漏。
+
+**2026-10-14 Codex：咨询会话本地抽取式记忆与 30 条滑动窗口组合**
+
+- 改动：新增每个咨询独立的加密 `consultation_memories` 缓存及 `20261014_0031` 迁移；仅从窗口外较早的用户消息选取有界原句节选，直接标明不是已核实病历或医学证据；红旗分流仍先执行，节选只作为低优先级用户上下文进入普通回答。摘要写入后在模型流开始前释放数据库锁，删除咨询时由外键级联删除。无新增外部摘要模型调用，未改前端。
+- 验证：本地 PostgreSQL 上 `alembic upgrade head` 成功，`alembic current` 为 `20261014_0031 (head)`；专项 4 passed（含增量更新、加密、用户隔离、删除级联、接口注入）；相关文件 Ruff 全绿。全量后端 677 passed、1 skipped、1 failed；唯一失败 `tests/test_news.py::test_api_reports_ready_items_and_source_statuses` 隔离复跑稳定复现，其固定 `NOW=2026-10-04` 导致新闻在当前日期过期，与本次咨询改动无关。
+- 边界：这是规则选句与截断，不是语义模型总结，可能遗漏未命中信息；旧对话节选不参与红旗判定，也不替代知识检索。未对有数据的开发库执行降级（降级会删除新表）；未提交或推送。
+
+**2026-10-08 DSH：受用户指派接手，跑完 Codex 未完成的隔离图谱 A/B 评测**
+
+- 改动：仅新增 `backend/docs/knowledge_graph_evaluation_batch1_isolated_result.json`（18 题逐题结果）。**未编辑** Codex 的任何文件（`knowledge_graph_evaluation.py`、`compose.graph-eval.yaml`、评测数据与测试保持原样），未改门槛、知识状态、审核状态或线上开关。
+- 验证：隔离栈（PG 55432 / Neo4j 57687，tmpfs 一次性卷、loopback-only）实跑 `python -m app.knowledge_graph_evaluation --isolated-eval` 成功——18 题（12 supported / 6 负例）：真实 PG 关键词 RAG 来源命中 **6/12**、图谱期望对象命中 **4/12**、负例图谱误返回 **0/6**；耗时 RAG 4–16ms、图谱增量 7–19ms（首题 269ms 为预热）。图谱专项 `19 passed / 3.12s`（含真实 Neo4j 全量投影联调 `test_real_neo4j_full_snapshot_rebuild`）；无 `NEO4J_*` 配置时该联调正确 skip（1 skipped）。全程零付费：keyword 模式，未调向量与模型。
+- 边界：① 图谱 4/12 **被 RAG 关键词命中率压住**——脚本只在「该关系的证据 chunk 同时被 RAG 命中」时计命中，4/12 是 6/12 的子集，不代表图谱检索能力上限，也不代表医学回答正确率；② Codex 报的「异步图谱专项挂起」**未能复现**：把 `NEO4J_URI` 指向死端口 57688 时同一测试 **3.49s 快速失败**、并不挂起，故**原挂起原因仍未查明**，只能确认现在可稳定跑通；③ 为跑评测在 `.venv-codex` 安装了 pyproject 已声明的可选依赖（`neo4j==6.4.0` + `pytz`），未改 `pyproject.toml`；④ 复跑须先重启隔离 Neo4j 容器——脚本按设计拒绝覆盖非空图；⑤ 结果仍属 `evaluation_only`、暂未经专业医学审核、不可发布；⑥ **未提交、未推送**。
+- 复跑：`docker compose -f compose.graph-eval.yaml up -d` → 重启 neo4j → 以 `APP_ENVIRONMENT=development POSTGRES_DB=medical_assistant_graph_eval POSTGRES_PORT=55432 POSTGRES_USER=graph_eval POSTGRES_PASSWORD=graph-eval-local-only` 运行上述模块。
+
+2026-10-08 Codex：新增独立评测副本 4 主题/9 条 pending 关系及冻结 18 题，修复咨询图谱主题入口误用联网陌生病名提取器的问题，只在本地 PG 对已发布主题/别名做显式匹配。验证：离线数据专项 8 passed，Ruff 全绿；原入口在新题集 18/18 未识别，故有必要改接线。边界：真实 PG/Neo4j 端口均未监听，异步图谱专项运行挂起、原因未明，模型 A/B 未跑；未开启线上图谱或正式发布。
+2026-10-08 Codex：在用户允许联网后逐篇核对首批四层候选的 4 个北京卫健委原文，新增 `backend/docs/KNOWLEDGE_GRAPH_BATCH1_SOURCE_AUDIT.md`，给出 8 处证据摘录缺口的逐项处理建议；同步 §6 请求 DSH 修正其所有权内的候选包。验证：4 篇公开原文均可读取，现有候选包仍被评测导出命令以 8 个缺口拒绝；未改候选、审核状态、数据库、Neo4j 或咨询开关。
+2026-10-08 Codex：新增离线 `--evaluation-manifest`，只接受来源、摘录和 pending 状态有效的候选包，输出“暂未经专业医学审核 / evaluation_only / 不可发布”；正式 PostgreSQL/Neo4j 发布路径未改。专项 6 passed、Ruff 全绿；首批实包 8 处证据缺口，命令退出 1 且不导出清单。无数据库、网络、付费调用或迁移；实际隔离投影和 A/B 评测仍待后续实现。
+**2026-10-08 Codex：咨询 benchmark 低分记录、红旗漏判修复与 API 实测**
+
+- 改动：新增 `backend/docs/CONSULTATION_BENCHMARK_20261008.md` 与固定合成问题冒烟脚本；`backend/app/safety/triage.py` 增加卒中相关的口语化言语/单侧无力表达，`backend/tests/test_triage.py` 加正反例。未改生产检索门槛、知识审核状态或前端。
+- 验证：独立 51 题关键词 8/51、真实 hybrid Top-3 和实际咨询 Top-4 均 47/51；approved-only 0/51；两个题集共 5 道紧急题的确定性预检由 4/5 升为 5/5；真实合成问题冒烟 4 条本地/模型路径及 1 条联网兜底成功；全量 `pytest -q` 669 passed、1 skipped；`ruff check .` 全绿。仅公开合成问题调用了外部向量、千问与搜索，两个评测断点位于 `backend/docs/`。
+- 边界：这不是临床准确率或独立盲测；51 题已用于分析，不能再作为新留出集。未调用真实用户问题、未发布知识、未提交或推送。当前四道 hybrid 漏题留待新题集和误召回约束下改进，不为刷分降低门槛。
+
+**2026-10-07 Codex：认证文案口径更正**
+
+- 改动：`RESUME_HIGHLIGHTS.md`、`PROJECT_FULL_CHAIN.md`、`backend/docs/DATA_MODEL.md` 明确登录态刷新只轮换刷新令牌、不会提升 `auth_version`；重置密码才提升版本并撤销该用户的刷新会话。未改认证实现。
+- 验证：对照 `backend/app/services/auth.py`、`backend/app/services/phone_verification.py`、`backend/app/api/dependencies.py` 与密码重置回归测试逐条核对；纯文档改动，未运行测试。
+- 边界：此前生成的简历 DOCX 已避开错误表述，本轮未修改 DOCX；本轮未提交或推送。
+
 ### 2026-10-06 DSH 前端：知识图谱探索页（P0）
 
 - **入口位置与理由（用户 2026-10-06 已选定）**：独立路由页 /knowledge-graph，入口在 WorkspaceLayout.vue 的 <nav aria-label=主导航> 里新增「知识图谱」（排在咨询历史与我的知识库之间）。理由：①按项目规则，用户可见入口默认不进 .composer——本次 HomeView.vue 一行未改；②该页做的是独立探索，不属聊天流程；③**不挂 WorkspaceLayout**：工作区受 ADR-011 的 min-width:1000px 约束，375px 必然溢出，而本页要求 375px 不溢出，与 /portal 同一取舍，页面顶部给唯一回程「← 返回工作区」。**若用户希望页面内保留侧栏，需先改 ADR-011 的适用范围，按规则须先问用户。**

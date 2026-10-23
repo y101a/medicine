@@ -13,6 +13,7 @@ from uuid import UUID
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.workflow_progress import document_workflow
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.core.privacy import redact_direct_identifiers
@@ -37,6 +38,10 @@ from app.schemas.document_generations import (
 from app.services.audit_logs import AUDIT_OUTCOME_REJECTED, AUDIT_OUTCOME_SUCCESS, add_audit_log
 from app.services.document_generation_content import (
     generate_content_plan,
+    plan_document_outline,
+    review_content_plan,
+    review_document_draft,
+    revise_document_section,
     source_snapshots,
 )
 from app.services.document_generation_intent import (
@@ -109,6 +114,11 @@ def _out(
         expires_at=row.expires_at,
         created_at=row.created_at,
         updated_at=row.updated_at,
+        workflow=document_workflow(
+            status,
+            row.workflow_stage,
+            specialist_models_enabled=bool(row.multi_agent_enabled),
+        ),
     )
 
 
@@ -294,6 +304,7 @@ async def create(
         client_request_id=payload.client_request_id,
         requested_formats=list(request.formats),
         status="queued",
+        multi_agent_enabled=settings.multi_agent_enabled,
         model=settings.document_generation_model,
         template_mode="uploaded"
         if template_bytes is not None
@@ -600,6 +611,15 @@ async def process_one(db: AsyncSession, generation_id: UUID) -> bool:
     if row is None or row.status not in ACTIVE_STATUSES:
         await db.rollback()
         return False
+    if row.multi_agent_enabled and row.attempt_count >= 2:
+        await db.rollback()
+        await _mark_failed(
+            db,
+            generation_id,
+            AppError(502, "DOCUMENT_AGENT_RETRY_LIMIT", "协同文档生成已达到重试上限"),
+            [],
+        )
+        return False
     _, request, topic = await _owned_source(
         db,
         row.user_id,
@@ -616,6 +636,7 @@ async def process_one(db: AsyncSession, generation_id: UUID) -> bool:
         )
         return False
     row.status = "generating"
+    row.workflow_stage = "evidence"
     row.attempt_count += 1
     row.updated_at = datetime.now(UTC)
     await db.commit()
@@ -635,7 +656,66 @@ async def process_one(db: AsyncSession, generation_id: UUID) -> bool:
             )
         await db.commit()
         snapshots = source_snapshots(citations)
-        plan = await generate_content_plan(topic, citations)
+        outline = None
+        row = await db.scalar(
+            select(GeneratedDocument)
+            .where(GeneratedDocument.id == generation_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        if row is None or row.status == "cancelled":
+            await db.rollback()
+            return False
+        if row.multi_agent_enabled:
+            row.workflow_stage = "planner"
+            await db.commit()
+            outline = await plan_document_outline(topic, citations)
+        row = await db.scalar(
+            select(GeneratedDocument)
+            .where(GeneratedDocument.id == generation_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        if row is None or row.status == "cancelled":
+            await db.rollback()
+            return False
+        row.workflow_stage = "writer"
+        await db.commit()
+        plan = (
+            await generate_content_plan(topic, citations, outline=outline)
+            if outline is not None
+            else await generate_content_plan(topic, citations)
+        )
+
+        locked = await db.scalar(
+            select(GeneratedDocument).where(GeneratedDocument.id == generation_id).with_for_update()
+        )
+        if locked is None or locked.status == "cancelled":
+            await db.rollback()
+            return False
+        locked.workflow_stage = "reviewer"
+        await db.commit()
+        review_content_plan(plan, len(citations))
+        if row.multi_agent_enabled:
+            verdict = await review_document_draft(plan, citations)
+            if verdict.risk == "high":
+                raise AppError(422, "DOCUMENT_AGENT_REVIEW_REJECTED", "复核 Agent 发现高风险内容")
+            if verdict.risk == "uncertain" and verdict.section_index is None:
+                raise AppError(422, "DOCUMENT_AGENT_REVIEW_UNRESOLVED", "复核意见需要进一步核对")
+            if verdict.risk == "uncertain" and verdict.section_index is not None:
+                current = await db.scalar(
+                    select(GeneratedDocument)
+                    .where(GeneratedDocument.id == generation_id)
+                    .with_for_update()
+                    .execution_options(populate_existing=True)
+                )
+                if current is None or current.status == "cancelled":
+                    await db.rollback()
+                    return False
+                current.workflow_stage = "writer"
+                await db.commit()
+                plan = await revise_document_section(plan, citations, verdict)
+                review_content_plan(plan, len(citations))
 
         locked = await db.scalar(
             select(GeneratedDocument).where(GeneratedDocument.id == generation_id).with_for_update()
@@ -644,6 +724,7 @@ async def process_one(db: AsyncSession, generation_id: UUID) -> bool:
             await db.rollback()
             return False
         locked.status = "rendering"
+        locked.workflow_stage = "layout"
         locked.updated_at = datetime.now(UTC)
         await db.commit()
 
@@ -668,6 +749,8 @@ async def process_one(db: AsyncSession, generation_id: UUID) -> bool:
             rendered.append(("pptx", pptx_bytes, slides))
 
         settings = get_settings()
+        locked.workflow_stage = "delivery"
+        await db.commit()
         files: list[GeneratedDocumentFile] = []
         for format, payload, page_count in rendered:
             validate_generated_document(

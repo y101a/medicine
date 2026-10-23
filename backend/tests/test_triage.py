@@ -48,6 +48,28 @@ def test_enhanced_red_flags_are_detected():
         assert result.assessment_method == "deterministic_rules"
 
 
+def test_stroke_warning_covers_lay_speech_and_one_sided_weakness():
+    cases = (
+        "说话突然含糊不清，半边身子使不上劲，几分钟后又好像正常了",
+        "家人讲话突然含糊不清",
+        "我一侧身体突然使不上劲",
+    )
+    for content in cases:
+        result = evaluate_triage(content)
+        assert result.route == "emergency", content
+        assert "stroke_warning" in result.matched_rule_ids
+
+
+def test_stroke_warning_lay_phrases_respect_negation_and_education():
+    cases = (
+        "我没有说话突然含糊不清",
+        "请科普说话突然含糊不清时该如何识别风险",
+        "以前半边身子使不上劲，现在没有不适",
+    )
+    for content in cases:
+        assert evaluate_triage(content).route == "continue", content
+
+
 def test_educational_or_hypothetical_questions_do_not_trigger():
     cases = (
         "什么是胸痛？",

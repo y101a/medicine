@@ -93,15 +93,83 @@ def check_package(package: dict) -> dict:
     }
 
 
+def build_evaluation_manifest(package: dict) -> dict:
+    """Prepare explicitly unreviewed, offline-only data; never publish it."""
+
+    checked = check_package(package)
+    issues = list(checked["issues"])
+    topics = package.get("topics", [])
+    if package.get("status") != "all_candidates_pending_human_review":
+        issues.append({
+            "topic": "", "code": "NOT_PENDING_PACKAGE",
+            "detail": "evaluation input must be a pending candidate package",
+        })
+    for topic in topics if isinstance(topics, list) else []:
+        if not isinstance(topic, dict):
+            continue
+        source = topic.get("source")
+        if not isinstance(source, dict) or not str(source.get("url", "")).startswith("https://"):
+            issues.append({
+                "topic": str(topic.get("topic_key", "")), "code": "MISSING_PUBLIC_SOURCE",
+                "detail": "a public HTTPS source URL is required",
+            })
+        if not topic.get("excerpts"):
+            issues.append({
+                "topic": str(topic.get("topic_key", "")), "code": "MISSING_EXCERPTS",
+                "detail": "source excerpts are required",
+            })
+        for triple in topic.get("candidate_triples", []):
+            if not isinstance(triple, dict):
+                continue
+            evidence = triple.get("evidence_excerpt")
+            if not isinstance(evidence, str) or not any(
+                evidence and evidence in excerpt
+                for excerpt in topic.get("excerpts", [])
+                if isinstance(excerpt, str)
+            ):
+                issues.append({
+                    "topic": str(topic.get("topic_key", "")),
+                    "code": "TRIPLE_EVIDENCE_NOT_IN_EXCERPTS",
+                    "detail": f"{triple.get('subject', '')} -> {triple.get('object', '')}",
+                })
+    if issues:
+        return {
+            "ok": False, "data_scope": "evaluation_only",
+            "medical_review_label": "暂未经专业医学审核",
+            "eligible_for_publication": False, "issues": issues,
+        }
+    return {
+        "ok": True,
+        "data_scope": "evaluation_only",
+        "medical_review_label": "暂未经专业医学审核",
+        "eligible_for_publication": False,
+        "topics": [
+            {
+                "topic_key": topic["topic_key"],
+                "source": topic["source"],
+                "excerpts": topic["excerpts"],
+                "candidate_triples": topic["candidate_triples"],
+            }
+            for topic in topics
+        ],
+        "issues": [],
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Read-only prototype graph candidate check")
     parser.add_argument("--file", required=True, type=Path)
+    parser.add_argument(
+        "--evaluation-manifest", action="store_true",
+        help="emit an unreviewed, evaluation-only manifest; never writes to databases",
+    )
     args = parser.parse_args()
     try:
         package = json.loads(args.file.read_text(encoding="utf-8"))
         if not isinstance(package, dict):
             raise ValueError("root must be an object")
-        result = check_package(package)
+        result = (build_evaluation_manifest(package) if args.evaluation_manifest
+                  else check_package(package))
     except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
         print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False))
         return 2

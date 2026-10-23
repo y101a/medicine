@@ -209,7 +209,7 @@ async def list_messages(db: AsyncSession, user_id: UUID, cid: UUID, before: int 
     )
 
 
-async def ai_history(db: AsyncSession, user_id: UUID, cid: UUID, limit: int = 30):
+async def ai_history(db: AsyncSession, user_id: UUID, cid: UUID, limit: int = 200):
     await owned(db, user_id, cid)
     rows = (
         await db.scalars(
@@ -228,7 +228,7 @@ async def ai_history(db: AsyncSession, user_id: UUID, cid: UUID, limit: int = 30
     triage = deserialize_triage(
         decrypt_sensitive(rows[0].triage_ciphertext) if rows[0].triage_ciphertext else None
     )
-    return history, triage, rows[0].id
+    return history, triage, rows[0].id, rows[-1].sequence
 
 
 async def latest_card_source(db: AsyncSession, user_id: UUID, cid: UUID) -> UUID:

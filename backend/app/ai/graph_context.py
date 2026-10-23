@@ -5,8 +5,10 @@ import json
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.graph.state import RetrievalEvidence
-from app.rag.web_search import safe_search_topic
-from app.services.knowledge_graph_query import explore_public_graph, find_public_concepts
+from app.services.knowledge_graph_query import (
+    explore_public_graph,
+    find_public_question_concepts,
+)
 
 
 async def build_public_graph_context(
@@ -16,10 +18,7 @@ async def build_public_graph_context(
 ) -> tuple[str | None, int]:
     """Return at most five relations; never introduce an unnumbered source."""
 
-    topic = safe_search_topic(user_text)
-    if not topic:
-        return None, 0
-    concepts = await find_public_concepts(db, topic)
+    concepts = await find_public_question_concepts(db, user_text)
     if len(concepts) != 1:
         return None, 0
     graph = await explore_public_graph(db, concepts[0].id)

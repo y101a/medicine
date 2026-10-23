@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0",
+  "status": "frozen_before_first_run",
+  "medical_review_label": "暂未经专业医学审核",
+  "purpose": "只评测检索证据与图谱关系，不评估临床正确性",
+  "cases": [
+    {"id":"fever_discomfort","query":"小孩发热又明显不舒服，资料里怎么描述这种情况？","expected_topic":"儿童发热","expected_objects":["发热伴明显不适"],"expected_source":"pediatric_fever","case_type":"supported","split":"tune"},
+    {"id":"fever_clothing","query":"孩子发烧时穿盖方面有什么科普提示？","expected_topic":"儿童发热","expected_objects":["减少衣物与保证液体摄入"],"expected_source":"pediatric_fever","case_type":"supported","split":"holdout"},
+    {"id":"fever_drink","query":"儿童发热，在喝水和室温上要注意什么？","expected_topic":"儿童发热","expected_objects":["减少衣物与保证液体摄入"],"expected_source":"pediatric_fever","case_type":"supported","split":"tune"},
+    {"id":"fever_observe","query":"孩子发烧在家观察时，除了温度还应留意什么？","expected_topic":"儿童发热","expected_objects":["观察精神状态"],"expected_source":"pediatric_fever","case_type":"supported","split":"holdout"},
+    {"id":"fever_dose_negative","query":"给孩子用药的具体毫克剂量是多少？","expected_topic":"儿童发热","expected_objects":[],"expected_source":null,"case_type":"unsupported","split":"holdout"},
+    {"id":"inflammation_signs","query":"局部发炎为什么会红、肿、热、痛？","expected_topic":"炎症","expected_objects":["局部红肿热痛与功能障碍"],"expected_source":"temperature_regulation","case_type":"supported","split":"tune"},
+    {"id":"inflammation_function","query":"炎症除了红肿热痛，还可能影响局部功能吗？","expected_topic":"炎症","expected_objects":["局部红肿热痛与功能障碍"],"expected_source":"temperature_regulation","case_type":"supported","split":"holdout"},
+    {"id":"fever_inflammation_relation","query":"发热和发炎有关系吗，完全是一回事吗？","expected_topic":"发热","expected_objects":["炎症"],"expected_source":"temperature_regulation","case_type":"supported","split":"tune"},
+    {"id":"inflammation_antibiotic_confusable","query":"发炎就一定要吃抗菌药吗？","expected_topic":null,"expected_objects":[],"expected_source":null,"case_type":"confusable","split":"holdout"},
+    {"id":"antibiotic_resistance","query":"随便吃抗菌药为什么会有耐药问题？","expected_topic":"抗菌药物","expected_objects":["细菌耐药"],"expected_source":"rational_antibiotic_use","case_type":"supported","split":"tune"},
+    {"id":"antibiotic_self_purchase","query":"抗菌药可以自己买来吃、自己改用量吗？","expected_topic":"抗菌药物","expected_objects":["不自行购买或擅自调整抗菌药"],"expected_source":"rational_antibiotic_use","case_type":"supported","split":"holdout"},
+    {"id":"antibiotic_specific_drug_negative","query":"这次感冒应该选哪一种具体抗菌药？","expected_topic":"抗菌药物","expected_objects":[],"expected_source":null,"case_type":"unsupported","split":"holdout"},
+    {"id":"antibiotic_case_generalization","query":"是不是所有人吃抗菌药都会长皮疹？","expected_topic":"抗菌药物","expected_objects":[],"expected_source":null,"case_type":"confusable","split":"tune"},
+    {"id":"activity_prepare","query":"开始健身前准备活动有必要吗？","expected_topic":"科学运动","expected_objects":["循序渐进并做好准备活动"],"expected_source":"safe_activity_start","case_type":"supported","split":"tune"},
+    {"id":"activity_gradual","query":"刚开始运动就突然加大难度合适吗？","expected_topic":"科学运动","expected_objects":["循序渐进并做好准备活动"],"expected_source":"safe_activity_start","case_type":"supported","split":"holdout"},
+    {"id":"activity_injury","query":"运动时关节错位又迅速肿起来，还要继续活动吗？","expected_topic":"科学运动","expected_objects":["严重运动损伤需停止活动并就医"],"expected_source":"safe_activity_start","case_type":"supported","split":"holdout"},
+    {"id":"activity_personal_target_negative","query":"我的目标心率和每周跑步次数应该定多少？","expected_topic":"科学运动","expected_objects":[],"expected_source":null,"case_type":"unsupported","split":"tune"},
+    {"id":"retired_relation","query":"如果儿童发热的护理来源被撤回，旧建议还能引用吗？","expected_topic":null,"expected_objects":[],"expected_source":null,"case_type":"withdrawn","split":"holdout"}
+  ]
+}

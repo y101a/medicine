@@ -1,0 +1,4297 @@
+{
+  "identity": {
+    "schemaVersion": 2,
+    "datasetSha256": "ada04c05f9024331bb38c98826ffc87cddf80e74f1b5baad20d58c91bf1f0541",
+    "mode": "hybrid",
+    "topK": 4,
+    "split": "all",
+    "gate": {
+      "profile": "candidate-threshold",
+      "vector": 0.56,
+      "keyword": 0.2,
+      "keywordOnly": 0.2,
+      "webVector": 0.6
+    }
+  },
+  "retryCount": 1,
+  "cases": {
+    "sudden_slurred_speech": {
+      "case_id": "sudden_slurred_speech",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "emergency",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.630722,
+      "returned_slugs": [
+        "emergency-warning"
+      ],
+      "returned_titles": [
+        "紧急危险表现与求助原型资料"
+      ],
+      "returned_trust_levels": [
+        "prototype"
+      ],
+      "expected_slugs": [
+        "emergency-warning"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "emergency-warning",
+          "title": "紧急危险表现与求助原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.630722,
+          "keyword_score": null,
+          "vector_similarity": 0.630722,
+          "rerank_score": 0.53611402,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "headache-dizziness",
+          "title": "头痛与头晕科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.541497,
+          "keyword_score": null,
+          "vector_similarity": 0.541497,
+          "rerank_score": 0.46027234,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "chronic-health",
+          "title": "常见慢性健康问题原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.510353,
+          "keyword_score": null,
+          "vector_similarity": 0.510353,
+          "rerank_score": 0.43379967,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "fitness-aerobic-intensity",
+          "title": "有氧运动强度怎么判断",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.47724,
+          "keyword_score": null,
+          "vector_similarity": 0.47724,
+          "rerank_score": 0.40565386,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 3,
+      "gate_profile": "candidate-threshold"
+    },
+    "unresponsive_no_breathing": {
+      "case_id": "unresponsive_no_breathing",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "emergency",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.682592,
+      "returned_slugs": [
+        "emergency-warning",
+        "emergency-warning",
+        "asthma",
+        "urticaria-eczema"
+      ],
+      "returned_titles": [
+        "紧急危险表现与求助原型资料",
+        "紧急危险表现与求助原型资料",
+        "哮喘常见表现原型资料",
+        "荨麻疹与湿疹科普原型"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "emergency-warning"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "emergency-warning",
+          "title": "紧急危险表现与求助原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.682592,
+          "keyword_score": null,
+          "vector_similarity": 0.682592,
+          "rerank_score": 0.58020339,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "emergency-warning",
+          "title": "紧急危险表现与求助原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.617599,
+          "keyword_score": null,
+          "vector_similarity": 0.617599,
+          "rerank_score": 0.52495888,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "asthma",
+          "title": "哮喘常见表现原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.6154,
+          "keyword_score": null,
+          "vector_similarity": 0.6154,
+          "rerank_score": 0.5230897,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "urticaria-eczema",
+          "title": "荨麻疹与湿疹科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.580535,
+          "keyword_score": null,
+          "vector_similarity": 0.580535,
+          "rerank_score": 0.49345452,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        }
+      ],
+      "filtered_count": 0,
+      "gate_profile": "candidate-threshold"
+    },
+    "lay_term_anti_inflammatory": {
+      "case_id": "lay_term_anti_inflammatory",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.697855,
+      "returned_slugs": [
+        "medicine-use"
+      ],
+      "returned_titles": [
+        "合理用药与抗菌药物原型资料"
+      ],
+      "returned_trust_levels": [
+        "prototype"
+      ],
+      "expected_slugs": [
+        "medicine-use"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "medicine-use",
+          "title": "合理用药与抗菌药物原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.697855,
+          "keyword_score": null,
+          "vector_similarity": 0.697855,
+          "rerank_score": 0.59317712,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "tcm-seasonal-routine",
+          "title": "四季起居与顺时养生",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.532301,
+          "keyword_score": null,
+          "vector_similarity": 0.532301,
+          "rerank_score": 0.45245556,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "medicine-use",
+          "title": "合理用药与抗菌药物原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.507289,
+          "keyword_score": null,
+          "vector_similarity": 0.507289,
+          "rerank_score": 0.43119556,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "tcm-older-adults",
+          "title": "老年人养生的通用注意",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.492,
+          "keyword_score": null,
+          "vector_similarity": 0.492,
+          "rerank_score": 0.41820034,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 3,
+      "gate_profile": "candidate-threshold"
+    },
+    "cat_scratch_bleeding": {
+      "case_id": "cat_scratch_bleeding",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "urgent",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.680508,
+      "returned_slugs": [
+        "animal-bite"
+      ],
+      "returned_titles": [
+        "动物咬伤处理原型资料"
+      ],
+      "returned_trust_levels": [
+        "prototype"
+      ],
+      "expected_slugs": [
+        "animal-bite"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "animal-bite",
+          "title": "动物咬伤处理原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.680508,
+          "keyword_score": null,
+          "vector_similarity": 0.680508,
+          "rerank_score": 0.57843203,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "tcm-cupping-gua-sha",
+          "title": "拔罐与刮痧的常见说法与政策边界",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.517882,
+          "keyword_score": 0.1,
+          "vector_similarity": 0.517882,
+          "rerank_score": 0.45520006,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "tcm-acupoint-pressing",
+          "title": "穴位按压的常见说法与安全提醒",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.468285,
+          "keyword_score": 0.1,
+          "vector_similarity": 0.468285,
+          "rerank_score": 0.41304249,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "urticaria-eczema",
+          "title": "荨麻疹与湿疹科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.477038,
+          "keyword_score": null,
+          "vector_similarity": 0.477038,
+          "rerank_score": 0.40548267,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 3,
+      "gate_profile": "candidate-threshold"
+    },
+    "elderly_blood_pressure_high": {
+      "case_id": "elderly_blood_pressure_high",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 2,
+      "top_similarity": 0.611262,
+      "returned_slugs": [
+        "chronic-health",
+        "hypertension"
+      ],
+      "returned_titles": [
+        "常见慢性健康问题原型资料",
+        "高血压认识与随访原型资料"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "hypertension"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "chronic-health",
+          "title": "常见慢性健康问题原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.611262,
+          "keyword_score": null,
+          "vector_similarity": 0.611262,
+          "rerank_score": 0.51957253,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "hypertension",
+          "title": "高血压认识与随访原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.577056,
+          "keyword_score": null,
+          "vector_similarity": 0.577056,
+          "rerank_score": 0.49049801,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "tcm-older-adults",
+          "title": "老年人养生的通用注意",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.554934,
+          "keyword_score": null,
+          "vector_similarity": 0.554934,
+          "rerank_score": 0.47169377,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "hypertension",
+          "title": "高血压认识与随访原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.549824,
+          "keyword_score": null,
+          "vector_similarity": 0.549824,
+          "rerank_score": 0.46735011,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 2,
+      "gate_profile": "candidate-threshold"
+    },
+    "exertional_chest_tightness": {
+      "case_id": "exertional_chest_tightness",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "urgent",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.657774,
+      "returned_slugs": [
+        "coronary-heart-disease",
+        "emergency-warning",
+        "coronary-heart-disease",
+        "3780871b6c6644b59fe2e15d6ef53084.shtml"
+      ],
+      "returned_titles": [
+        "冠心病与胸痛就医原型资料",
+        "紧急危险表现与求助原型资料",
+        "冠心病与胸痛就医原型资料",
+        "国家卫生健康委员会2024年8月6日新闻发布会文字实录"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "coronary-heart-disease"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "coronary-heart-disease",
+          "title": "冠心病与胸痛就医原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.657774,
+          "keyword_score": null,
+          "vector_similarity": 0.657774,
+          "rerank_score": 0.5591081,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "emergency-warning",
+          "title": "紧急危险表现与求助原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.642897,
+          "keyword_score": null,
+          "vector_similarity": 0.642897,
+          "rerank_score": 0.54646206,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "coronary-heart-disease",
+          "title": "冠心病与胸痛就医原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.640237,
+          "keyword_score": null,
+          "vector_similarity": 0.640237,
+          "rerank_score": 0.54420113,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "3780871b6c6644b59fe2e15d6ef53084.shtml",
+          "title": "国家卫生健康委员会2024年8月6日新闻发布会文字实录",
+          "source_key": "web_search_prototype",
+          "trust_level": "prototype",
+          "similarity": 0.628842,
+          "keyword_score": null,
+          "vector_similarity": 0.628842,
+          "rerank_score": 0.53451591,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        }
+      ],
+      "filtered_count": 0,
+      "gate_profile": "candidate-threshold"
+    },
+    "drinking_and_urinating_a_lot": {
+      "case_id": "drinking_and_urinating_a_lot",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "urgent",
+      "split": "tune",
+      "hit": false,
+      "passed": false,
+      "false_positive": false,
+      "matched_rank": null,
+      "top_similarity": null,
+      "returned_slugs": [],
+      "returned_titles": [],
+      "returned_trust_levels": [],
+      "expected_slugs": [
+        "diabetes"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "fitness-hydration-heat",
+          "title": "运动补水与高温天气运动",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.516842,
+          "keyword_score": null,
+          "vector_similarity": 0.516842,
+          "rerank_score": 0.4393153,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "norovirus-gastroenteritis",
+          "title": "诺如病毒急性胃肠炎原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.511578,
+          "keyword_score": null,
+          "vector_similarity": 0.511578,
+          "rerank_score": 0.43484151,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "fitness-progression",
+          "title": "运动量为什么要循序渐进",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.485192,
+          "keyword_score": 0.105263,
+          "vector_similarity": 0.485192,
+          "rerank_score": 0.42820277,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "diabetes",
+          "title": "糖尿病常见表现与随访原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.47674,
+          "keyword_score": 0.105263,
+          "vector_similarity": 0.47674,
+          "rerank_score": 0.42101843,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 4,
+      "gate_profile": "candidate-threshold"
+    },
+    "hypoglycemia_after_medication": {
+      "case_id": "hypoglycemia_after_medication",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "urgent",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.732897,
+      "returned_slugs": [
+        "chronic-health",
+        "fitness-chronic-conditions",
+        "diabetes",
+        "fitness-hydration-heat"
+      ],
+      "returned_titles": [
+        "常见慢性健康问题原型资料",
+        "高血压、糖尿病等慢病人群运动的通用注意",
+        "糖尿病常见表现与随访原型资料",
+        "运动补水与高温天气运动"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "chronic-health"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "chronic-health",
+          "title": "常见慢性健康问题原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.732897,
+          "keyword_score": null,
+          "vector_similarity": 0.732897,
+          "rerank_score": 0.62296203,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "fitness-chronic-conditions",
+          "title": "高血压、糖尿病等慢病人群运动的通用注意",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.591444,
+          "keyword_score": null,
+          "vector_similarity": 0.591444,
+          "rerank_score": 0.50272759,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "diabetes",
+          "title": "糖尿病常见表现与随访原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.585827,
+          "keyword_score": null,
+          "vector_similarity": 0.585827,
+          "rerank_score": 0.49795292,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "fitness-hydration-heat",
+          "title": "运动补水与高温天气运动",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.562854,
+          "keyword_score": null,
+          "vector_similarity": 0.562854,
+          "rerank_score": 0.47842619,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        }
+      ],
+      "filtered_count": 0,
+      "gate_profile": "candidate-threshold"
+    },
+    "sneezing_fit_every_spring": {
+      "case_id": "sneezing_fit_every_spring",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.730758,
+      "returned_slugs": [
+        "allergic-rhinitis"
+      ],
+      "returned_titles": [
+        "过敏性鼻炎常见表现原型资料"
+      ],
+      "returned_trust_levels": [
+        "prototype"
+      ],
+      "expected_slugs": [
+        "allergic-rhinitis"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "allergic-rhinitis",
+          "title": "过敏性鼻炎常见表现原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.730758,
+          "keyword_score": null,
+          "vector_similarity": 0.730758,
+          "rerank_score": 0.62114465,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "tcm-seasonal-routine",
+          "title": "四季起居与顺时养生",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.535578,
+          "keyword_score": null,
+          "vector_similarity": 0.535578,
+          "rerank_score": 0.45524117,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "allergic-rhinitis",
+          "title": "过敏性鼻炎常见表现原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.52515,
+          "keyword_score": null,
+          "vector_similarity": 0.52515,
+          "rerank_score": 0.44637766,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "urticaria-eczema",
+          "title": "荨麻疹与湿疹科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.512477,
+          "keyword_score": null,
+          "vector_similarity": 0.512477,
+          "rerank_score": 0.43560552,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 3,
+      "gate_profile": "candidate-threshold"
+    },
+    "night_wheeze_cough": {
+      "case_id": "night_wheeze_cough",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "urgent",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.631708,
+      "returned_slugs": [
+        "asthma",
+        "tcm-seasonal-routine"
+      ],
+      "returned_titles": [
+        "哮喘常见表现原型资料",
+        "四季起居与顺时养生"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "asthma"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "asthma",
+          "title": "哮喘常见表现原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.631708,
+          "keyword_score": null,
+          "vector_similarity": 0.631708,
+          "rerank_score": 0.53695143,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "tcm-seasonal-routine",
+          "title": "四季起居与顺时养生",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.560089,
+          "keyword_score": null,
+          "vector_similarity": 0.560089,
+          "rerank_score": 0.47607535,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "allergic-rhinitis",
+          "title": "过敏性鼻炎常见表现原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.552478,
+          "keyword_score": null,
+          "vector_similarity": 0.552478,
+          "rerank_score": 0.46960672,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "asthma",
+          "title": "哮喘常见表现原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.54232,
+          "keyword_score": null,
+          "vector_similarity": 0.54232,
+          "rerank_score": 0.46097191,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 2,
+      "gate_profile": "candidate-threshold"
+    },
+    "reflux_after_meals": {
+      "case_id": "reflux_after_meals",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.670121,
+      "returned_slugs": [
+        "gastroesophageal-reflux"
+      ],
+      "returned_titles": [
+        "胃食管反流常见表现原型资料"
+      ],
+      "returned_trust_levels": [
+        "prototype"
+      ],
+      "expected_slugs": [
+        "gastroesophageal-reflux"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "gastroesophageal-reflux",
+          "title": "胃食管反流常见表现原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.670121,
+          "keyword_score": null,
+          "vector_similarity": 0.670121,
+          "rerank_score": 0.56960257,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "gastroesophageal-reflux",
+          "title": "胃食管反流常见表现原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.559647,
+          "keyword_score": null,
+          "vector_similarity": 0.559647,
+          "rerank_score": 0.47569998,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "thyroid-conditions",
+          "title": "甲状腺常见问题概览原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.50987,
+          "keyword_score": null,
+          "vector_similarity": 0.50987,
+          "rerank_score": 0.43338988,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "coronary-heart-disease",
+          "title": "冠心病与胸痛就医原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.484132,
+          "keyword_score": null,
+          "vector_similarity": 0.484132,
+          "rerank_score": 0.41151197,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 3,
+      "gate_profile": "candidate-threshold"
+    },
+    "family_vomiting_diarrhea": {
+      "case_id": "family_vomiting_diarrhea",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "urgent",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.569411,
+      "returned_slugs": [
+        "norovirus-gastroenteritis",
+        "norovirus-gastroenteritis"
+      ],
+      "returned_titles": [
+        "诺如病毒急性胃肠炎原型资料",
+        "诺如病毒急性胃肠炎原型资料"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "norovirus-gastroenteritis"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "norovirus-gastroenteritis",
+          "title": "诺如病毒急性胃肠炎原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.569411,
+          "keyword_score": 0.107143,
+          "vector_similarity": 0.569411,
+          "rerank_score": 0.50007083,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "norovirus-gastroenteritis",
+          "title": "诺如病毒急性胃肠炎原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.567677,
+          "keyword_score": null,
+          "vector_similarity": 0.567677,
+          "rerank_score": 0.48252566,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "gastroesophageal-reflux",
+          "title": "胃食管反流常见表现原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.52926,
+          "keyword_score": null,
+          "vector_similarity": 0.52926,
+          "rerank_score": 0.44987062,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "e3fe2ad7805c49d5b55eea744ecf0ae0.shtml",
+          "title": "国家卫生健康委员会2026年4月23日新闻发布会文字实录",
+          "source_key": "web_search_prototype",
+          "trust_level": "prototype",
+          "similarity": 0.502437,
+          "keyword_score": null,
+          "vector_similarity": 0.502437,
+          "rerank_score": 0.42707128,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 2,
+      "gate_profile": "candidate-threshold"
+    },
+    "flu_season_household": {
+      "case_id": "flu_season_household",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": false,
+      "passed": false,
+      "false_positive": false,
+      "matched_rank": null,
+      "top_similarity": null,
+      "returned_slugs": [],
+      "returned_titles": [],
+      "returned_trust_levels": [],
+      "expected_slugs": [
+        "infection-prevention"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "infection-prevention",
+          "title": "呼吸道传染病个人防护原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.527841,
+          "keyword_score": null,
+          "vector_similarity": 0.527841,
+          "rerank_score": 0.44866479,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "fitness-hydration-heat",
+          "title": "运动补水与高温天气运动",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.434924,
+          "keyword_score": null,
+          "vector_similarity": 0.434924,
+          "rerank_score": 0.36968532,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "tcm-seasonal-routine",
+          "title": "四季起居与顺时养生",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.410913,
+          "keyword_score": null,
+          "vector_similarity": 0.410913,
+          "rerank_score": 0.34927593,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "wellness-salt-oil-sugar-alcohol",
+          "title": "少盐少油、控糖限酒的具体量",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.387287,
+          "keyword_score": null,
+          "vector_similarity": 0.387287,
+          "rerank_score": 0.3291943,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 4,
+      "gate_profile": "candidate-threshold"
+    },
+    "neck_nodule_on_checkup": {
+      "case_id": "neck_nodule_on_checkup",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.660779,
+      "returned_slugs": [
+        "thyroid-conditions",
+        "thyroid-conditions"
+      ],
+      "returned_titles": [
+        "甲状腺常见问题概览原型资料",
+        "甲状腺常见问题概览原型资料"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "thyroid-conditions"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "thyroid-conditions",
+          "title": "甲状腺常见问题概览原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.660779,
+          "keyword_score": null,
+          "vector_similarity": 0.660779,
+          "rerank_score": 0.56166252,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "thyroid-conditions",
+          "title": "甲状腺常见问题概览原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.656206,
+          "keyword_score": null,
+          "vector_similarity": 0.656206,
+          "rerank_score": 0.55777529,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "urticaria-eczema",
+          "title": "荨麻疹与湿疹科普原型",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.520008,
+          "keyword_score": 0.105263,
+          "vector_similarity": 0.520008,
+          "rerank_score": 0.45779623,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "wellness-sedentary-behaviour",
+          "title": "久坐行为与不活动的健康风险",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.492838,
+          "keyword_score": 0.105263,
+          "vector_similarity": 0.492838,
+          "rerank_score": 0.43470187,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 2,
+      "gate_profile": "candidate-threshold"
+    },
+    "thyroid_function_abnormal": {
+      "case_id": "thyroid_function_abnormal",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.609284,
+      "returned_slugs": [
+        "thyroid-conditions"
+      ],
+      "returned_titles": [
+        "甲状腺常见问题概览原型资料"
+      ],
+      "returned_trust_levels": [
+        "prototype"
+      ],
+      "expected_slugs": [
+        "thyroid-conditions"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "thyroid-conditions",
+          "title": "甲状腺常见问题概览原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.609284,
+          "keyword_score": null,
+          "vector_similarity": 0.609284,
+          "rerank_score": 0.51789174,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "thyroid-conditions",
+          "title": "甲状腺常见问题概览原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.512725,
+          "keyword_score": 0.16129,
+          "vector_similarity": 0.512725,
+          "rerank_score": 0.46000974,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "hypertension",
+          "title": "高血压认识与随访原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.528391,
+          "keyword_score": null,
+          "vector_similarity": 0.528391,
+          "rerank_score": 0.44913266,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "diabetes",
+          "title": "糖尿病常见表现与随访原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.52774,
+          "keyword_score": null,
+          "vector_similarity": 0.52774,
+          "rerank_score": 0.44857922,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 3,
+      "gate_profile": "candidate-threshold"
+    },
+    "wellness_how_much_activity": {
+      "case_id": "wellness_how_much_activity",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.680212,
+      "returned_slugs": [
+        "wellness-physical-activity",
+        "fitness-progression",
+        "wellness-diet-and-activity-balance",
+        "fitness-resistance-training"
+      ],
+      "returned_titles": [
+        "身体活动：为什么要动、动多少算够",
+        "运动量为什么要循序渐进",
+        "吃动平衡与每周运动量",
+        "力量（抗阻）训练的原则与安全"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "wellness-physical-activity"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "wellness-physical-activity",
+          "title": "身体活动：为什么要动、动多少算够",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.680212,
+          "keyword_score": 0.375,
+          "vector_similarity": 0.680212,
+          "rerank_score": 0.63442981,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "fitness-progression",
+          "title": "运动量为什么要循序渐进",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.655628,
+          "keyword_score": null,
+          "vector_similarity": 0.655628,
+          "rerank_score": 0.55728341,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "wellness-diet-and-activity-balance",
+          "title": "吃动平衡与每周运动量",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.603664,
+          "keyword_score": null,
+          "vector_similarity": 0.603664,
+          "rerank_score": 0.51311446,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "fitness-resistance-training",
+          "title": "力量（抗阻）训练的原则与安全",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.566095,
+          "keyword_score": null,
+          "vector_similarity": 0.566095,
+          "rerank_score": 0.48118098,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        }
+      ],
+      "filtered_count": 0,
+      "gate_profile": "candidate-threshold"
+    },
+    "wellness_sitting_all_day": {
+      "case_id": "wellness_sitting_all_day",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.569817,
+      "returned_slugs": [
+        "wellness-sedentary-behaviour"
+      ],
+      "returned_titles": [
+        "久坐行为与不活动的健康风险"
+      ],
+      "returned_trust_levels": [
+        "prototype"
+      ],
+      "expected_slugs": [
+        "wellness-sedentary-behaviour"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "wellness-sedentary-behaviour",
+          "title": "久坐行为与不活动的健康风险",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.569817,
+          "keyword_score": 0.1,
+          "vector_similarity": 0.569817,
+          "rerank_score": 0.49934484,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "wellness-sedentary-behaviour",
+          "title": "久坐行为与不活动的健康风险",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.52581,
+          "keyword_score": 0.1,
+          "vector_similarity": 0.52581,
+          "rerank_score": 0.4619384,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "wellness-sedentary-behaviour",
+          "title": "久坐行为与不活动的健康风险",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.500962,
+          "keyword_score": 0.1,
+          "vector_similarity": 0.500962,
+          "rerank_score": 0.44081738,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "35390.html",
+          "title": "卫生防护中心 - 高血压",
+          "source_key": "web_search_prototype",
+          "trust_level": "prototype",
+          "similarity": 0.440103,
+          "keyword_score": null,
+          "vector_similarity": 0.440103,
+          "rerank_score": 0.37408769,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 3,
+      "gate_profile": "candidate-threshold"
+    },
+    "wellness_daily_diet_principles": {
+      "case_id": "wellness_daily_diet_principles",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.726054,
+      "returned_slugs": [
+        "wellness-balanced-diet-principles"
+      ],
+      "returned_titles": [
+        "平衡膳食的八条准则"
+      ],
+      "returned_trust_levels": [
+        "prototype"
+      ],
+      "expected_slugs": [
+        "wellness-balanced-diet-principles"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "wellness-balanced-diet-principles",
+          "title": "平衡膳食的八条准则",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.726054,
+          "keyword_score": 0.304348,
+          "vector_similarity": 0.726054,
+          "rerank_score": 0.66279792,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "tcm-tonic-misconceptions",
+          "title": "药膳与进补的常见误区",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.520519,
+          "keyword_score": null,
+          "vector_similarity": 0.520519,
+          "rerank_score": 0.44244133,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "wellness-diet-and-activity-balance",
+          "title": "吃动平衡与每周运动量",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.514987,
+          "keyword_score": null,
+          "vector_similarity": 0.514987,
+          "rerank_score": 0.43773896,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "wellness-balanced-diet-principles",
+          "title": "平衡膳食的八条准则",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.507078,
+          "keyword_score": null,
+          "vector_similarity": 0.507078,
+          "rerank_score": 0.43101669,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 3,
+      "gate_profile": "candidate-threshold"
+    },
+    "wellness_eat_move_balance": {
+      "case_id": "wellness_eat_move_balance",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.69167,
+      "returned_slugs": [
+        "wellness-diet-and-activity-balance",
+        "fitness-progression",
+        "wellness-diet-and-activity-balance"
+      ],
+      "returned_titles": [
+        "吃动平衡与每周运动量",
+        "运动量为什么要循序渐进",
+        "吃动平衡与每周运动量"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "wellness-diet-and-activity-balance"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "wellness-diet-and-activity-balance",
+          "title": "吃动平衡与每周运动量",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.69167,
+          "keyword_score": 1.0,
+          "vector_similarity": 0.69167,
+          "rerank_score": 0.73791971,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "fitness-progression",
+          "title": "运动量为什么要循序渐进",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.577335,
+          "keyword_score": null,
+          "vector_similarity": 0.577335,
+          "rerank_score": 0.49073472,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "wellness-diet-and-activity-balance",
+          "title": "吃动平衡与每周运动量",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.562993,
+          "keyword_score": null,
+          "vector_similarity": 0.562993,
+          "rerank_score": 0.47854422,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "fitness-progression",
+          "title": "运动量为什么要循序渐进",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.526372,
+          "keyword_score": null,
+          "vector_similarity": 0.526372,
+          "rerank_score": 0.44741652,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 1,
+      "gate_profile": "candidate-threshold"
+    },
+    "wellness_salt_oil_alcohol": {
+      "case_id": "wellness_salt_oil_alcohol",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 2,
+      "top_similarity": 0.610563,
+      "returned_slugs": [
+        "4712324a0508410b953a3d3eb717ab43.shtml",
+        "wellness-salt-oil-sugar-alcohol",
+        "wellness-salt-oil-sugar-alcohol"
+      ],
+      "returned_titles": [
+        "国家卫生健康委员会2024年6月6日新闻发布会文字实录",
+        "少盐少油、控糖限酒的具体量",
+        "少盐少油、控糖限酒的具体量"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "wellness-salt-oil-sugar-alcohol"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "4712324a0508410b953a3d3eb717ab43.shtml",
+          "title": "国家卫生健康委员会2024年6月6日新闻发布会文字实录",
+          "source_key": "web_search_prototype",
+          "trust_level": "prototype",
+          "similarity": 0.610563,
+          "keyword_score": null,
+          "vector_similarity": 0.610563,
+          "rerank_score": 0.51897865,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "wellness-salt-oil-sugar-alcohol",
+          "title": "少盐少油、控糖限酒的具体量",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.57839,
+          "keyword_score": 0.1,
+          "vector_similarity": 0.57839,
+          "rerank_score": 0.50663132,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "wellness-salt-oil-sugar-alcohol",
+          "title": "少盐少油、控糖限酒的具体量",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.589446,
+          "keyword_score": null,
+          "vector_similarity": 0.589446,
+          "rerank_score": 0.50102904,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "wellness-salt-oil-sugar-alcohol",
+          "title": "少盐少油、控糖限酒的具体量",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.536878,
+          "keyword_score": null,
+          "vector_similarity": 0.536878,
+          "rerank_score": 0.4563465,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 1,
+      "gate_profile": "candidate-threshold"
+    },
+    "wellness_start_training_safely": {
+      "case_id": "wellness_start_training_safely",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.609676,
+      "returned_slugs": [
+        "wellness-fitness-guide-framework",
+        "wellness-fitness-guide-framework",
+        "wellness-fitness-guide-framework"
+      ],
+      "returned_titles": [
+        "科学健身先评估再安排",
+        "科学健身先评估再安排",
+        "科学健身先评估再安排"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "wellness-fitness-guide-framework"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "wellness-fitness-guide-framework",
+          "title": "科学健身先评估再安排",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.609676,
+          "keyword_score": 0.227273,
+          "vector_similarity": 0.609676,
+          "rerank_score": 0.55231556,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "wellness-fitness-guide-framework",
+          "title": "科学健身先评估再安排",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.605215,
+          "keyword_score": 0.227273,
+          "vector_similarity": 0.605215,
+          "rerank_score": 0.54852351,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "wellness-fitness-guide-framework",
+          "title": "科学健身先评估再安排",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.550633,
+          "keyword_score": 0.227273,
+          "vector_similarity": 0.550633,
+          "rerank_score": 0.50212914,
+          "kept": true,
+          "reason": "keyword-at-or-above-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "fitness-pregnancy",
+          "title": "孕期身体活动的一般建议",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.542427,
+          "keyword_score": null,
+          "vector_similarity": 0.542427,
+          "rerank_score": 0.4610628,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 1,
+      "gate_profile": "candidate-threshold"
+    },
+    "wellness_warmup_in_cold": {
+      "case_id": "wellness_warmup_in_cold",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.73728,
+      "returned_slugs": [
+        "wellness-warmup-and-protection",
+        "wellness-warmup-and-protection"
+      ],
+      "returned_titles": [
+        "热身与运动时的保暖",
+        "热身与运动时的保暖"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "wellness-warmup-and-protection"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "wellness-warmup-and-protection",
+          "title": "热身与运动时的保暖",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.73728,
+          "keyword_score": 0.216216,
+          "vector_similarity": 0.73728,
+          "rerank_score": 0.65912074,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "wellness-warmup-and-protection",
+          "title": "热身与运动时的保暖",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.669462,
+          "keyword_score": null,
+          "vector_similarity": 0.669462,
+          "rerank_score": 0.56904237,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "fitness-hydration-heat",
+          "title": "运动补水与高温天气运动",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.536857,
+          "keyword_score": null,
+          "vector_similarity": 0.536857,
+          "rerank_score": 0.45632885,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "fitness-hydration-heat",
+          "title": "运动补水与高温天气运动",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.53591,
+          "keyword_score": null,
+          "vector_similarity": 0.53591,
+          "rerank_score": 0.45552322,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 2,
+      "gate_profile": "candidate-threshold"
+    },
+    "wellness_tcm_wellness_basics": {
+      "case_id": "wellness_tcm_wellness_basics",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.741619,
+      "returned_slugs": [
+        "wellness-tcm-health-literacy",
+        "wellness-tcm-health-literacy",
+        "tcm-moxibustion"
+      ],
+      "returned_titles": [
+        "中医养生的一般理念",
+        "中医养生的一般理念",
+        "艾灸的常见说法与风险边界"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "wellness-tcm-health-literacy"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "wellness-tcm-health-literacy",
+          "title": "中医养生的一般理念",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.741619,
+          "keyword_score": 0.409091,
+          "vector_similarity": 0.741619,
+          "rerank_score": 0.69173946,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "wellness-tcm-health-literacy",
+          "title": "中医养生的一般理念",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.588995,
+          "keyword_score": null,
+          "vector_similarity": 0.588995,
+          "rerank_score": 0.5006455,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "tcm-moxibustion",
+          "title": "艾灸的常见说法与风险边界",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.575069,
+          "keyword_score": null,
+          "vector_similarity": 0.575069,
+          "rerank_score": 0.48880825,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "tcm-daily-routine-sleep",
+          "title": "起居有常与睡眠习惯",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.550521,
+          "keyword_score": null,
+          "vector_similarity": 0.550521,
+          "rerank_score": 0.46794281,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 1,
+      "gate_profile": "candidate-threshold"
+    },
+    "wellness_three_reductions": {
+      "case_id": "wellness_three_reductions",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.701248,
+      "returned_slugs": [
+        "wellness-healthy-lifestyle-action",
+        "wellness-healthy-lifestyle-action"
+      ],
+      "returned_titles": [
+        "全民健康生活方式行动与「三减三健」",
+        "全民健康生活方式行动与「三减三健」"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "wellness-healthy-lifestyle-action"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "wellness-healthy-lifestyle-action",
+          "title": "全民健康生活方式行动与「三减三健」",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.701248,
+          "keyword_score": 0.148148,
+          "vector_similarity": 0.701248,
+          "rerank_score": 0.61828305,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "wellness-healthy-lifestyle-action",
+          "title": "全民健康生活方式行动与「三减三健」",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.648332,
+          "keyword_score": 0.136364,
+          "vector_similarity": 0.648332,
+          "rerank_score": 0.57153716,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "wellness-healthy-lifestyle-action",
+          "title": "全民健康生活方式行动与「三减三健」",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.47075,
+          "keyword_score": 0.136364,
+          "vector_similarity": 0.47075,
+          "rerank_score": 0.42059188,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "330feafa9cd7458080c05dcdfd380af8.shtml",
+          "title": "关于印发健康中国行动——糖尿病防治行动实施方案（2024—2030年）的通知",
+          "source_key": "web_search_prototype",
+          "trust_level": "prototype",
+          "similarity": 0.439871,
+          "keyword_score": 0.136364,
+          "vector_similarity": 0.439871,
+          "rerank_score": 0.39434474,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 2,
+      "gate_profile": "candidate-threshold"
+    },
+    "fitness_how_hard_am_i_working": {
+      "case_id": "fitness_how_hard_am_i_working",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.673277,
+      "returned_slugs": [
+        "fitness-aerobic-intensity",
+        "fitness-aerobic-intensity"
+      ],
+      "returned_titles": [
+        "有氧运动强度怎么判断",
+        "有氧运动强度怎么判断"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "fitness-aerobic-intensity"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "fitness-aerobic-intensity",
+          "title": "有氧运动强度怎么判断",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.673277,
+          "keyword_score": null,
+          "vector_similarity": 0.673277,
+          "rerank_score": 0.57228519,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "fitness-aerobic-intensity",
+          "title": "有氧运动强度怎么判断",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.628013,
+          "keyword_score": 0.142857,
+          "vector_similarity": 0.628013,
+          "rerank_score": 0.55523982,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "wellness-diet-and-activity-balance",
+          "title": "吃动平衡与每周运动量",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.50779,
+          "keyword_score": null,
+          "vector_similarity": 0.50779,
+          "rerank_score": 0.43162146,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "fitness-pregnancy",
+          "title": "孕期身体活动的一般建议",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.506354,
+          "keyword_score": null,
+          "vector_similarity": 0.506354,
+          "rerank_score": 0.4304011,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 2,
+      "gate_profile": "candidate-threshold"
+    },
+    "fitness_want_to_train_strength": {
+      "case_id": "fitness_want_to_train_strength",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.650689,
+      "returned_slugs": [
+        "fitness-resistance-training"
+      ],
+      "returned_titles": [
+        "力量（抗阻）训练的原则与安全"
+      ],
+      "returned_trust_levels": [
+        "prototype"
+      ],
+      "expected_slugs": [
+        "fitness-resistance-training"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "fitness-resistance-training",
+          "title": "力量（抗阻）训练的原则与安全",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.650689,
+          "keyword_score": null,
+          "vector_similarity": 0.650689,
+          "rerank_score": 0.55308603,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "fitness-progression",
+          "title": "运动量为什么要循序渐进",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.535388,
+          "keyword_score": null,
+          "vector_similarity": 0.535388,
+          "rerank_score": 0.45508001,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "fitness-older-adults-falls",
+          "title": "老年人身体活动与防跌倒",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.496617,
+          "keyword_score": 0.15,
+          "vector_similarity": 0.496617,
+          "rerank_score": 0.44462476,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "fitness-stretching",
+          "title": "柔韧性与拉伸：什么时候拉、怎么拉",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.506714,
+          "keyword_score": null,
+          "vector_similarity": 0.506714,
+          "rerank_score": 0.43070692,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 3,
+      "gate_profile": "candidate-threshold"
+    },
+    "fitness_stretch_before_or_after": {
+      "case_id": "fitness_stretch_before_or_after",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.651396,
+      "returned_slugs": [
+        "fitness-stretching",
+        "fitness-recovery-sleep"
+      ],
+      "returned_titles": [
+        "柔韧性与拉伸：什么时候拉、怎么拉",
+        "运动后的恢复与睡眠"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "fitness-stretching"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "fitness-stretching",
+          "title": "柔韧性与拉伸：什么时候拉、怎么拉",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.651396,
+          "keyword_score": 0.192308,
+          "vector_similarity": 0.651396,
+          "rerank_score": 0.58253307,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "fitness-recovery-sleep",
+          "title": "运动后的恢复与睡眠",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.577726,
+          "keyword_score": 0.15,
+          "vector_similarity": 0.577726,
+          "rerank_score": 0.51356746,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "wellness-warmup-and-protection",
+          "title": "热身与运动时的保暖",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.524646,
+          "keyword_score": 0.1,
+          "vector_similarity": 0.524646,
+          "rerank_score": 0.4609495,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "wellness-warmup-and-protection",
+          "title": "热身与运动时的保暖",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.542147,
+          "keyword_score": null,
+          "vector_similarity": 0.542147,
+          "rerank_score": 0.46082496,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 2,
+      "gate_profile": "candidate-threshold"
+    },
+    "fitness_add_load_faster": {
+      "case_id": "fitness_add_load_faster",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.600128,
+      "returned_slugs": [
+        "fitness-progression"
+      ],
+      "returned_titles": [
+        "运动量为什么要循序渐进"
+      ],
+      "returned_trust_levels": [
+        "prototype"
+      ],
+      "expected_slugs": [
+        "fitness-progression"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "fitness-progression",
+          "title": "运动量为什么要循序渐进",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.600128,
+          "keyword_score": null,
+          "vector_similarity": 0.600128,
+          "rerank_score": 0.51010838,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "fitness-progression",
+          "title": "运动量为什么要循序渐进",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.549363,
+          "keyword_score": null,
+          "vector_similarity": 0.549363,
+          "rerank_score": 0.46695819,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "fitness-resistance-training",
+          "title": "力量（抗阻）训练的原则与安全",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.515466,
+          "keyword_score": null,
+          "vector_similarity": 0.515466,
+          "rerank_score": 0.43814622,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "wellness-physical-activity",
+          "title": "身体活动：为什么要动、动多少算够",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.504874,
+          "keyword_score": null,
+          "vector_similarity": 0.504874,
+          "rerank_score": 0.42914312,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 3,
+      "gate_profile": "candidate-threshold"
+    },
+    "fitness_child_daily_activity": {
+      "case_id": "fitness_child_daily_activity",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.704561,
+      "returned_slugs": [
+        "fitness-children-adolescents"
+      ],
+      "returned_titles": [
+        "儿童青少年身体活动建议"
+      ],
+      "returned_trust_levels": [
+        "prototype"
+      ],
+      "expected_slugs": [
+        "fitness-children-adolescents"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "fitness-children-adolescents",
+          "title": "儿童青少年身体活动建议",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.704561,
+          "keyword_score": null,
+          "vector_similarity": 0.704561,
+          "rerank_score": 0.59887659,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "wellness-sedentary-behaviour",
+          "title": "久坐行为与不活动的健康风险",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.54711,
+          "keyword_score": null,
+          "vector_similarity": 0.54711,
+          "rerank_score": 0.46504353,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "fitness-progression",
+          "title": "运动量为什么要循序渐进",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.531751,
+          "keyword_score": null,
+          "vector_similarity": 0.531751,
+          "rerank_score": 0.451988,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "wellness-diet-and-activity-balance",
+          "title": "吃动平衡与每周运动量",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.526686,
+          "keyword_score": null,
+          "vector_similarity": 0.526686,
+          "rerank_score": 0.44768275,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 3,
+      "gate_profile": "candidate-threshold"
+    },
+    "fitness_elderly_fear_of_falling": {
+      "case_id": "fitness_elderly_fear_of_falling",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 3,
+      "top_similarity": 0.691438,
+      "returned_slugs": [
+        "tcm-older-adults",
+        "tcm-traditional-exercises",
+        "fitness-older-adults-falls"
+      ],
+      "returned_titles": [
+        "老年人养生的通用注意",
+        "太极拳、八段锦等传统健身功法",
+        "老年人身体活动与防跌倒"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "fitness-older-adults-falls"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "tcm-older-adults",
+          "title": "老年人养生的通用注意",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.691438,
+          "keyword_score": null,
+          "vector_similarity": 0.691438,
+          "rerank_score": 0.58772196,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "tcm-traditional-exercises",
+          "title": "太极拳、八段锦等传统健身功法",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.69077,
+          "keyword_score": null,
+          "vector_similarity": 0.69077,
+          "rerank_score": 0.58715486,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "fitness-older-adults-falls",
+          "title": "老年人身体活动与防跌倒",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.6301,
+          "keyword_score": 0.105263,
+          "vector_similarity": 0.6301,
+          "rerank_score": 0.55137455,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "fitness-older-adults-falls",
+          "title": "老年人身体活动与防跌倒",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.558694,
+          "keyword_score": 0.105263,
+          "vector_similarity": 0.558694,
+          "rerank_score": 0.49067902,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 1,
+      "gate_profile": "candidate-threshold"
+    },
+    "fitness_pregnant_can_i_exercise": {
+      "case_id": "fitness_pregnant_can_i_exercise",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.668138,
+      "returned_slugs": [
+        "fitness-pregnancy",
+        "fitness-pregnancy",
+        "fitness-pregnancy"
+      ],
+      "returned_titles": [
+        "孕期身体活动的一般建议",
+        "孕期身体活动的一般建议",
+        "孕期身体活动的一般建议"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "fitness-pregnancy"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "fitness-pregnancy",
+          "title": "孕期身体活动的一般建议",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.668138,
+          "keyword_score": null,
+          "vector_similarity": 0.668138,
+          "rerank_score": 0.56791733,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "fitness-pregnancy",
+          "title": "孕期身体活动的一般建议",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.63499,
+          "keyword_score": null,
+          "vector_similarity": 0.63499,
+          "rerank_score": 0.53974114,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "fitness-pregnancy",
+          "title": "孕期身体活动的一般建议",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.573511,
+          "keyword_score": null,
+          "vector_similarity": 0.573511,
+          "rerank_score": 0.48748451,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "wellness-diet-and-activity-balance",
+          "title": "吃动平衡与每周运动量",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.559753,
+          "keyword_score": null,
+          "vector_similarity": 0.559753,
+          "rerank_score": 0.47578968,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 1,
+      "gate_profile": "candidate-threshold"
+    },
+    "fitness_chronic_disease_starting_out": {
+      "case_id": "fitness_chronic_disease_starting_out",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.740559,
+      "returned_slugs": [
+        "fitness-chronic-conditions",
+        "fitness-chronic-conditions",
+        "fitness-hydration-heat",
+        "wellness-fitness-guide-framework"
+      ],
+      "returned_titles": [
+        "高血压、糖尿病等慢病人群运动的通用注意",
+        "高血压、糖尿病等慢病人群运动的通用注意",
+        "运动补水与高温天气运动",
+        "科学健身先评估再安排"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "fitness-chronic-conditions"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "fitness-chronic-conditions",
+          "title": "高血压、糖尿病等慢病人群运动的通用注意",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.740559,
+          "keyword_score": 0.151515,
+          "vector_similarity": 0.740559,
+          "rerank_score": 0.65220267,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "fitness-chronic-conditions",
+          "title": "高血压、糖尿病等慢病人群运动的通用注意",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.643658,
+          "keyword_score": 0.1,
+          "vector_similarity": 0.643658,
+          "rerank_score": 0.56210952,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "fitness-hydration-heat",
+          "title": "运动补水与高温天气运动",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.598427,
+          "keyword_score": 0.130435,
+          "vector_similarity": 0.598427,
+          "rerank_score": 0.52822812,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "wellness-fitness-guide-framework",
+          "title": "科学健身先评估再安排",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.601715,
+          "keyword_score": 0.107143,
+          "vector_similarity": 0.601715,
+          "rerank_score": 0.52752919,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        }
+      ],
+      "filtered_count": 0,
+      "gate_profile": "candidate-threshold"
+    },
+    "fitness_summer_outdoor_workout": {
+      "case_id": "fitness_summer_outdoor_workout",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.621488,
+      "returned_slugs": [
+        "fitness-hydration-heat",
+        "fitness-hydration-heat"
+      ],
+      "returned_titles": [
+        "运动补水与高温天气运动",
+        "运动补水与高温天气运动"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "fitness-hydration-heat"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "fitness-hydration-heat",
+          "title": "运动补水与高温天气运动",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.621488,
+          "keyword_score": 0.157895,
+          "vector_similarity": 0.621488,
+          "rerank_score": 0.55194929,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "fitness-hydration-heat",
+          "title": "运动补水与高温天气运动",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.626352,
+          "keyword_score": null,
+          "vector_similarity": 0.626352,
+          "rerank_score": 0.53239928,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "fitness-hydration-heat",
+          "title": "运动补水与高温天气运动",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.547599,
+          "keyword_score": null,
+          "vector_similarity": 0.547599,
+          "rerank_score": 0.46545889,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "fitness-heatstroke-risk",
+          "title": "高温运动中的重症中暑（热射病）风险",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.529231,
+          "keyword_score": null,
+          "vector_similarity": 0.529231,
+          "rerank_score": 0.44984625,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 2,
+      "gate_profile": "candidate-threshold"
+    },
+    "fitness_heat_stroke_danger": {
+      "case_id": "fitness_heat_stroke_danger",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "urgent",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.612141,
+      "returned_slugs": [
+        "fitness-heatstroke-risk",
+        "fitness-heatstroke-risk",
+        "fitness-hydration-heat"
+      ],
+      "returned_titles": [
+        "高温运动中的重症中暑（热射病）风险",
+        "高温运动中的重症中暑（热射病）风险",
+        "运动补水与高温天气运动"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "fitness-heatstroke-risk"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "fitness-heatstroke-risk",
+          "title": "高温运动中的重症中暑（热射病）风险",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.612141,
+          "keyword_score": null,
+          "vector_similarity": 0.612141,
+          "rerank_score": 0.52031979,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "fitness-heatstroke-risk",
+          "title": "高温运动中的重症中暑（热射病）风险",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.602224,
+          "keyword_score": null,
+          "vector_similarity": 0.602224,
+          "rerank_score": 0.5118903,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "fitness-hydration-heat",
+          "title": "运动补水与高温天气运动",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.580186,
+          "keyword_score": null,
+          "vector_similarity": 0.580186,
+          "rerank_score": 0.49315799,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "fitness-heatstroke-risk",
+          "title": "高温运动中的重症中暑（热射病）风险",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.538477,
+          "keyword_score": null,
+          "vector_similarity": 0.538477,
+          "rerank_score": 0.45770563,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 1,
+      "gate_profile": "candidate-threshold"
+    },
+    "fitness_sprain_when_to_hospital": {
+      "case_id": "fitness_sprain_when_to_hospital",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "urgent",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.641398,
+      "returned_slugs": [
+        "fitness-injury-red-flags",
+        "fitness-injury-red-flags",
+        "wellness-warmup-and-protection",
+        "fitness-children-adolescents"
+      ],
+      "returned_titles": [
+        "运动损伤的就医信号",
+        "运动损伤的就医信号",
+        "热身与运动时的保暖",
+        "儿童青少年身体活动建议"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "fitness-injury-red-flags"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "fitness-injury-red-flags",
+          "title": "运动损伤的就医信号",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.641398,
+          "keyword_score": 0.125,
+          "vector_similarity": 0.641398,
+          "rerank_score": 0.56393867,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "fitness-injury-red-flags",
+          "title": "运动损伤的就医信号",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.600471,
+          "keyword_score": 0.125,
+          "vector_similarity": 0.600471,
+          "rerank_score": 0.52915075,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "wellness-warmup-and-protection",
+          "title": "热身与运动时的保暖",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.606474,
+          "keyword_score": null,
+          "vector_similarity": 0.606474,
+          "rerank_score": 0.51550314,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "fitness-children-adolescents",
+          "title": "儿童青少年身体活动建议",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.600679,
+          "keyword_score": null,
+          "vector_similarity": 0.600679,
+          "rerank_score": 0.51057686,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        }
+      ],
+      "filtered_count": 0,
+      "gate_profile": "candidate-threshold"
+    },
+    "fitness_night_neighbourhood_gym": {
+      "case_id": "fitness_night_neighbourhood_gym",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": false,
+      "passed": false,
+      "false_positive": false,
+      "matched_rank": null,
+      "top_similarity": null,
+      "returned_slugs": [],
+      "returned_titles": [],
+      "returned_trust_levels": [],
+      "expected_slugs": [
+        "fitness-equipment-venue-safety"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "fitness-equipment-venue-safety",
+          "title": "运动装备与场地安全",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.493137,
+          "keyword_score": 0.111111,
+          "vector_similarity": 0.493137,
+          "rerank_score": 0.43583292,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "fitness-equipment-venue-safety",
+          "title": "运动装备与场地安全",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.503739,
+          "keyword_score": null,
+          "vector_similarity": 0.503739,
+          "rerank_score": 0.42817816,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "fitness-equipment-venue-safety",
+          "title": "运动装备与场地安全",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.472685,
+          "keyword_score": 0.111111,
+          "vector_similarity": 0.472685,
+          "rerank_score": 0.41844879,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "fitness-older-adults-falls",
+          "title": "老年人身体活动与防跌倒",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.486248,
+          "keyword_score": null,
+          "vector_similarity": 0.486248,
+          "rerank_score": 0.4133108,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 4,
+      "gate_profile": "candidate-threshold"
+    },
+    "fitness_sore_after_training": {
+      "case_id": "fitness_sore_after_training",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.600144,
+      "returned_slugs": [
+        "fitness-recovery-sleep",
+        "fitness-recovery-sleep"
+      ],
+      "returned_titles": [
+        "运动后的恢复与睡眠",
+        "运动后的恢复与睡眠"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "fitness-recovery-sleep"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "fitness-recovery-sleep",
+          "title": "运动后的恢复与睡眠",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.600144,
+          "keyword_score": 0.105263,
+          "vector_similarity": 0.600144,
+          "rerank_score": 0.52591226,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "fitness-recovery-sleep",
+          "title": "运动后的恢复与睡眠",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.570574,
+          "keyword_score": null,
+          "vector_similarity": 0.570574,
+          "rerank_score": 0.48498748,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "fitness-recovery-sleep",
+          "title": "运动后的恢复与睡眠",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.509446,
+          "keyword_score": 0.173913,
+          "vector_similarity": 0.509446,
+          "rerank_score": 0.45911646,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "wellness-warmup-and-protection",
+          "title": "热身与运动时的保暖",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.472734,
+          "keyword_score": null,
+          "vector_similarity": 0.472734,
+          "rerank_score": 0.40182374,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 2,
+      "gate_profile": "candidate-threshold"
+    },
+    "tcm_sleep_hours_and_timing": {
+      "case_id": "tcm_sleep_hours_and_timing",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.748243,
+      "returned_slugs": [
+        "tcm-daily-routine-sleep",
+        "fitness-recovery-sleep"
+      ],
+      "returned_titles": [
+        "起居有常与睡眠习惯",
+        "运动后的恢复与睡眠"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "tcm-daily-routine-sleep"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "tcm-daily-routine-sleep",
+          "title": "起居有常与睡眠习惯",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.748243,
+          "keyword_score": null,
+          "vector_similarity": 0.748243,
+          "rerank_score": 0.63600625,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "fitness-recovery-sleep",
+          "title": "运动后的恢复与睡眠",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.563828,
+          "keyword_score": null,
+          "vector_similarity": 0.563828,
+          "rerank_score": 0.47925407,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "tcm-daily-routine-sleep",
+          "title": "起居有常与睡眠习惯",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.529816,
+          "keyword_score": null,
+          "vector_similarity": 0.529816,
+          "rerank_score": 0.45034399,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "tcm-older-adults",
+          "title": "老年人养生的通用注意",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.503025,
+          "keyword_score": null,
+          "vector_similarity": 0.503025,
+          "rerank_score": 0.42757151,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 2,
+      "gate_profile": "candidate-threshold"
+    },
+    "tcm_emotion_regulation": {
+      "case_id": "tcm_emotion_regulation",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.732036,
+      "returned_slugs": [
+        "tcm-emotional-regulation",
+        "tcm-emotional-regulation"
+      ],
+      "returned_titles": [
+        "情志调养：情绪与压力的日常调节",
+        "情志调养：情绪与压力的日常调节"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "tcm-emotional-regulation"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "tcm-emotional-regulation",
+          "title": "情志调养：情绪与压力的日常调节",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.732036,
+          "keyword_score": null,
+          "vector_similarity": 0.732036,
+          "rerank_score": 0.62223046,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "tcm-emotional-regulation",
+          "title": "情志调养：情绪与压力的日常调节",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.675174,
+          "keyword_score": null,
+          "vector_similarity": 0.675174,
+          "rerank_score": 0.57389801,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "tcm-emotional-regulation",
+          "title": "情志调养：情绪与压力的日常调节",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.506791,
+          "keyword_score": null,
+          "vector_similarity": 0.506791,
+          "rerank_score": 0.43077217,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "wellness-tcm-health-literacy",
+          "title": "中医养生的一般理念",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.473913,
+          "keyword_score": null,
+          "vector_similarity": 0.473913,
+          "rerank_score": 0.40282575,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 2,
+      "gate_profile": "candidate-threshold"
+    },
+    "tcm_season_change_routine": {
+      "case_id": "tcm_season_change_routine",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.599224,
+      "returned_slugs": [
+        "tcm-seasonal-routine"
+      ],
+      "returned_titles": [
+        "四季起居与顺时养生"
+      ],
+      "returned_trust_levels": [
+        "prototype"
+      ],
+      "expected_slugs": [
+        "tcm-seasonal-routine"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "tcm-seasonal-routine",
+          "title": "四季起居与顺时养生",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.599224,
+          "keyword_score": null,
+          "vector_similarity": 0.599224,
+          "rerank_score": 0.50934019,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "tcm-seasonal-routine",
+          "title": "四季起居与顺时养生",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.558744,
+          "keyword_score": null,
+          "vector_similarity": 0.558744,
+          "rerank_score": 0.4749322,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "tcm-emotional-regulation",
+          "title": "情志调养：情绪与压力的日常调节",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.553962,
+          "keyword_score": null,
+          "vector_similarity": 0.553962,
+          "rerank_score": 0.47086737,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "tcm-tonic-misconceptions",
+          "title": "药膳与进补的常见误区",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.516552,
+          "keyword_score": null,
+          "vector_similarity": 0.516552,
+          "rerank_score": 0.43906933,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 3,
+      "gate_profile": "candidate-threshold"
+    },
+    "tcm_eating_with_moderation": {
+      "case_id": "tcm_eating_with_moderation",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.636604,
+      "returned_slugs": [
+        "tcm-moderate-eating"
+      ],
+      "returned_titles": [
+        "饮食有节：规律进餐与不过饱"
+      ],
+      "returned_trust_levels": [
+        "prototype"
+      ],
+      "expected_slugs": [
+        "tcm-moderate-eating"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "tcm-moderate-eating",
+          "title": "饮食有节：规律进餐与不过饱",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.636604,
+          "keyword_score": 0.176471,
+          "vector_similarity": 0.636604,
+          "rerank_score": 0.56758389,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "wellness-tcm-health-literacy",
+          "title": "中医养生的一般理念",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.542139,
+          "keyword_score": null,
+          "vector_similarity": 0.542139,
+          "rerank_score": 0.46081826,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "tcm-moderate-eating",
+          "title": "饮食有节：规律进餐与不过饱",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.500942,
+          "keyword_score": 0.176471,
+          "vector_similarity": 0.500942,
+          "rerank_score": 0.45227119,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "tcm-tonic-misconceptions",
+          "title": "药膳与进补的常见误区",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.519195,
+          "keyword_score": null,
+          "vector_similarity": 0.519195,
+          "rerank_score": 0.44131558,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 3,
+      "gate_profile": "candidate-threshold"
+    },
+    "tcm_foot_soak_cautions": {
+      "case_id": "tcm_foot_soak_cautions",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.651526,
+      "returned_slugs": [
+        "tcm-foot-soak",
+        "tcm-foot-soak",
+        "tcm-foot-soak"
+      ],
+      "returned_titles": [
+        "足浴（泡脚）的常见说法与禁忌",
+        "足浴（泡脚）的常见说法与禁忌",
+        "足浴（泡脚）的常见说法与禁忌"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "tcm-foot-soak"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "tcm-foot-soak",
+          "title": "足浴（泡脚）的常见说法与禁忌",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.651526,
+          "keyword_score": null,
+          "vector_similarity": 0.651526,
+          "rerank_score": 0.55379743,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "tcm-foot-soak",
+          "title": "足浴（泡脚）的常见说法与禁忌",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.617046,
+          "keyword_score": null,
+          "vector_similarity": 0.617046,
+          "rerank_score": 0.52448875,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "tcm-foot-soak",
+          "title": "足浴（泡脚）的常见说法与禁忌",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.601753,
+          "keyword_score": null,
+          "vector_similarity": 0.601753,
+          "rerank_score": 0.51148998,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "tcm-cupping-gua-sha",
+          "title": "拔罐与刮痧的常见说法与政策边界",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.513289,
+          "keyword_score": null,
+          "vector_similarity": 0.513289,
+          "rerank_score": 0.43629603,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 1,
+      "gate_profile": "candidate-threshold"
+    },
+    "tcm_moxibustion_at_home": {
+      "case_id": "tcm_moxibustion_at_home",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.689276,
+      "returned_slugs": [
+        "tcm-moxibustion"
+      ],
+      "returned_titles": [
+        "艾灸的常见说法与风险边界"
+      ],
+      "returned_trust_levels": [
+        "prototype"
+      ],
+      "expected_slugs": [
+        "tcm-moxibustion"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "tcm-moxibustion",
+          "title": "艾灸的常见说法与风险边界",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.689276,
+          "keyword_score": null,
+          "vector_similarity": 0.689276,
+          "rerank_score": 0.58588466,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "tcm-cupping-gua-sha",
+          "title": "拔罐与刮痧的常见说法与政策边界",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.550892,
+          "keyword_score": 0.153846,
+          "vector_similarity": 0.550892,
+          "rerank_score": 0.49133497,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "tcm-moxibustion",
+          "title": "艾灸的常见说法与风险边界",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.508659,
+          "keyword_score": null,
+          "vector_similarity": 0.508659,
+          "rerank_score": 0.43236039,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "tcm-moxibustion",
+          "title": "艾灸的常见说法与风险边界",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.506615,
+          "keyword_score": null,
+          "vector_similarity": 0.506615,
+          "rerank_score": 0.43062308,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 3,
+      "gate_profile": "candidate-threshold"
+    },
+    "tcm_cupping_is_medical": {
+      "case_id": "tcm_cupping_is_medical",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.644334,
+      "returned_slugs": [
+        "tcm-cupping-gua-sha",
+        "tcm-moxibustion",
+        "tcm-cupping-gua-sha"
+      ],
+      "returned_titles": [
+        "拔罐与刮痧的常见说法与政策边界",
+        "艾灸的常见说法与风险边界",
+        "拔罐与刮痧的常见说法与政策边界"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "tcm-cupping-gua-sha"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "tcm-cupping-gua-sha",
+          "title": "拔罐与刮痧的常见说法与政策边界",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.644334,
+          "keyword_score": null,
+          "vector_similarity": 0.644334,
+          "rerank_score": 0.54768394,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "tcm-moxibustion",
+          "title": "艾灸的常见说法与风险边界",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.600986,
+          "keyword_score": null,
+          "vector_similarity": 0.600986,
+          "rerank_score": 0.51083821,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "tcm-cupping-gua-sha",
+          "title": "拔罐与刮痧的常见说法与政策边界",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.595081,
+          "keyword_score": null,
+          "vector_similarity": 0.595081,
+          "rerank_score": 0.5058191,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "tcm-acupoint-pressing",
+          "title": "穴位按压的常见说法与安全提醒",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.555057,
+          "keyword_score": null,
+          "vector_similarity": 0.555057,
+          "rerank_score": 0.47179842,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 1,
+      "gate_profile": "candidate-threshold"
+    },
+    "tcm_pressing_points_safely": {
+      "case_id": "tcm_pressing_points_safely",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": false,
+      "passed": false,
+      "false_positive": false,
+      "matched_rank": null,
+      "top_similarity": null,
+      "returned_slugs": [],
+      "returned_titles": [],
+      "returned_trust_levels": [],
+      "expected_slugs": [
+        "tcm-acupoint-pressing"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "tcm-acupoint-pressing",
+          "title": "穴位按压的常见说法与安全提醒",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.522101,
+          "keyword_score": null,
+          "vector_similarity": 0.522101,
+          "rerank_score": 0.44378613,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "tcm-acupoint-pressing",
+          "title": "穴位按压的常见说法与安全提醒",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.512271,
+          "keyword_score": null,
+          "vector_similarity": 0.512271,
+          "rerank_score": 0.43543053,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "tcm-cupping-gua-sha",
+          "title": "拔罐与刮痧的常见说法与政策边界",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.467295,
+          "keyword_score": null,
+          "vector_similarity": 0.467295,
+          "rerank_score": 0.3972005,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "tcm-moxibustion",
+          "title": "艾灸的常见说法与风险边界",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.4572,
+          "keyword_score": null,
+          "vector_similarity": 0.4572,
+          "rerank_score": 0.38862007,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 4,
+      "gate_profile": "candidate-threshold"
+    },
+    "tcm_baduanjin_for_elderly": {
+      "case_id": "tcm_baduanjin_for_elderly",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.646119,
+      "returned_slugs": [
+        "tcm-traditional-exercises",
+        "tcm-older-adults",
+        "tcm-traditional-exercises",
+        "tcm-traditional-exercises"
+      ],
+      "returned_titles": [
+        "太极拳、八段锦等传统健身功法",
+        "老年人养生的通用注意",
+        "太极拳、八段锦等传统健身功法",
+        "太极拳、八段锦等传统健身功法"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "tcm-traditional-exercises"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "tcm-traditional-exercises",
+          "title": "太极拳、八段锦等传统健身功法",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.646119,
+          "keyword_score": 0.266667,
+          "vector_similarity": 0.646119,
+          "rerank_score": 0.58920102,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "tcm-older-adults",
+          "title": "老年人养生的通用注意",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.600298,
+          "keyword_score": 0.266667,
+          "vector_similarity": 0.600298,
+          "rerank_score": 0.55025327,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "tcm-traditional-exercises",
+          "title": "太极拳、八段锦等传统健身功法",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.521853,
+          "keyword_score": 0.266667,
+          "vector_similarity": 0.521853,
+          "rerank_score": 0.48357487,
+          "kept": true,
+          "reason": "keyword-at-or-above-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "tcm-traditional-exercises",
+          "title": "太极拳、八段锦等传统健身功法",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.461584,
+          "keyword_score": 0.266667,
+          "vector_similarity": 0.461584,
+          "rerank_score": 0.43234637,
+          "kept": true,
+          "reason": "keyword-at-or-above-threshold"
+        }
+      ],
+      "filtered_count": 0,
+      "gate_profile": "candidate-threshold"
+    },
+    "tcm_autumn_tonic_myth": {
+      "case_id": "tcm_autumn_tonic_myth",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.640676,
+      "returned_slugs": [
+        "tcm-tonic-misconceptions"
+      ],
+      "returned_titles": [
+        "药膳与进补的常见误区"
+      ],
+      "returned_trust_levels": [
+        "prototype"
+      ],
+      "expected_slugs": [
+        "tcm-tonic-misconceptions"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "tcm-tonic-misconceptions",
+          "title": "药膳与进补的常见误区",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.640676,
+          "keyword_score": 0.125,
+          "vector_similarity": 0.640676,
+          "rerank_score": 0.5633246,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "tcm-seasonal-routine",
+          "title": "四季起居与顺时养生",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.484362,
+          "keyword_score": null,
+          "vector_similarity": 0.484362,
+          "rerank_score": 0.41170774,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "tcm-seasonal-routine",
+          "title": "四季起居与顺时养生",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.4837,
+          "keyword_score": null,
+          "vector_similarity": 0.4837,
+          "rerank_score": 0.41114468,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "tcm-seasonal-routine",
+          "title": "四季起居与顺时养生",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.462894,
+          "keyword_score": null,
+          "vector_similarity": 0.462894,
+          "rerank_score": 0.39345998,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 3,
+      "gate_profile": "candidate-threshold"
+    },
+    "tcm_nine_constitutions": {
+      "case_id": "tcm_nine_constitutions",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.700311,
+      "returned_slugs": [
+        "tcm-constitution-theory",
+        "tcm-constitution-theory",
+        "wellness-tcm-health-literacy"
+      ],
+      "returned_titles": [
+        "中医体质学说的科普",
+        "中医体质学说的科普",
+        "中医养生的一般理念"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "tcm-constitution-theory"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "tcm-constitution-theory",
+          "title": "中医体质学说的科普",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.700311,
+          "keyword_score": null,
+          "vector_similarity": 0.700311,
+          "rerank_score": 0.59526437,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "tcm-constitution-theory",
+          "title": "中医体质学说的科普",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.63007,
+          "keyword_score": null,
+          "vector_similarity": 0.63007,
+          "rerank_score": 0.53555909,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "wellness-tcm-health-literacy",
+          "title": "中医养生的一般理念",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.629773,
+          "keyword_score": null,
+          "vector_similarity": 0.629773,
+          "rerank_score": 0.53530734,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "tcm-dampness-framing",
+          "title": "「湿气」说法的理性说明",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.557171,
+          "keyword_score": null,
+          "vector_similarity": 0.557171,
+          "rerank_score": 0.47359493,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 1,
+      "gate_profile": "candidate-threshold"
+    },
+    "tcm_sanfu_patch_by_myself": {
+      "case_id": "tcm_sanfu_patch_by_myself",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.584622,
+      "returned_slugs": [
+        "tcm-sanfu-patch",
+        "tcm-sanfu-patch"
+      ],
+      "returned_titles": [
+        "「冬病夏治」与三伏贴的说明",
+        "「冬病夏治」与三伏贴的说明"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "tcm-sanfu-patch"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "tcm-sanfu-patch",
+          "title": "「冬病夏治」与三伏贴的说明",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.584622,
+          "keyword_score": 0.272727,
+          "vector_similarity": 0.584622,
+          "rerank_score": 0.5378376,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "tcm-sanfu-patch",
+          "title": "「冬病夏治」与三伏贴的说明",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.543576,
+          "keyword_score": 0.272727,
+          "vector_similarity": 0.543576,
+          "rerank_score": 0.50294891,
+          "kept": true,
+          "reason": "keyword-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "tcm-sanfu-patch",
+          "title": "「冬病夏治」与三伏贴的说明",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.492415,
+          "keyword_score": null,
+          "vector_similarity": 0.492415,
+          "rerank_score": 0.41855312,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "medicine-use",
+          "title": "合理用药与抗菌药物原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.434464,
+          "keyword_score": null,
+          "vector_similarity": 0.434464,
+          "rerank_score": 0.36929457,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 2,
+      "gate_profile": "candidate-threshold"
+    },
+    "tcm_dampness_is_not_diagnosis": {
+      "case_id": "tcm_dampness_is_not_diagnosis",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.709858,
+      "returned_slugs": [
+        "tcm-dampness-framing",
+        "tcm-dampness-framing",
+        "tcm-dampness-framing"
+      ],
+      "returned_titles": [
+        "「湿气」说法的理性说明",
+        "「湿气」说法的理性说明",
+        "「湿气」说法的理性说明"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "tcm-dampness-framing"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "tcm-dampness-framing",
+          "title": "「湿气」说法的理性说明",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.709858,
+          "keyword_score": 0.125,
+          "vector_similarity": 0.709858,
+          "rerank_score": 0.62212896,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "tcm-dampness-framing",
+          "title": "「湿气」说法的理性说明",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.696739,
+          "keyword_score": 0.125,
+          "vector_similarity": 0.696739,
+          "rerank_score": 0.61097816,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "tcm-dampness-framing",
+          "title": "「湿气」说法的理性说明",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.612764,
+          "keyword_score": null,
+          "vector_similarity": 0.612764,
+          "rerank_score": 0.52084938,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "tcm-constitution-theory",
+          "title": "中医体质学说的科普",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.507669,
+          "keyword_score": null,
+          "vector_similarity": 0.507669,
+          "rerank_score": 0.43151884,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 1,
+      "gate_profile": "candidate-threshold"
+    },
+    "tcm_elderly_health_cautions": {
+      "case_id": "tcm_elderly_health_cautions",
+      "case_type": "supported",
+      "body_system": "unspecified",
+      "query_style": "unspecified",
+      "safety_class": "education",
+      "split": "tune",
+      "hit": true,
+      "passed": true,
+      "false_positive": false,
+      "matched_rank": 1,
+      "top_similarity": 0.661995,
+      "returned_slugs": [
+        "tcm-older-adults",
+        "chronic-health"
+      ],
+      "returned_titles": [
+        "老年人养生的通用注意",
+        "常见慢性健康问题原型资料"
+      ],
+      "returned_trust_levels": [
+        "prototype",
+        "prototype"
+      ],
+      "expected_slugs": [
+        "tcm-older-adults"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "slug": "tcm-older-adults",
+          "title": "老年人养生的通用注意",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.661995,
+          "keyword_score": null,
+          "vector_similarity": 0.661995,
+          "rerank_score": 0.56269616,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 2,
+          "slug": "chronic-health",
+          "title": "常见慢性健康问题原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.620535,
+          "keyword_score": null,
+          "vector_similarity": 0.620535,
+          "rerank_score": 0.52745434,
+          "kept": true,
+          "reason": "vector-at-or-above-threshold"
+        },
+        {
+          "rank": 3,
+          "slug": "hypertension",
+          "title": "高血压认识与随访原型资料",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.548143,
+          "keyword_score": null,
+          "vector_similarity": 0.548143,
+          "rerank_score": 0.46592133,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        },
+        {
+          "rank": 4,
+          "slug": "tcm-traditional-exercises",
+          "title": "太极拳、八段锦等传统健身功法",
+          "source_key": "developer_prototype_knowledge",
+          "trust_level": "prototype",
+          "similarity": 0.544795,
+          "keyword_score": null,
+          "vector_similarity": 0.544795,
+          "rerank_score": 0.46307549,
+          "kept": false,
+          "reason": "vector-below-threshold"
+        }
+      ],
+      "filtered_count": 2,
+      "gate_profile": "candidate-threshold"
+    }
+  }
+}

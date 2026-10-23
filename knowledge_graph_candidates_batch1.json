@@ -1,0 +1,219 @@
+{
+  "package": "four_layer_batch1_graph_candidates",
+  "generated_by": "DSH",
+  "generated_at": "2026-10-06",
+  "status": "all_candidates_pending_human_review",
+  "hard_rules": [
+    "本文件全部条目为候选：review.decision 必须保持 pending，AI 不得写入 reviewed/approved/published。",
+    "每条关系的证据只能指向公共 knowledge_chunks；本文件里的 evidence 是待回填到 chunk 的原文摘录。",
+    "概念类型与关系类型取自冻结词表，未新增任何 predicate。",
+    "原文出现的药品名、剂量、疗程、个人化运动量化建议一律标入 prohibited_in_answer_layer，只作为审核材料，不进入回答层。"
+  ],
+  "vocabulary_frozen_from": [
+    "backend/app/models/knowledge_graph.py",
+    "backend/app/services/knowledge_graph_vocabulary.py"
+  ],
+  "concept_types_frozen": ["topic", "symptom", "department", "red_flag", "self_care"],
+  "predicate_type_rules": {
+    "MAY_INCLUDE_SYMPTOM": "topic -> symptom",
+    "HAS_RED_FLAG": "topic -> red_flag",
+    "SUGGESTS_DEPARTMENT": "topic -> department",
+    "HAS_SELF_CARE_TOPIC": "topic -> self_care",
+    "RELATED_TOPIC": "topic -> topic"
+  },
+  "license_basis": "北京市卫生健康委员会《法律声明》：本网站内容（除转载内容外）如需使用或转载，需注明转载来源。署名转载可用，本项目已双向核验（DSH 与 Codex 各自独立核对）。",
+  "fetch_evidence": "四篇原文均于 2026-10-06 由 DSH 实际抓取，HTTP 200。",
+  "topics": [
+    {
+      "topic_key": "pediatric_fever",
+      "knowledge_layer": "disease",
+      "title": "儿童发热",
+      "source": {
+        "site": "北京市卫生健康委员会",
+        "publisher": "首都医科大学附属北京佑安医院",
+        "url": "https://wjw.beijing.gov.cn/bmfw_20143/jkzs/jksh/202512/t20251216_4344978.html",
+        "title": "儿科科普，佑安专家告诉您宝宝发烧了物理降温还是吃退烧药？",
+        "published_on_page": "2025-12-08",
+        "url_date": "20251216",
+        "license": "署名转载可用（北京卫健委《法律声明》）"
+      },
+      "excerpts": [
+        "当孩子因为发烧表现出明显不适时（通常是体温超过38.5℃，且精神差）。主要目的是缓解不适，而非追求体温正常。",
+        "减少衣物、降低室温、保证液体摄入。让孩子感觉凉爽舒适即可。多喝水或奶，是最好、最安全的「降温药」。",
+        "捂汗：儿童体温调节中枢不完善，捂汗可能导致体温过高，引发热射病，非常危险！",
+        "酒精擦浴：酒精可通过皮肤吸收，可能导致孩子中毒或过敏。",
+        "退热贴：作用有限，主要是让家长心理安慰，如果孩子抗拒，不必强求。",
+        "简单流程：发烧且不适 → 根据体重服用一种退烧药 → 让孩子穿盖轻薄 → 鼓励多喝水 → 观察精神状态。"
+      ],
+      "concepts": [
+        {"concept_type": "topic", "canonical_name": "儿童发热"},
+        {"concept_type": "symptom", "canonical_name": "发热伴明显不适", "evidence": "当孩子因为发烧表现出明显不适时（通常是体温超过38.5℃，且精神差）"},
+        {"concept_type": "red_flag", "canonical_name": "捂汗导致体温过高甚至热射病", "evidence": "捂汗可能导致体温过高，引发热射病，非常危险！"},
+        {"concept_type": "red_flag", "canonical_name": "酒精擦浴导致中毒或过敏", "evidence": "酒精可通过皮肤吸收，可能导致孩子中毒或过敏。"},
+        {"concept_type": "self_care", "canonical_name": "减少衣物与保证液体摄入", "evidence": "减少衣物、降低室温、保证液体摄入。"},
+        {"concept_type": "self_care", "canonical_name": "观察精神状态", "evidence": "观察精神状态。"},
+        {"concept_type": "department", "canonical_name": "儿科", "evidence": "北京佑安医院儿科"}
+      ],
+      "candidate_triples": [
+        {"subject": "儿童发热", "predicate": "MAY_INCLUDE_SYMPTOM", "object": "发热伴明显不适", "review": {"decision": "pending"}},
+        {"subject": "儿童发热", "predicate": "HAS_RED_FLAG", "object": "捂汗导致体温过高甚至热射病", "review": {"decision": "pending"}},
+        {"subject": "儿童发热", "predicate": "HAS_RED_FLAG", "object": "酒精擦浴导致中毒或过敏", "review": {"decision": "pending"}},
+        {"subject": "儿童发热", "predicate": "HAS_SELF_CARE_TOPIC", "object": "减少衣物与保证液体摄入", "review": {"decision": "pending"}},
+        {"subject": "儿童发热", "predicate": "HAS_SELF_CARE_TOPIC", "object": "观察精神状态", "review": {"decision": "pending"}},
+        {"subject": "儿童发热", "predicate": "SUGGESTS_DEPARTMENT", "object": "儿科", "review": {"decision": "pending"}}
+      ],
+      "prohibited_in_answer_layer": [
+        "对乙酰氨基酚（适合3个月以上）与布洛芬（适合6个月以上）等具体药品名",
+        "根据体重计算剂量",
+        "对乙酰氨基酚至少间隔4小时、布洛芬至少间隔6小时、24小时内不超过4次"
+      ],
+      "open_questions_for_reviewer": [
+        "回答层是否允许出现「38.5℃」这类阈值？出现阈值可能被读成自行用药的门槛。",
+        "「儿科」是否直接作为通常咨询科室，还是要写「儿科/发热门诊」？",
+        "现有 predicate 没有否定语义，「禁止捂汗/禁止酒精擦浴」只能编码成 red_flag，是否可接受？"
+      ]
+    },
+    {
+      "topic_key": "temperature_regulation",
+      "knowledge_layer": "physiology",
+      "title": "体温调节与发热机制",
+      "source": {
+        "site": "北京市卫生健康委员会",
+        "publisher": "北京市垂杨柳医院",
+        "url": "https://wjw.beijing.gov.cn/bmfw_20143/jkzs/jksh/202509/t20250930_4214811.html",
+        "title": "【杨柳科普】发热和发炎的关系你了解吗？",
+        "published_on_page": "2025-09-30",
+        "license": "署名转载可用（北京卫健委《法律声明》）"
+      },
+      "excerpts": [
+        "发热（发烧）是指体温调节中枢（下丘脑）将体温「调高」的状态，通常体温超过37.3℃。",
+        "发热的三个关键特点：1.是全身性反应，不同于发炎的局部发热；2.由于致热源（如细菌、病毒、炎症因子）触发；3.属于主动调节，不是简单的体温失控。",
+        "发炎（炎症）是人体对损伤或感染的一种防御反应。",
+        "发炎的五大典型表现：红——血流增加；肿——液体渗出；热——局部温度升高；痛——神经受刺激；功能障碍。",
+        "充足的睡眠。合理的膳食。适度的运动。每周至少150分钟慢跑、健走、骑行等有氧运动，有助于降低促炎因子。",
+        "本文仅限于公益科普及学术交流，如有不适请及时就医。"
+      ],
+      "concepts": [
+        {"concept_type": "topic", "canonical_name": "发热"},
+        {"concept_type": "topic", "canonical_name": "炎症"},
+        {"concept_type": "symptom", "canonical_name": "局部红肿热痛与功能障碍", "evidence": "发炎的五大典型表现：红、肿、热、痛、功能障碍"},
+        {"concept_type": "self_care", "canonical_name": "睡眠、膳食与适度运动", "evidence": "充足的睡眠。合理的膳食。适度的运动。"}
+      ],
+      "candidate_triples": [
+        {"subject": "发热", "predicate": "RELATED_TOPIC", "object": "炎症", "review": {"decision": "pending"}},
+        {"subject": "炎症", "predicate": "MAY_INCLUDE_SYMPTOM", "object": "局部红肿热痛与功能障碍", "review": {"decision": "pending"}},
+        {"subject": "发热", "predicate": "HAS_SELF_CARE_TOPIC", "object": "睡眠、膳食与适度运动", "review": {"decision": "pending"}}
+      ],
+      "prohibited_in_answer_layer": [
+        "「每周至少150分钟有氧运动」等具体量化建议（个人化运动处方边界）",
+        "IL-1 / IL-6 / TNF-α / 前列腺素E2 等机制介质名称是否进回答层需人工确认"
+      ],
+      "open_questions_for_reviewer": [
+        "「通常体温超过37.3℃」是否作为可回答的常识阈值？",
+        "机制解释（下丘脑调高体温、致热源）要讲到多细，才不会读成确定病因？"
+      ]
+    },
+    {
+      "topic_key": "rational_antibiotic_use",
+      "knowledge_layer": "pharmacology",
+      "title": "合理使用抗菌药物",
+      "source": {
+        "site": "北京市卫生健康委员会",
+        "publisher": "北京市垂杨柳医院",
+        "url": "https://wjw.beijing.gov.cn/bmfw_20143/jkzs/jksh/202605/t20260506_4638136.html",
+        "title": "【杨柳科普】别让抗菌药变「伤身药」",
+        "published_on_page": "2026-05-06",
+        "license": "署名转载可用（北京卫健委《法律声明》）"
+      },
+      "excerpts": [
+        "抗菌药物≠消炎药≠感冒药，这是绝大多数患者最容易混淆的误区。抗菌药物是专门针对细菌起效的药物。",
+        "普通感冒、流感大多是病毒感染导致的，而抗菌药物对病毒是毫无作用的，盲目服用完全无效。",
+        "90%以上的上呼吸道感染（感冒、咽炎、扁桃体炎初期）都是病毒引起，无需用抗菌药。只有出现咳黄痰、流脓涕、高烧不退、血常规提示细菌感染时，才需要在医生指导下使用。",
+        "症状好转就停药，剩药留着下次用。这个习惯相当危险！抗菌药杀灭细菌需要足够疗程，症状好转不代表细菌被彻底清除。",
+        "细菌耐药性，目前是全球最严峻的健康危机。",
+        "不自行购买抗菌药物、严格按剂量、疗程服用。抗菌药物必须由医生根据病情、血常规、细菌培养等检查结果判断，切勿自行买药。不要擅自加量、减量、停药。",
+        "【本文仅限于公益科普及学术交流，如有不适请及时就医。文中部分资料来源网络及文献，侵删】"
+      ],
+      "concepts": [
+        {"concept_type": "topic", "canonical_name": "抗菌药物"},
+        {"concept_type": "topic", "canonical_name": "细菌耐药"},
+        {"concept_type": "symptom", "canonical_name": "用药后皮疹与局部红肿刺痛瘙痒", "evidence": "随后出现双臂红肿刺痛、瘙痒不适，用药第二天出现少量皮疹"},
+        {"concept_type": "red_flag", "canonical_name": "用药后出现不良反应需咨询专业人员", "evidence": "特前来药房窗口咨询药师，寻求专业解答"},
+        {"concept_type": "self_care", "canonical_name": "不自行购买、不擅自停药与加减量", "evidence": "切勿自行买药。不要擅自加量、减量、停药。"},
+        {"concept_type": "department", "canonical_name": "药学咨询窗口", "evidence": "清华大学附属垂杨柳医院药学咨询窗口"}
+      ],
+      "candidate_triples": [
+        {"subject": "抗菌药物", "predicate": "RELATED_TOPIC", "object": "细菌耐药", "review": {"decision": "pending"}},
+        {"subject": "抗菌药物", "predicate": "MAY_INCLUDE_SYMPTOM", "object": "用药后皮疹与局部红肿刺痛瘙痒", "review": {"decision": "pending"}},
+        {"subject": "抗菌药物", "predicate": "HAS_RED_FLAG", "object": "用药后出现不良反应需咨询专业人员", "review": {"decision": "pending"}},
+        {"subject": "抗菌药物", "predicate": "HAS_SELF_CARE_TOPIC", "object": "不自行购买、不擅自停药与加减量", "review": {"decision": "pending"}},
+        {"subject": "抗菌药物", "predicate": "SUGGESTS_DEPARTMENT", "object": "药学咨询窗口", "review": {"decision": "pending"}}
+      ],
+      "prohibited_in_answer_layer": [
+        "青霉素、头孢、阿奇霉素、左氧氟沙星等具体药品名（不得作为推荐用药出现）",
+        "「医生让吃7天，哪怕吃3天就不难受了，也要坚持吃完整个疗程」等具体疗程数字",
+        "「严格按剂量服用」需改写为「按医务人员说明使用」，避免被读成本产品给剂量"
+      ],
+      "open_questions_for_reviewer": [
+        "「药学咨询窗口」是否符合科室口径，还是改用「药房/药学门诊」？",
+        "「咳黄痰、流脓涕、高烧不退、血常规提示细菌感染」这类就医指征是否进回答层？"
+      ]
+    },
+    {
+      "topic_key": "safe_activity_start",
+      "knowledge_layer": "wellness_fitness",
+      "title": "科学健身起步",
+      "source": {
+        "site": "北京市卫生健康委员会",
+        "publisher": "北京大学第三医院",
+        "url": "https://wjw.beijing.gov.cn/xwzx_20031/jcdt/202504/t20250423_4072360.html",
+        "title": "北京大学第三医院运动医学科王健全参加国家卫健委新闻发布会 介绍科学运动相关内容",
+        "published_on_page": "2025-04-23",
+        "license": "署名转载可用（北京卫健委《法律声明》）"
+      },
+      "excerpts": [
+        "运动需要遵循「因人而异、循序渐进」的原则。首先，运动前要做好适当的准备活动，注意运动场地和环境因素。其次，不要一次运动时间过长，更不要在运动当中突然增加难度。最后，运动后要做好牵拉运动，放松肌肉和关节，同时也要注意休息。",
+        "运动过量不仅没有益处反而是有害的，运动能力不代表健康。如果出现心慌、心悸、大汗淋漓、肌肉疲劳等情况，说明运动量已经比较大，对身体可能造成损伤，就要停止或者减少运动量。",
+        "对于老年人群，运动前要进行很好的评估，防止运动中出现跌倒骨折或者心血管意外等。",
+        "如果受伤瞬间听到响声，感受到关节错动，或受伤后肢体有变形以及剧烈疼痛、迅速肿胀，一般来说可能存在关节脱位、韧带断裂或骨折，这种情况下要禁止活动，及时就医。",
+        "受伤以后，尽量要到医院就诊，让医生来进行判断。"
+      ],
+      "concepts": [
+        {"concept_type": "topic", "canonical_name": "科学运动"},
+        {"concept_type": "symptom", "canonical_name": "心慌心悸大汗与肌肉疲劳（运动过量信号）", "evidence": "如果出现心慌、心悸、大汗淋漓、肌肉疲劳等情况，说明运动量已经比较大"},
+        {"concept_type": "red_flag", "canonical_name": "关节错动、肢体变形、剧烈疼痛、迅速肿胀需禁止活动并及时就医", "evidence": "这种情况下要禁止活动，及时就医"},
+        {"concept_type": "self_care", "canonical_name": "准备活动、循序渐进与运动后牵拉", "evidence": "运动前要做好适当的准备活动……运动后要做好牵拉运动"},
+        {"concept_type": "self_care", "canonical_name": "损伤后加压包扎、抬高患肢与夹板保护", "evidence": "出现肿胀可以加压包扎……把肢体要抬高，高于心脏的位置"},
+        {"concept_type": "department", "canonical_name": "运动医学科", "evidence": "北京大学第三医院运动医学科"}
+      ],
+      "candidate_triples": [
+        {"subject": "科学运动", "predicate": "MAY_INCLUDE_SYMPTOM", "object": "心慌心悸大汗与肌肉疲劳（运动过量信号）", "review": {"decision": "pending"}},
+        {"subject": "科学运动", "predicate": "HAS_RED_FLAG", "object": "关节错动、肢体变形、剧烈疼痛、迅速肿胀需禁止活动并及时就医", "review": {"decision": "pending"}},
+        {"subject": "科学运动", "predicate": "HAS_SELF_CARE_TOPIC", "object": "准备活动、循序渐进与运动后牵拉", "review": {"decision": "pending"}},
+        {"subject": "科学运动", "predicate": "HAS_SELF_CARE_TOPIC", "object": "损伤后加压包扎、抬高患肢与夹板保护", "review": {"decision": "pending"}},
+        {"subject": "科学运动", "predicate": "SUGGESTS_DEPARTMENT", "object": "运动医学科", "review": {"decision": "pending"}}
+      ],
+      "prohibited_in_answer_layer": [
+        "糖尿病人群「饮食后1小时、中等强度、40分钟到1小时」等个人化运动处方",
+        "「每周至少150分钟」等具体强度/时长达标建议",
+        "各类人群（脂肪肝、糖尿病、老年）的分人群运动方案不得直接作为个人建议输出"
+      ],
+      "open_questions_for_reviewer": [
+        "分人群建议（老年、脂肪肝、糖尿病）能否进回答层，还是只保留「特殊人群先做评估」这一句？",
+        "损伤应急处理（加压包扎、抬高、夹板）属于自我照护还是需要先就医？"
+      ]
+    }
+  ],
+  "source_registry_gaps": [
+    "本包 4 篇都来自北京卫健委站点，许可依据同一份《法律声明》（署名可用），是本项目唯一已双向核验可用的来源。",
+    "内蒙古卫健委《网站声明》允许转载但要求非盈利使用，且抓取器实测 FETCH_FAILED。",
+    "四川省卫健委为「非商业转发 + 署名」，属法务判断。",
+    "中国疾控中心 /jkp/ 类页面的许可表述不明确，属法务判断。",
+    "药监局来源只适合核验注册事实，不能替代说明书或处方依据。"
+  ],
+  "next_step_owner": {
+    "content_and_candidates": "DSH 已完成（本文件）",
+    "medical_and_license_review": "需具备医学审核能力的真人；结论只能是 approved / rejected / returned，AI 不得代签",
+    "graph_validation_publication_projection": "Codex（校验、发布、投影与 G3 对比评测）"
+  }
+}

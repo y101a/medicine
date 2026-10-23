@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.models.knowledge import KnowledgeDocument
 from app.models.knowledge_graph import (
+    ConceptType,
     GraphClaim,
     GraphClaimPredicate,
     GraphClaimStatus,
@@ -89,6 +90,54 @@ async def find_public_concepts(db: AsyncSession, query: str) -> list[GraphConcep
         .limit(5)
     )
     return list(rows.all())
+
+
+async def find_public_question_concepts(db: AsyncSession, question: str) -> list[GraphConcept]:
+    """Match an explicit published topic name/alias locally; fail closed on ties.
+
+    This is separate from the web-search term extractor: ordinary graph topics
+    such as 儿童发热 need not be unknown disease names. Nothing is sent to Neo4j
+    except the selected concept UUID.
+    """
+
+    if not get_settings().neo4j_read_enabled or not 2 <= len(question.strip()) <= 2000:
+        return []
+    try:
+        normalized = normalize_concept_name(question)
+    except KnowledgeGraphVocabularyError:
+        return []
+    ids = select(GraphClaim.subject_concept_id).where(
+        GraphClaim.status == GraphClaimStatus.PUBLISHED,
+        GraphClaim.review_decision == GraphReviewDecision.APPROVED,
+    )
+    concepts = list((await db.scalars(
+        select(GraphConcept).where(
+            GraphConcept.status == GraphConceptStatus.ACTIVE,
+            GraphConcept.concept_type == ConceptType.TOPIC,
+            GraphConcept.id.in_(ids),
+        ).limit(2001)
+    )).all())
+    if len(concepts) > 2000 or not concepts:
+        return []
+    concept_ids = [concept.id for concept in concepts]
+    aliases = (await db.scalars(
+        select(GraphConceptAlias).where(
+            GraphConceptAlias.concept_id.in_(concept_ids),
+            GraphConceptAlias.status == GraphConceptStatus.ACTIVE,
+        )
+    )).all()
+    terms: dict[UUID, set[str]] = {
+        concept.id: {concept.normalized_name} for concept in concepts
+    }
+    for alias in aliases:
+        terms[alias.concept_id].add(alias.normalized_text)
+    ranked = [
+        (max((len(term) for term in terms[concept.id]
+              if len(term) >= 2 and term in normalized), default=0), concept)
+        for concept in concepts
+    ]
+    best = max((length for length, _ in ranked), default=0)
+    return [concept for length, concept in ranked if length == best] if best else []
 
 
 def _read_graph(

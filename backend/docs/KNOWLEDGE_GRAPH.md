@@ -1,5 +1,61 @@
 # 知识图谱治理层与 G2 全量投影
 
+## 暂未经专业医学审核的评测数据（2026-10-08）
+
+首批四层候选包仍是 `pending`，不能把项目作者或机器的来源一致性检查写成
+“医学审核通过”。使用 `python -m app.knowledge_graph_candidate_check --file
+../knowledge_graph_candidates_batch1.json --evaluation-manifest` 可只读生成
+`data_scope=evaluation_only`、`medical_review_label=暂未经专业医学审核`、
+`eligible_for_publication=false` 的评测清单。命令不连接 PostgreSQL、Neo4j，
+不修改候选状态，也不调用正式 `approve-claim`/`publish`。来源 URL、摘录或候选
+证据校验有问题时只输出问题，不生成可用清单。当前候选包若仍有证据缺口，应先
+修正来源摘录；这项机器校验不证明医学正确性或版权许可。
+
+这个清单**不能**进入正常用户咨询。后续实际 PostgreSQL/Neo4j 投影及 RAG A/B
+评测必须使用隔离的测试环境和独立题集；未完成前不得宣称正式数据已发布或图谱
+已增强线上回答。原有 `approved` 发布门槛保持不变。
+
+首批隔离评测材料在 `docs/knowledge_graph_evaluation_batch1.json`（4 主题、9 条
+`pending` 候选关系）及 `docs/knowledge_graph_evaluation_batch1_cases.json`（18 题，
+含 tune/holdout、无覆盖、易混和撤回场景）。它是从公开原文逐项筛选的评测副本，
+不是 DSH 维护的原候选包，也没有给任何关系补“医学审核通过”状态。历史 18 题的
+隔离 PostgreSQL/Neo4j 逐题结果保存在
+`docs/knowledge_graph_evaluation_batch1_isolated_result.json`：12 道有关系题中，
+RAG 命中预期来源 6 道、图谱命中预期对象 4 道；6 道负例无图谱误返回。
+这是检索工程结果，不是回答质量或医学正确率。
+
+2026-10-14 新增 `docs/knowledge_graph_evaluation_batch2_cases.json`：51 道全部冻结的
+新 holdout，25 道已收录关系题覆盖全部 9 个候选对象，26 道无覆盖/易混负例。
+历史 18 道原题和结果未改。连同 `medical_retrieval_evaluation_v2.json` 的 80 道、
+`medical_retrieval_evaluation_independent.json` 的 51 道，四份题集共 **200 道精确去重问题**，
+其中图谱专项共 69 道。四份题集目标、语料与指标不同，**不得相加成一个统一的 200 题
+准确率**；尤其原型语料同轮形成的 51 题不能称为独立留出集。
+
+新增 51 道已在临时隔离 PostgreSQL/Neo4j 上实跑，逐题结果见
+`docs/knowledge_graph_evaluation_batch2_isolated_result.json`（含冻结题集 SHA-256）。
+25 道关系题中，关键词 RAG 命中预期来源 **22/25**，图谱命中预期对象 **15/25**；
+26 道无覆盖/易混负例中，**15/26** 返回了题目未要求的关系。10 道关系漏命中里：
+3 道上游 RAG 没命中来源；另有 5 道虽然命中来源，但主题词面匹配未触发图谱；
+剩余 2 道虽触发图谱，证据块 ID 没有同时出现在本轮 RAG 来源中。负例误返回主要
+暴露当前图谱读取逻辑只按主题+证据块筛选，没有按问题意图筛选目标关系；这不等于
+模型已经给出错误医学回答，本评测不含模型生成。所有指标仅描述这批人工构造的
+4 主题、9 关系测试，不可外推为临床准确率，也不能宣称完成统一的 200 题评测。
+
+隔离环境就绪后分别运行：
+
+```powershell
+cd backend
+.\.venv-codex\Scripts\python.exe -m app.knowledge_graph_evaluation --isolated-eval --case-set batch1
+.\.venv-codex\Scripts\python.exe -m app.knowledge_graph_evaluation --isolated-eval --case-set batch2
+```
+
+评测程序仅允许 `medical_assistant_graph_eval:55432`，并拒绝覆盖非空 Neo4j；
+启动隔离容器和写入测试图前须另行确认。两批报告应分开保存；本次 batch2 已查看，
+今后如果按失败题修改主题匹配或关系门槛，就不能再把本批作为未见过的 holdout。
+
+咨询图谱主题识别已与陌生病名联网提取器分离：只在 PostgreSQL 本地对已发布的
+topic 名称/别名做明确词面匹配，歧义时不使用图谱；发往 Neo4j 的仍只有概念 UUID。
+
 ## G2 只读查询与 G4 受控接线（2026-10-06）
 
 后端现有 `GET /api/v1/knowledge-graph/concepts?query=...` 和

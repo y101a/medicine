@@ -78,6 +78,24 @@ def test_explore_contract_rejects_cypher_and_unbounded_depth():
         GraphExploreIn.model_validate({"conceptId": str(uuid4()), "depth": 3})
 
 
+async def test_question_topic_match_uses_published_names_and_aliases(
+    profile_context, monkeypatch
+):
+    _, db, _ = profile_context
+    await extracted_fixture(db)
+    await approve_all_candidates(db)
+    await enqueue_publication(db, actor="图谱测试")
+    monkeypatch.setattr(query.get_settings(), "neo4j_read_enabled", True)
+
+    exact = await query.find_public_question_concepts(db, "肺癌有哪些常见表现？")
+    alias = await query.find_public_question_concepts(db, "支气管肺癌的科普资料？")
+    unrelated = await query.find_public_question_concepts(db, "今天天气怎样？")
+
+    assert [item.canonical_name for item in exact] == ["肺癌"]
+    assert [item.canonical_name for item in alias] == ["肺癌"]
+    assert unrelated == []
+
+
 async def test_unknown_predicate_rejected_before_database(profile_context):
     _, db, _ = profile_context
     with pytest.raises(ValueError, match="关系类型"):

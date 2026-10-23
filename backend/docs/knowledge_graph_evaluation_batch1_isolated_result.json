@@ -1,0 +1,287 @@
+{
+  "medical_review_label": "暂未经专业医学审核",
+  "mode": "real_postgresql_keyword_rag_vs_evaluation_neo4j",
+  "answer_quality_scored": false,
+  "cases": 18,
+  "rag_source_hits": 6,
+  "supported_cases": 12,
+  "graph_expected_hits": 4,
+  "negative_graph_returns": 0,
+  "negative_cases": 6,
+  "results": [
+    {
+      "id": "fever_discomfort",
+      "split": "tune",
+      "case_type": "supported",
+      "rag_source_hit": false,
+      "graph_triggered": true,
+      "graph_objects": [],
+      "expected_objects": [
+        "发热伴明显不适"
+      ],
+      "graph_expected_hit": false,
+      "graph_unexpected": [],
+      "rag_ms": 16.3,
+      "graph_extra_ms": 269.3
+    },
+    {
+      "id": "fever_clothing",
+      "split": "holdout",
+      "case_type": "supported",
+      "rag_source_hit": false,
+      "graph_triggered": true,
+      "graph_objects": [],
+      "expected_objects": [
+        "减少衣物与保证液体摄入"
+      ],
+      "graph_expected_hit": false,
+      "graph_unexpected": [],
+      "rag_ms": 5.3,
+      "graph_extra_ms": 11.3
+    },
+    {
+      "id": "fever_drink",
+      "split": "tune",
+      "case_type": "supported",
+      "rag_source_hit": true,
+      "graph_triggered": true,
+      "graph_objects": [
+        "减少衣物与保证液体摄入",
+        "发热伴明显不适",
+        "观察精神状态"
+      ],
+      "expected_objects": [
+        "减少衣物与保证液体摄入"
+      ],
+      "graph_expected_hit": true,
+      "graph_unexpected": [
+        "发热伴明显不适",
+        "观察精神状态"
+      ],
+      "rag_ms": 5.5,
+      "graph_extra_ms": 7.4
+    },
+    {
+      "id": "fever_observe",
+      "split": "holdout",
+      "case_type": "supported",
+      "rag_source_hit": false,
+      "graph_triggered": true,
+      "graph_objects": [],
+      "expected_objects": [
+        "观察精神状态"
+      ],
+      "graph_expected_hit": false,
+      "graph_unexpected": [],
+      "rag_ms": 4.6,
+      "graph_extra_ms": 9.2
+    },
+    {
+      "id": "fever_dose_negative",
+      "split": "holdout",
+      "case_type": "unsupported",
+      "rag_source_hit": false,
+      "graph_triggered": false,
+      "graph_objects": [],
+      "expected_objects": [],
+      "graph_expected_hit": false,
+      "graph_unexpected": [],
+      "rag_ms": 4.4,
+      "graph_extra_ms": 0.0
+    },
+    {
+      "id": "inflammation_signs",
+      "split": "tune",
+      "case_type": "supported",
+      "rag_source_hit": true,
+      "graph_triggered": true,
+      "graph_objects": [
+        "局部红肿热痛与功能障碍"
+      ],
+      "expected_objects": [
+        "局部红肿热痛与功能障碍"
+      ],
+      "graph_expected_hit": true,
+      "graph_unexpected": [],
+      "rag_ms": 7.0,
+      "graph_extra_ms": 7.7
+    },
+    {
+      "id": "inflammation_function",
+      "split": "holdout",
+      "case_type": "supported",
+      "rag_source_hit": true,
+      "graph_triggered": true,
+      "graph_objects": [],
+      "expected_objects": [
+        "局部红肿热痛与功能障碍"
+      ],
+      "graph_expected_hit": false,
+      "graph_unexpected": [],
+      "rag_ms": 4.5,
+      "graph_extra_ms": 8.3
+    },
+    {
+      "id": "fever_inflammation_relation",
+      "split": "tune",
+      "case_type": "supported",
+      "rag_source_hit": true,
+      "graph_triggered": false,
+      "graph_objects": [],
+      "expected_objects": [
+        "炎症"
+      ],
+      "graph_expected_hit": false,
+      "graph_unexpected": [],
+      "rag_ms": 4.7,
+      "graph_extra_ms": 0.0
+    },
+    {
+      "id": "inflammation_antibiotic_confusable",
+      "split": "holdout",
+      "case_type": "confusable",
+      "rag_source_hit": false,
+      "graph_triggered": true,
+      "graph_objects": [],
+      "expected_objects": [],
+      "graph_expected_hit": false,
+      "graph_unexpected": [],
+      "rag_ms": 3.9,
+      "graph_extra_ms": 8.4
+    },
+    {
+      "id": "antibiotic_resistance",
+      "split": "tune",
+      "case_type": "supported",
+      "rag_source_hit": false,
+      "graph_triggered": true,
+      "graph_objects": [],
+      "expected_objects": [
+        "细菌耐药"
+      ],
+      "graph_expected_hit": false,
+      "graph_unexpected": [],
+      "rag_ms": 4.3,
+      "graph_extra_ms": 7.8
+    },
+    {
+      "id": "antibiotic_self_purchase",
+      "split": "holdout",
+      "case_type": "supported",
+      "rag_source_hit": true,
+      "graph_triggered": true,
+      "graph_objects": [
+        "不自行购买或擅自调整抗菌药",
+        "细菌耐药"
+      ],
+      "expected_objects": [
+        "不自行购买或擅自调整抗菌药"
+      ],
+      "graph_expected_hit": true,
+      "graph_unexpected": [
+        "细菌耐药"
+      ],
+      "rag_ms": 4.9,
+      "graph_extra_ms": 7.6
+    },
+    {
+      "id": "antibiotic_specific_drug_negative",
+      "split": "holdout",
+      "case_type": "unsupported",
+      "rag_source_hit": false,
+      "graph_triggered": true,
+      "graph_objects": [],
+      "expected_objects": [],
+      "graph_expected_hit": false,
+      "graph_unexpected": [],
+      "rag_ms": 4.7,
+      "graph_extra_ms": 7.6
+    },
+    {
+      "id": "antibiotic_case_generalization",
+      "split": "tune",
+      "case_type": "confusable",
+      "rag_source_hit": false,
+      "graph_triggered": true,
+      "graph_objects": [],
+      "expected_objects": [],
+      "graph_expected_hit": false,
+      "graph_unexpected": [],
+      "rag_ms": 3.7,
+      "graph_extra_ms": 19.1
+    },
+    {
+      "id": "activity_prepare",
+      "split": "tune",
+      "case_type": "supported",
+      "rag_source_hit": true,
+      "graph_triggered": true,
+      "graph_objects": [
+        "循序渐进并做好准备活动"
+      ],
+      "expected_objects": [
+        "循序渐进并做好准备活动"
+      ],
+      "graph_expected_hit": true,
+      "graph_unexpected": [],
+      "rag_ms": 5.4,
+      "graph_extra_ms": 8.1
+    },
+    {
+      "id": "activity_gradual",
+      "split": "holdout",
+      "case_type": "supported",
+      "rag_source_hit": false,
+      "graph_triggered": true,
+      "graph_objects": [],
+      "expected_objects": [
+        "循序渐进并做好准备活动"
+      ],
+      "graph_expected_hit": false,
+      "graph_unexpected": [],
+      "rag_ms": 4.5,
+      "graph_extra_ms": 10.1
+    },
+    {
+      "id": "activity_injury",
+      "split": "holdout",
+      "case_type": "supported",
+      "rag_source_hit": false,
+      "graph_triggered": true,
+      "graph_objects": [],
+      "expected_objects": [
+        "严重运动损伤需停止活动并就医"
+      ],
+      "graph_expected_hit": false,
+      "graph_unexpected": [],
+      "rag_ms": 4.2,
+      "graph_extra_ms": 6.6
+    },
+    {
+      "id": "activity_personal_target_negative",
+      "split": "tune",
+      "case_type": "unsupported",
+      "rag_source_hit": false,
+      "graph_triggered": false,
+      "graph_objects": [],
+      "expected_objects": [],
+      "graph_expected_hit": false,
+      "graph_unexpected": [],
+      "rag_ms": 5.6,
+      "graph_extra_ms": 0.0
+    },
+    {
+      "id": "retired_relation",
+      "split": "holdout",
+      "case_type": "withdrawn",
+      "rag_source_hit": false,
+      "graph_triggered": true,
+      "graph_objects": [],
+      "expected_objects": [],
+      "graph_expected_hit": false,
+      "graph_unexpected": [],
+      "rag_ms": 3.8,
+      "graph_extra_ms": 8.6
+    }
+  ]
+}

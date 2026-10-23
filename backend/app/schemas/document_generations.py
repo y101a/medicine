@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -46,6 +46,7 @@ class DocumentGenerationOut(BaseModel):
     expires_at: datetime | None = Field(default=None, serialization_alias="expiresAt")
     created_at: datetime = Field(serialization_alias="createdAt")
     updated_at: datetime = Field(serialization_alias="updatedAt")
+    workflow: dict[str, Any] | None = None
 
 
 class DocumentGenerationList(BaseModel):

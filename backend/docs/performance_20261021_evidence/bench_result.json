@@ -1,0 +1,87 @@
+[
+  {
+    "scenario": "login（Argon2 校验 + 写会话）",
+    "concurrency": 30,
+    "seconds": 13.0,
+    "requests": 101,
+    "ok": 101,
+    "errors": 0,
+    "rps": 7.8,
+    "status_codes": {
+      "200": 101
+    },
+    "mean": 3509.0,
+    "p50": 3378.6,
+    "p90": 5293.5,
+    "p99": 7897.7,
+    "max": 8574.1
+  },
+  {
+    "scenario": "list_consultations（分页读）",
+    "concurrency": 30,
+    "seconds": 10.63,
+    "requests": 757,
+    "ok": 757,
+    "errors": 0,
+    "rps": 71.2,
+    "status_codes": {
+      "200": 757
+    },
+    "mean": 414.4,
+    "p50": 356.1,
+    "p90": 728.4,
+    "p99": 1096.5,
+    "max": 1282.1
+  },
+  {
+    "scenario": "create_consultation（写）",
+    "concurrency": 30,
+    "seconds": 10.14,
+    "requests": 656,
+    "ok": 656,
+    "errors": 0,
+    "rps": 64.7,
+    "status_codes": {
+      "201": 656
+    },
+    "mean": 460.5,
+    "p50": 399.8,
+    "p90": 801.3,
+    "p99": 1280.8,
+    "max": 1467.4
+  },
+  {
+    "scenario": "post_message（写 + 红旗预检）",
+    "concurrency": 30,
+    "seconds": 10.46,
+    "requests": 507,
+    "ok": 507,
+    "errors": 0,
+    "rps": 48.5,
+    "status_codes": {
+      "201": 507
+    },
+    "mean": 604.2,
+    "p50": 376.9,
+    "p90": 1350.8,
+    "p99": 2127.4,
+    "max": 3881.9
+  },
+  {
+    "scenario": "get_messages（分页读）",
+    "concurrency": 30,
+    "seconds": 10.57,
+    "requests": 511,
+    "ok": 511,
+    "errors": 0,
+    "rps": 48.3,
+    "status_codes": {
+      "200": 511
+    },
+    "mean": 610.0,
+    "p50": 539.0,
+    "p90": 1003.0,
+    "p99": 1509.4,
+    "max": 2210.5
+  }
+]

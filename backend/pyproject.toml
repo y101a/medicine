@@ -9,6 +9,7 @@ description = "病理诊断科普助手后端"
 requires-python = ">=3.12"
 dependencies = [
   "alembic>=1.16,<2",
+    "anyio>=4,<5",
   "av>=14,<17",
   "cryptography>=45,<47",
   "fastapi>=0.116,<1",
@@ -26,6 +27,7 @@ dependencies = [
   "pydantic-settings>=2.10,<3",
   "pyjwt>=2.10,<3",
   "sqlalchemy[asyncio]>=2.0.41,<3",
+  "tokenizers>=0.22,<0.23",
   "uvicorn[standard]>=0.35,<1",
   "tzdata>=2025.2; platform_system == 'Windows'",
 ]

@@ -138,6 +138,10 @@ HISTORY_BEFORE = re.compile(r"(?:既往|曾经|以前|过去|多年前)[^，。�
 RESOLVED_AFTER = re.compile(r"^(?:已经?|现已)?(?:缓解|好了|消失|恢复)")
 SPLIT_SENTENCE = re.compile(r"[，,。.!！?？；;\n]+")
 CHEST_PAIN_PATTERN = re.compile(r"胸(?:口|部)?[^，。！？；]{0,6}(?:痛|疼|压迫|压榨|憋闷)")
+STROKE_SPEECH_PATTERN = re.compile(r"(?:说话|讲话|言语)(?:突然|开始|变得)?(?:含糊不清|含混不清)")
+STROKE_WEAKNESS_PATTERN = re.compile(
+    r"(?:半边身子|半边身体|一侧身体|一边身子)(?:突然)?(?:使不上劲|没劲|无力)"
+)
 PREGNANCY_EMERGENCY_PATTERN = re.compile(
     r"(?:孕妇|怀孕|孕期|产后)[^，。！？；]{0,8}(?:大量出血|大出血|抽搐|剧烈腹痛)"
 )
@@ -148,7 +152,7 @@ EDUCATIONAL_CONTEXT = re.compile(
 CURRENT_CONTEXT = re.compile(
     r"(?:(?:我|本人|家人|孩子|老人|他|她|患者)"
     r"(?:现在|目前|刚才|刚刚|突然|正在|有|出现|感觉|发生)|"
-    r"现在|目前|刚才|刚刚|突然|正在|已经出现)"
+    r"^(?:现在|目前|刚才|刚刚|突然|正在|已经出现))"
 )
 
 
@@ -212,6 +216,12 @@ def evaluate_triage(content: str, assessed_at: datetime | None = None) -> Triage
         matched = any(_active_term(sentence, term) for sentence in sentences for term in rule.terms)
         if rule.id == "acute_chest_pain" and not matched:
             matched = any(_active_pattern(sentence, CHEST_PAIN_PATTERN) for sentence in sentences)
+        if rule.id == "stroke_warning" and not matched:
+            matched = any(
+                _active_pattern(sentence, pattern)
+                for sentence in sentences
+                for pattern in (STROKE_SPEECH_PATTERN, STROKE_WEAKNESS_PATTERN)
+            )
         if rule.id == "pregnancy_emergency" and not matched:
             matched = any(
                 _active_pattern(sentence, PREGNANCY_EMERGENCY_PATTERN) for sentence in sentences

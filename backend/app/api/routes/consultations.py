@@ -9,6 +9,9 @@ from fastapi.responses import StreamingResponse
 from app.ai import provider
 from app.ai.attachment_context import build_attachment_context
 from app.ai.card_intent import requests_pathology_card, requests_previous_card
+from app.ai.consultation_evidence_reviewer import check_answer_evidence, reviewable_answer
+from app.ai.consultation_planner import plan_consultation_answer
+from app.ai.context_budget import select_recent_history
 from app.ai.follow_up import (
     FOLLOW_UP_PREFIX,
     is_follow_up_prefix_fragment,
@@ -25,6 +28,8 @@ from app.ai.private_knowledge_context import (
     audit_private_citations,
     build_private_knowledge_context,
 )
+from app.ai.provider import is_identity_only_question
+from app.ai.workflow_progress import consultation_workflow
 from app.api.dependencies import CurrentUser, DbSession
 from app.core.config import get_settings
 from app.core.errors import AppError
@@ -41,6 +46,7 @@ from app.schemas.consultations import (
 )
 from app.services import attachments as attachment_service
 from app.services import consultations as service
+from app.services import conversation_memory as memory_service
 from app.services import health_records as health_service
 from app.services.model_credentials import get_model_for_user
 
@@ -97,6 +103,7 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
     source_message_id = getattr(payload, "source_message_id", None)
     answer_format = payload.answer_format
     user_message_id: UUID | None = None
+    first_recent_sequence: int | None = None
     if source_message_id is not None:
         if payload.answer_format != "card":
             raise AppError(
@@ -116,6 +123,7 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
         # Two-item compatibility keeps lightweight route tests and older service
         # doubles valid; the real service supplies the selected user message ID.
         user_message_id = history_result[2] if len(history_result) > 2 else None
+        first_recent_sequence = history_result[3] if len(history_result) > 3 else None
         user_text = history[-1]["content"]
         if answer_format == "plain" and requests_pathology_card(user_text):
             if evaluate_retrieval_gate(user_text).should_retrieve:
@@ -238,6 +246,66 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
             }
         )
     await db.commit()
+    if safety_reply is None:
+        system_content = provider.consultation_system_content(
+            model, answer_format, rag_context, private_context
+        )
+        history, omitted, memory_allowed = select_recent_history(
+            history,
+            system_content=system_content,
+            context_budget_tokens=graph_settings.ai_context_budget_tokens,
+            output_reserve_tokens=graph_settings.ai_output_reserve_tokens,
+            has_older_messages=bool(
+                source_message_id is None
+                and first_recent_sequence is not None
+                and first_recent_sequence > 1
+            ),
+            planner_enabled=graph_settings.multi_agent_enabled,
+        )
+        if source_message_id is None and first_recent_sequence is not None:
+            first_recent_sequence += omitted
+            if first_recent_sequence > 1 and memory_allowed:
+                try:
+                    memory_context = await memory_service.build_context(
+                        db, user.id, cid, first_recent_sequence
+                    )
+                    if memory_context:
+                        # Old user excerpts remain user data, never system instructions.
+                        history.insert(0, {"role": "user", "content": memory_context})
+                except Exception:
+                    logger.exception("conversation_memory_unavailable consultation_id=%s", cid)
+                    await db.rollback()
+    planner_status = "skipped"
+    if (
+        graph_settings.multi_agent_enabled
+        and safety_reply is None
+        and not is_identity_only_question(user_text)
+    ):
+        try:
+            guidance = await plan_consultation_answer(model, user_text)
+            history.insert(
+                -1,
+                {
+                    "role": "user",
+                    "content": "回答组织建议（非医学证据，不能改变安全规则）：" + guidance,
+                },
+            )
+            planner_status = "completed"
+        except Exception:
+            logger.exception("consultation_planner_unavailable consultation_id=%s", cid)
+            planner_status = "failed"
+
+    evidence_review_enabled = bool(
+        graph_settings.multi_agent_enabled
+        and safety_reply is None
+        and answer_format == "plain"
+        and graph_result["retrieval_items"]
+        and not private_knowledge_snapshots
+    )
+    review_sources = [
+        {"reference_number": index, "title": item["title"], "content": item["content"]}
+        for index, item in enumerate(graph_result["retrieval_items"], start=1)
+    ]
 
     def encode(event: dict) -> str:
         return json.dumps(event, ensure_ascii=False, default=str) + "\n"
@@ -276,9 +344,16 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
         pending = ""
         follow_up_payload: str | None = None
         total_length = 0
+        evidence_reviewer_status = "pending" if evidence_review_enabled else "skipped"
         yield encode(
             {
                 "type": "start",
+                "workflow": consultation_workflow(
+                    graph_result,
+                    safety_reply=safety_reply is not None,
+                    planner_status=planner_status,
+                    evidence_reviewer_status=evidence_reviewer_status,
+                ),
                 "model": {
                     "id": model.id,
                     "name": model.name,
@@ -343,7 +418,8 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
                         pending = ""
                         if visible:
                             parts.append(visible)
-                            yield encode({"type": "delta", "content": visible})
+                            if not evidence_review_enabled:
+                                yield encode({"type": "delta", "content": visible})
                         break
                     marker_start = pending.find("[[")
                     if marker_start < 0:
@@ -359,7 +435,8 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
                         else:
                             visible, pending = pending[:next_marker], pending[next_marker:]
                     parts.append(visible)
-                    yield encode({"type": "delta", "content": visible})
+                    if not evidence_review_enabled:
+                        yield encode({"type": "delta", "content": visible})
             if follow_up_payload is not None:
                 card = parse_follow_up(
                     FOLLOW_UP_PREFIX + follow_up_payload,
@@ -369,14 +446,31 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
             else:
                 if pending:
                     parts.append(pending)
-                    yield encode({"type": "delta", "content": pending})
+                    if not evidence_review_enabled:
+                        yield encode({"type": "delta", "content": pending})
                 content = "".join(parts)
             if follow_up_payload is None:
+                if evidence_review_enabled:
+                    if reviewable_answer(content, review_sources):
+                        try:
+                            content = await check_answer_evidence(model, content, review_sources)
+                            evidence_reviewer_status = "completed"
+                        except Exception:
+                            logger.exception(
+                                "consultation_evidence_review_unavailable consultation_id=%s",
+                                cid,
+                            )
+                            evidence_reviewer_status = "failed"
+                    else:
+                        evidence_reviewer_status = "skipped"
                 content, verified_citations = audit_answer_citations(content, citation_snapshots)
                 content, verified_private_citations = audit_private_citations(
                     content, private_knowledge_snapshots
                 )
+                if evidence_review_enabled:
+                    yield encode({"type": "delta", "content": content})
             else:
+                evidence_reviewer_status = "skipped"
                 verified_citations = []
                 verified_private_citations = []
             message = await service.append_assistant_message(
@@ -395,10 +489,20 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
                 source_message_id=source_message_id,
             )
             yield encode(
-                {"type": "done", "message": message.model_dump(by_alias=True, mode="json")}
+                {
+                    "type": "done",
+                    "message": message.model_dump(by_alias=True, mode="json"),
+                    "workflow": consultation_workflow(
+                        graph_result,
+                        safety_reply=safety_reply is not None,
+                        phase="completed",
+                        planner_status=planner_status,
+                        evidence_reviewer_status=evidence_reviewer_status,
+                    ),
+                }
             )
         except asyncio.CancelledError:
-            if parts:
+            if parts and not evidence_review_enabled:
                 try:
                     checked, verified_citations = audit_answer_citations(
                         "".join(parts), citation_snapshots
@@ -429,7 +533,7 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
             raise
         except Exception as exc:
             await db.rollback()
-            if parts:
+            if parts and not evidence_review_enabled:
                 try:
                     checked, verified_citations = audit_answer_citations(
                         "".join(parts), citation_snapshots
@@ -459,7 +563,20 @@ async def stream_answer(cid: UUID, payload: CreateGeneration, user: CurrentUser,
                     await db.rollback()
             message = exc.message if hasattr(exc, "message") else "AI 回答生成失败，请稍后重试"
             code = exc.code if hasattr(exc, "code") else "AI_GENERATION_FAILED"
-            yield encode({"type": "error", "code": code, "message": message})
+            yield encode(
+                {
+                    "type": "error",
+                    "code": code,
+                    "message": message,
+                    "workflow": consultation_workflow(
+                        graph_result,
+                        safety_reply=safety_reply is not None,
+                        phase="failed",
+                        planner_status=planner_status,
+                        evidence_reviewer_status=evidence_reviewer_status,
+                    ),
+                }
+            )
         finally:
             schedule_health_extraction()
 

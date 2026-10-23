@@ -1,0 +1,40 @@
+name: medical-assistant-graph-eval
+
+# Disposable, loopback-only evaluation services. Never attach the app's normal
+# postgres_data or neo4j_data volumes; stopping these containers drops tmpfs data.
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.6-pg17-trixie
+    restart: "no"
+    environment:
+      POSTGRES_USER: graph_eval
+      POSTGRES_PASSWORD: graph-eval-local-only
+      POSTGRES_DB: medical_assistant_graph_eval
+    ports:
+      - "127.0.0.1:55432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    volumes:
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U graph_eval -d medical_assistant_graph_eval"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  neo4j:
+    image: neo4j:5-community
+    restart: "no"
+    environment:
+      NEO4J_AUTH: neo4j/graph-eval-local-only
+    ports:
+      - "127.0.0.1:57474:7474"
+      - "127.0.0.1:57687:7687"
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:7474 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s

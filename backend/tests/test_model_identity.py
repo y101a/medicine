@@ -54,7 +54,7 @@ async def test_each_provider_request_uses_its_own_identity_and_route(
     monkeypatch.setattr(
         provider,
         "get_settings",
-        lambda: SimpleNamespace(ai_timeout_seconds=10),
+        lambda: SimpleNamespace(ai_timeout_seconds=10, ai_output_reserve_tokens=2048),
     )
 
     chunks = [
@@ -68,6 +68,7 @@ async def test_each_provider_request_uses_its_own_identity_and_route(
     assert request.headers["Authorization"] == "Bearer test-key"
     payload = json.loads(request.content)
     assert payload["model"] == definition.id
+    assert payload["max_tokens"] == 2048
     assert payload["messages"][1:] == history[-1:]
     system_content = payload["messages"][0]["content"]
     assert definition.provider_name in system_content
@@ -127,7 +128,7 @@ async def test_system_prompt_states_the_health_record_capability(
     monkeypatch.setattr(
         provider,
         "get_settings",
-        lambda: SimpleNamespace(ai_timeout_seconds=10),
+        lambda: SimpleNamespace(ai_timeout_seconds=10, ai_output_reserve_tokens=2048),
     )
 
     [

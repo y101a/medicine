@@ -27,8 +27,7 @@ async def test_graph_context_reuses_approved_number_only(monkeypatch):
     async def explore(_db, _id):
         return PublicGraphResult(True, 1, (relation,))
 
-    monkeypatch.setattr(graph_context, "safe_search_topic", lambda _text: "测试主题")
-    monkeypatch.setattr(graph_context, "find_public_concepts", concepts)
+    monkeypatch.setattr(graph_context, "find_public_question_concepts", concepts)
     monkeypatch.setattr(graph_context, "explore_public_graph", explore)
     citations = [
         {"canonical_url": "https://example.org/prototype", "trust_level": "prototype"},

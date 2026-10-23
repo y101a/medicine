@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     ai_base_url: str = "https://api.openai.com/v1"
     ai_model: str | None = None
     ai_timeout_seconds: float = 90
+    # Operator budget, not a claim about any provider's advertised window.
+    ai_context_budget_tokens: int = Field(default=32_768, ge=8_192, le=1_000_000)
+    ai_output_reserve_tokens: int = Field(default=2_048, ge=256, le=8_192)
     avatar_storage_dir: str = "data/avatars"
 
     # Named providers. Keys are SecretStr so settings repr/logging masks their values.
@@ -144,6 +147,8 @@ class Settings(BaseSettings):
     document_generation_limit_daily: int = Field(default=10, ge=1, le=100)
     document_generation_lease_seconds: int = Field(default=300, ge=60, le=900)
     document_generation_orphan_hours: int = Field(default=24, ge=1, le=168)
+    # Explicit opt-in: specialist model calls add cost and repeated provider transfer.
+    multi_agent_enabled: bool = False
 
     # Consultation document extraction stays local until the user sends a question.
     # 2026-09-21（用户确认的方案 B）把这三项放宽：手机扫描的多页 PDF 经常同时撞体积与页数上限。
@@ -227,6 +232,12 @@ class Settings(BaseSettings):
                 or self.aliyun_pnvs_access_key_secret is None
             ):
                 raise ValueError("生产环境必须配置阿里云短信认证 RAM AccessKey")
+        return self
+
+    @model_validator(mode="after")
+    def validate_ai_context_budget(self) -> Self:
+        if self.ai_output_reserve_tokens + 4_800 >= int(self.ai_context_budget_tokens * 0.9):
+            raise ValueError("AI 上下文预算必须为输出和历史摘要留出空间")
         return self
 
     @field_validator("embedding_dimensions")

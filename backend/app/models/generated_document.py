@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -36,6 +37,12 @@ class GeneratedDocument(Base):
     client_request_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     requested_formats: Mapped[list[str]] = mapped_column(ARRAY(String(8)), nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="queued")
+    workflow_stage: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="queued", server_default="queued"
+    )
+    multi_agent_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     model: Mapped[str] = mapped_column(String(128), nullable=False)
     template_mode: Mapped[str] = mapped_column(
         String(16), nullable=False, default="default", server_default="default"

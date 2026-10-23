@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import get_settings
 from app.core.errors import AppError
+from app.core.password_work import run_password_work
 from app.core.security import (
     create_access_token,
     decrypt_sensitive,
@@ -160,14 +161,25 @@ async def login_user(
     credentials = user.credentials if user else None
 
     if not user or not credentials:
-        hash_password(payload.password)
+        await run_password_work(hash_password, payload.password)
         raise AppError(401, "INVALID_CREDENTIALS", "用户名或密码错误")
 
     now = datetime.now(UTC)
     if credentials.locked_until and credentials.locked_until > now:
         raise AppError(423, "ACCOUNT_LOCKED", "登录失败次数过多，请稍后再试")
 
-    if not verify_password(payload.password, credentials.password_hash):
+    checked_hash = credentials.password_hash
+    password_valid = await run_password_work(verify_password, payload.password, checked_hash)
+    # Offloaded checks can finish concurrently. Lock and reload before updating
+    # the failure counter so parallel failures cannot overwrite each other.
+    await db.refresh(credentials, with_for_update=True)
+    now = datetime.now(UTC)
+    if credentials.password_hash != checked_hash:
+        raise AppError(401, "INVALID_CREDENTIALS", "用户名或密码错误")
+    if credentials.locked_until and credentials.locked_until > now:
+        raise AppError(423, "ACCOUNT_LOCKED", "登录失败次数过多，请稍后再试")
+
+    if not password_valid:
         credentials.failed_attempts += 1
         if credentials.failed_attempts >= MAX_FAILED_ATTEMPTS:
             credentials.locked_until = now + timedelta(minutes=LOCK_MINUTES)

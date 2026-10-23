@@ -1,0 +1,87 @@
+{
+  "package": "graph_evaluation_batch1",
+  "status": "all_candidates_pending_human_review",
+  "data_scope": "evaluation_only",
+  "medical_review_label": "暂未经专业医学审核",
+  "eligible_for_publication": false,
+  "selection_policy": "仅保留原文可直接定位、无个案泛化或个人用药处方的候选关系；不导入正式知识库",
+  "topics": [
+    {
+      "topic_key": "pediatric_fever",
+      "title": "儿童发热科普（隔离评测摘录）",
+      "source": {"url": "https://wjw.beijing.gov.cn/bmfw_20143/jkzs/jksh/202512/t20251216_4344978.html", "publisher": "首都医科大学附属北京佑安医院"},
+      "excerpts": [
+        "当孩子因为发烧表现出明显不适时（通常是体温超过38.5℃，且精神差）。主要目的是缓解不适，而非追求体温正常。",
+        "减少衣物、降低室温、保证液体摄入。让孩子感觉凉爽舒适即可。",
+        "让孩子穿盖轻薄 → 鼓励多喝水 → 观察精神状态。"
+      ],
+      "concepts": [
+        {"concept_type": "topic", "canonical_name": "儿童发热"},
+        {"concept_type": "symptom", "canonical_name": "发热伴明显不适", "evidence": "孩子因为发烧表现出明显不适"},
+        {"concept_type": "self_care", "canonical_name": "减少衣物与保证液体摄入", "evidence": "减少衣物、降低室温、保证液体摄入"},
+        {"concept_type": "self_care", "canonical_name": "观察精神状态", "evidence": "观察精神状态"}
+      ],
+      "candidate_triples": [
+        {"subject": "儿童发热", "predicate": "MAY_INCLUDE_SYMPTOM", "object": "发热伴明显不适", "evidence_excerpt": "孩子因为发烧表现出明显不适", "review": {"decision": "pending"}},
+        {"subject": "儿童发热", "predicate": "HAS_SELF_CARE_TOPIC", "object": "减少衣物与保证液体摄入", "evidence_excerpt": "减少衣物、降低室温、保证液体摄入", "review": {"decision": "pending"}},
+        {"subject": "儿童发热", "predicate": "HAS_SELF_CARE_TOPIC", "object": "观察精神状态", "evidence_excerpt": "观察精神状态", "review": {"decision": "pending"}}
+      ]
+    },
+    {
+      "topic_key": "temperature_regulation",
+      "title": "发热与炎症（隔离评测摘录）",
+      "source": {"url": "https://wjw.beijing.gov.cn/bmfw_20143/jkzs/jksh/202509/t20250930_4214811.html", "publisher": "北京市垂杨柳医院"},
+      "excerpts": [
+        "发炎（炎症）是人体对损伤或感染的一种防御反应",
+        "发炎的五大典型表现：\n红--血流增加\n肿--液体渗出\n热--局部温度升高\n痛--神经受刺激\n功能障碍",
+        "当身体某处发炎时，免疫细胞（如巨噬细胞）会释放炎症介质",
+        "这些物质通过血液到达大脑，作用于下丘脑的体温调节中枢，导致前列腺素E2合成增加，最终将体温“调高”。"
+      ],
+      "concepts": [
+        {"concept_type": "topic", "canonical_name": "发热"},
+        {"concept_type": "topic", "canonical_name": "炎症"},
+        {"concept_type": "symptom", "canonical_name": "局部红肿热痛与功能障碍", "evidence": "红--血流增加\n肿--液体渗出\n热--局部温度升高\n痛--神经受刺激\n功能障碍"}
+      ],
+      "candidate_triples": [
+        {"subject": "发热", "predicate": "RELATED_TOPIC", "object": "炎症", "evidence_excerpt": "当身体某处发炎时，免疫细胞（如巨噬细胞）会释放炎症介质", "review": {"decision": "pending"}},
+        {"subject": "炎症", "predicate": "MAY_INCLUDE_SYMPTOM", "object": "局部红肿热痛与功能障碍", "evidence_excerpt": "发炎的五大典型表现", "review": {"decision": "pending"}}
+      ]
+    },
+    {
+      "topic_key": "rational_antibiotic_use",
+      "title": "抗菌药物使用（隔离评测摘录）",
+      "source": {"url": "https://wjw.beijing.gov.cn/bmfw_20143/jkzs/jksh/202605/t20260506_4638136.html", "publisher": "北京市垂杨柳医院"},
+      "excerpts": [
+        "盲目服用完全无效，还会产生耐药细菌",
+        "抗菌药物必须由医生根据病情、血常规、细菌培养等检查结果判断，切勿自行买药。不要擅自加量、减量、停药。"
+      ],
+      "concepts": [
+        {"concept_type": "topic", "canonical_name": "抗菌药物"},
+        {"concept_type": "topic", "canonical_name": "细菌耐药"},
+        {"concept_type": "self_care", "canonical_name": "不自行购买或擅自调整抗菌药", "evidence": "切勿自行买药。不要擅自加量、减量、停药"}
+      ],
+      "candidate_triples": [
+        {"subject": "抗菌药物", "predicate": "RELATED_TOPIC", "object": "细菌耐药", "evidence_excerpt": "还会产生耐药细菌", "review": {"decision": "pending"}},
+        {"subject": "抗菌药物", "predicate": "HAS_SELF_CARE_TOPIC", "object": "不自行购买或擅自调整抗菌药", "evidence_excerpt": "切勿自行买药。不要擅自加量、减量、停药", "review": {"decision": "pending"}}
+      ]
+    },
+    {
+      "topic_key": "safe_activity_start",
+      "title": "科学运动（隔离评测摘录）",
+      "source": {"url": "https://wjw.beijing.gov.cn/xwzx_20031/jcdt/202504/t20250423_4072360.html", "publisher": "北京大学第三医院"},
+      "excerpts": [
+        "运动需要遵循“因人而异、循序渐进”的原则。首先，运动前要做好适当的准备活动，注意运动场地和环境因素。",
+        "如果受伤瞬间听到响声，感受到关节错动，或受伤后肢体有变形以及剧烈疼痛、迅速肿胀，一般来说可能存在关节脱位、韧带断裂或骨折，这种情况下要禁止活动，及时就医。"
+      ],
+      "concepts": [
+        {"concept_type": "topic", "canonical_name": "科学运动"},
+        {"concept_type": "self_care", "canonical_name": "循序渐进并做好准备活动", "evidence": "运动前要做好适当的准备活动"},
+        {"concept_type": "red_flag", "canonical_name": "严重运动损伤需停止活动并就医", "evidence": "这种情况下要禁止活动，及时就医"}
+      ],
+      "candidate_triples": [
+        {"subject": "科学运动", "predicate": "HAS_SELF_CARE_TOPIC", "object": "循序渐进并做好准备活动", "evidence_excerpt": "运动前要做好适当的准备活动", "review": {"decision": "pending"}},
+        {"subject": "科学运动", "predicate": "HAS_RED_FLAG", "object": "严重运动损伤需停止活动并就医", "evidence_excerpt": "这种情况下要禁止活动，及时就医", "review": {"decision": "pending"}}
+      ]
+    }
+  ]
+}
